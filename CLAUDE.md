@@ -1,17 +1,18 @@
 # Vird — Claude Çalışma Kuralları
 
-Proje dokümanı: `vird_proje_dokumani.md`
-Tasarım sistemi: `Tasarım Dosyaları/vird_tasarim.md`
+Proje dokümanı: `docs/vird_proje_dokumani.md`
+Tasarım sistemi: `docs/vird_tasarim.md`
+Görev listesi: `docs/todo.md`
 Stack: Flutter + Firebase
 
 ## Hangi Durumda Hangi Dosya
 
 | Durum | Oku |
 |---|---|
-| Yeni özellik / genel soru | `vird_proje_dokumani.md` |
-| UI, widget, ekran tasarımı | `Tasarım Dosyaları/vird_tasarim.md` |
-| Renk, tipografi, animasyon | `Tasarım Dosyaları/vird_tasarim.md` |
-| Hata ayıklama, bug fix | `tasks/lessons.md` (varsa) |
+| Yeni özellik / genel soru | `docs/vird_proje_dokumani.md` |
+| UI, widget, ekran tasarımı | `docs/vird_tasarim.md` |
+| Renk, tipografi, animasyon | `docs/vird_tasarim.md` |
+| Görev takibi | `docs/todo.md` |
 | Ne yapılacak belirsiz | İkisini de oku |
 
 ---
@@ -44,19 +45,19 @@ Stack: Flutter + Firebase
 
 ## 5. Öz-İyileştirme
 
-- Herhangi bir düzeltme sonrası `tasks/lessons.md` güncelle
+- Herhangi bir düzeltme sonrası `docs/lessons.md` güncelle
 - Aynı hatanın tekrarını önleyecek kural yaz
-- Session başında `tasks/lessons.md` gözden geçir
+- Session başında `docs/lessons.md` gözden geçir
 
 ---
 
 ## Görev Yönetimi
 
-1. `tasks/todo.md`'ye checkable maddeler olarak plan yaz
+1. `docs/todo.md`'ye checkable maddeler olarak plan yaz
 2. Uygulamaya başlamadan önce planı doğrula
 3. Giderken tamamlananları işaretle
 4. Her adımda kısa özet ver
-5. Düzeltmelerden sonra `tasks/lessons.md` güncelle
+5. Düzeltmelerden sonra `docs/lessons.md` güncelle
 
 ---
 
@@ -74,8 +75,8 @@ Stack: Flutter + Firebase
 
 - **Önce basitlik:** Her değişikliği minimal tut
 - **Root cause:** Geçici fix yok, gerçek sebebi bul
-- **Tasarıma sadık:** Her UI kararı `vird_tasarim.md`'e uygun olmalı
-- **Dinî hassasiyet:** Metin ve ton her zaman `vird_tasarim.md` Bölüm 13'e göre
+- **Tasarıma sadık:** Her UI kararı `docs/vird_tasarim.md`'e uygun olmalı
+- **Dinî hassasiyet:** Metin ve ton her zaman `docs/vird_tasarim.md` Bölüm 13'e göre
 
 ---
 
