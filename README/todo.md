@@ -20,12 +20,15 @@
 
 ---
 
-## Modül 2: Auth — Yapılacaklar
+## Modül 2: Auth & Profil — TAMAMLANDI (22 Nisan 2026)
 
-- [ ] Firebase projesi oluştur (console.firebase.google.com)
-- [ ] FlutterFire CLI ile projeye bağla
-- [ ] Google Sign-In + Email/Password auth entegre et
-- [ ] Giriş ekranı (splash → onboarding → login)
-- [ ] Kayıt ekranı (isim, kullanıcı adı, email zorunlu; şehir/üniversite opsiyonel)
-- [ ] Profil oluşturma adımı (kayıt sonrası)
-- [ ] Auth state yönetimi (giriş yapıldıysa ana ekran, yoksa login)
+- [x] Firebase entegrasyonu yapıldı (Authentication & Firestore Test Modu).
+- [x] Onboarding ekranı `SharedPreferences` ile entegre edilip sadece ilk açılışta gösterilmesi sağlandı.
+- [x] E-posta/Şifre ile Kayıt Ol ve Giriş Yap sayfaları oluşturuldu.
+- [x] **Ekstra:** Firebase `signInWithPopup` ile Web için "Google ile Giriş Yap / Kayıt Ol" özelliği butonu ve altyapısı eklendi.
+- [x] `AuthWrapper` yazılarak giriş durumuna göre (Giriş yaptıysa MainScreen, yapmadıysa LoginScreen) otomatik yönlendirme sağlandı.
+- [x] Profil sekmesi Firestore'a bağlanarak ismin, şehrin ve üniversitenin canlı olarak çekildiği dinamik bir karta çevrildi.
+- [x] **Ekstra:** Profil sayfasında anında güncellemeler yapabilmek için (sayfa değiştirmeden) alttan açılan (BottomSheet) "Profili Güncelle" ekranı yapıldı.
+- [x] **Ekstra:** `dropdown_search` paketi ile "Şehir" ve "Üniversite" alanlarına arama yapılabilen gelişmiş menüler bağlandı (Tüm iller ve üniversiteler eklendi, özel Türkçe karakter filtresi yazıldı).
+- [x] **Ekstra:** Profil sayfasında İsim güncelleme özelliği eklendi.
+- [x] **Ekstra:** Firebase Storage kısıtlamalarına/maliyetlerine takılmamak adına 20 adet Premium Avatar (DiceBear Micah) seçimi yapıldı, profil fotoğrafları sıfır maliyetle sisteme entegre edildi.

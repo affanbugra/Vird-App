@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "33941601352",
+    "project_id": "vird-app-52db1",
+    "storage_bucket": "vird-app-52db1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33941601352:android:eddc28e3f867d5976b2c7d",
+        "android_client_info": {
+          "package_name": "com.example.vird_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "33941601352-36d90l1dao3jci6jmjca0dscec07n9j7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKftU-WekcTsepLJLICfcdzSEaXfsTYJ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "33941601352-36d90l1dao3jci6jmjca0dscec07n9j7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

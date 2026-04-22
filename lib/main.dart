@@ -1,17 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_options.dart';
 import 'app_colors.dart';
+import 'providers/auth_provider.dart';
+import 'screens/auth/splash_screen.dart';
+import 'screens/auth/onboarding_screen.dart';
+import 'screens/auth/login_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
 import 'screens/vird_screen.dart';
 
-void main() {
-  runApp(const VirdApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  final prefs = await SharedPreferences.getInstance();
+  final showHome = prefs.getBool('showHome') ?? false;
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: VirdApp(showHome: showHome),
+    ),
+  );
 }
 
 class VirdApp extends StatelessWidget {
-  const VirdApp({super.key});
+  final bool showHome;
+  const VirdApp({super.key, required this.showHome});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +47,48 @@ class VirdApp extends StatelessWidget {
         textTheme: GoogleFonts.nunitoTextTheme(),
         scaffoldBackgroundColor: AppColors.white,
       ),
-      home: const MainScreen(),
+      home: AuthWrapper(initialShowHome: showHome),
+    );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  final bool initialShowHome;
+  const AuthWrapper({super.key, required this.initialShowHome});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  late bool _showHome;
+
+  @override
+  void initState() {
+    super.initState();
+    _showHome = widget.initialShowHome;
+  }
+
+  void _completeOnboarding() {
+    setState(() {
+      _showHome = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, child) {
+        if (auth.isLoading) {
+          return const SplashScreen();
+        }
+        if (auth.isAuthenticated) {
+          return const MainScreen();
+        }
+        return _showHome 
+            ? const LoginScreen() 
+            : OnboardingScreen(onCompleted: _completeOnboarding);
+      },
     );
   }
 }
