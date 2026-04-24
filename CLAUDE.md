@@ -1,8 +1,12 @@
 # Vird — Claude Çalışma Kuralları
 
+**Oturum başında HER ZAMAN oku:** `README/lessons.md` (proje durumu + dersler + Kuran veri sistemi)
+Tüm notlar `README/` klasöründedir — proje dışı hafıza dosyası kullanılmaz.
+
 Proje dokümanı: `README/vird_proje_dokumani.md`
 Tasarım sistemi: `README/vird_tasarim.md`
 Görev listesi: `README/todo.md`
+Dersler & bağlam: `README/lessons.md`
 Stack: Flutter + Firebase
 
 ## Hangi Durumda Hangi Dosya
@@ -13,6 +17,7 @@ Stack: Flutter + Firebase
 | UI, widget, ekran tasarımı | `README/vird_tasarim.md` |
 | Renk, tipografi, animasyon | `README/vird_tasarim.md` |
 | Görev takibi | `README/todo.md` |
+| Geliştirme ortamı, geçmiş dersler | `README/lessons.md` |
 | Ne yapılacak belirsiz | İkisini de oku |
 
 ---
