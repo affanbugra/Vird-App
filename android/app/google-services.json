@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "76964777636",
+    "project_id": "vird-fc834",
+    "storage_bucket": "vird-fc834.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:76964777636:android:74951407ab9810f33fa031",
+        "android_client_info": {
+          "package_name": "com.example.vird_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAErTjZoyQiKUagJH_UZE2X9A1EA4Hchn0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
