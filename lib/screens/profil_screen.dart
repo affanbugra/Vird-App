@@ -32,8 +32,6 @@ class ProfilScreen extends StatefulWidget {
 class _ProfilScreenState extends State<ProfilScreen> {
   HeatFilter _filter = HeatFilter.all;
   int? _selectedPage;
-  // MVP: boş — Firestore log modülünde doldurulacak
-  final Map<int, int> _readings = {};
 
   void _showSettings(BuildContext context) {
     final auth = context.read<AuthProvider>();
@@ -50,6 +48,55 @@ class _ProfilScreenState extends State<ProfilScreen> {
         },
       ),
     );
+  }
+
+  /// Firestore loglarından sayfa bazlı okuma sayılarını hesaplar
+  Map<int, int> _buildReadingsFromLogs(List<QueryDocumentSnapshot> logs) {
+    final Map<int, int> readings = {};
+    for (final doc in logs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final startPage = data['startPage'] as int?;
+      final endPage = data['endPage'] as int?;
+
+      if (startPage != null && endPage != null) {
+        // Sayfa aralığındaki tüm sayfaları say
+        for (int p = startPage; p <= endPage && p <= 604; p++) {
+          readings[p] = (readings[p] ?? 0) + 1;
+        }
+      } else {
+        // startPage/endPage yoksa pagesRead ile hatim ilerlemesi — genel sayaç
+        // Bu loglar haritada gösterilmez ama hasanat/totalPages'te sayılır
+      }
+    }
+    return readings;
+  }
+
+  /// Filtreye göre Firestore query oluşturur
+  Query<Map<String, dynamic>> _buildLogsQuery(String uid) {
+    var query = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('logs')
+        .orderBy('createdAt', descending: true);
+
+    // Meal filtresi — sadece meal tipindeki loglar
+    if (_filter == HeatFilter.meal) {
+      query = query.where('type', isEqualTo: 'meal');
+    } else if (_filter != HeatFilter.all) {
+      // Arapça logları göster (meal hariç tüm filtreler arapça bazlı)
+      query = query.where('type', isEqualTo: 'arapca');
+    }
+
+    // Tarih filtreleri
+    if (_filter == HeatFilter.month) {
+      final cutoff = DateTime.now().subtract(const Duration(days: 30));
+      query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff));
+    } else if (_filter == HeatFilter.year) {
+      final cutoff = DateTime.now().subtract(const Duration(days: 365));
+      query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff));
+    }
+
+    return query;
   }
 
   @override
@@ -81,49 +128,58 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final hatimCount = (data?['hatimCount'] as int?) ?? 0;
         final totalPages = (data?['totalPages'] as int?) ?? 0;
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ProfileHeader(
-                name: name,
-                username: username,
-                city: city,
-                university: uni,
-                avatarSeed: avatarSeed,
-                isPro: isPro,
-                isHafiz: isHafiz,
-                onSettingsTap: () => _showSettings(context),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    _StatGrid(
-                      seri: seri,
-                      hasanat: hasanat,
-                      hatimCount: hatimCount,
-                      totalPages: totalPages,
+        return StreamBuilder<QuerySnapshot>(
+          stream: _buildLogsQuery(user.uid).snapshots(),
+          builder: (context, logsSnapshot) {
+            final readings = logsSnapshot.hasData
+                ? _buildReadingsFromLogs(logsSnapshot.data!.docs)
+                : <int, int>{};
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ProfileHeader(
+                    name: name,
+                    username: username,
+                    city: city,
+                    university: uni,
+                    avatarSeed: avatarSeed,
+                    isPro: isPro,
+                    isHafiz: isHafiz,
+                    onSettingsTap: () => _showSettings(context),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        _StatGrid(
+                          seri: seri,
+                          hasanat: hasanat,
+                          hatimCount: hatimCount,
+                          totalPages: totalPages,
+                        ),
+                        const SizedBox(height: 12),
+                        _KuranHaritasiCard(
+                          filter: _filter,
+                          readings: readings,
+                          selectedPage: _selectedPage,
+                          onFilterChanged: (f) => setState(() {
+                            _filter = f;
+                            _selectedPage = null;
+                          }),
+                          onPageTap: (p) => setState(() => _selectedPage = p),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _KuranHaritasiCard(
-                      filter: _filter,
-                      readings: _readings,
-                      selectedPage: _selectedPage,
-                      onFilterChanged: (f) => setState(() {
-                        _filter = f;
-                        _selectedPage = null;
-                      }),
-                      onPageTap: (p) => setState(() => _selectedPage = p),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

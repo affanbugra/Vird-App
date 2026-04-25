@@ -20,16 +20,16 @@
 | 1 | Kurulum | ✅ Tamamlandı |
 | 2 | Auth (Google + email, Firebase) | ✅ Tamamlandı |
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
-| 4 | Hatimlerim ekranı | ⬜ |
-| 5 | Log girişi | ⬜ |
+| 4 | Hatimlerim ekranı | ✅ Tamamlandı |
+| 5 | Log girişi | ✅ Tamamlandı |
 | 6 | Seri sistemi | ⬜ |
 | 7 | Sure serii | ⬜ |
-| 8 | Hasanat sistemi | ⬜ |
-| 9 | Kuran Haritası (UI ✅, veri bağlantısı ⬜) | 🔶 Kısmen |
+| 8 | Hasanat sistemi | ✅ Tamamlandı |
+| 9 | Kuran Haritası (UI ✅, veri bağlantısı ✅) | ✅ Tamamlandı |
 | 10 | Offline mode | ⬜ |
 | 11 | Ekip sistemi | ⬜ |
 | 12 | Liderboard | ⬜ |
-| 13 | Profil (UI ✅) | 🔶 Kısmen |
+| 13 | Profil (UI ✅, ısı haritası veri bağlantısı ✅) | ✅ Tamamlandı |
 | 14 | Bildirimler | ⬜ |
 | 15 | Rozetler | ⬜ |
 | 16 | Vird sekmesi (UI + Firestore form) | ✅ Tamamlandı |
@@ -185,6 +185,82 @@ QuranData.cuzler                    // List<CuzInfo> — 30 cüz
 
 ---
 
+### Modül 4 & 5 — Hatimlerim + Log Girişi (2026-04-25)
+
+> Collaborator tarafından geliştirildi, ana projeye entegre edildi.
+
+#### Dosyalar
+- `lib/screens/hatimlerim_screen.dart` — Hatimlerim sekmesi (tam fonksiyonel)
+- `lib/widgets/log_entry_bottom_sheet.dart` — 3 tab'lı okuma kaydı bottom sheet
+- `lib/models/hatim_model.dart` — Hatim veri modeli
+- `lib/models/reading_log_model.dart` — Okuma log veri modeli
+
+#### Hatimlerim Ekranı
+1. **Seri & Hasanat kartları** — Firestore'dan `seri` ve `hasanat` alanları canlı
+2. **Aktif Hatimler listesi** — StreamBuilder ile gerçek zamanlı
+3. **Yeni Hatim Başlat** — FAB ile bottom sheet; Arapça + Meal seçimi, max 2 aktif hatim
+4. **Serbest Okuma** — Sağ üst `post_add` ikonu ile hatim dışı log girişi
+
+#### Log Girişi Bottom Sheet
+- **3 tab:** Hatim Devam | Sure | Sayfa
+- **Hatim Devam:** Kaldığı sayfayı gösterir, +X sayfa giriş
+- **Sure:** `DropdownSearch<SurahInfo>` — `QuranData.surahlar` listesinden seçim, sayfa sayısı otomatik hesaplama
+- **Sayfa:** Başlangıç-Bitiş sayfa aralığı giriş
+- **Arapça/Meal toggle:** Hatimden açılırsa tip sabit, serbest girişte seçilebilir
+- **Firestore işlemleri:** Log kaydı + hatim ilerlemesi + hasanat/totalPages güncelleme — tek `batch.commit()`
+
+#### Kuran Veri Adaptasyonu
+- **QuranProvider/QuranService/JSON sistemi kullanılMIYOR** — `QuranData` (static const) sistemi baz alındı
+- Sure listesi: `QuranData.surahlar` (114 SurahInfo)
+- Sayfa hesaplama: lokal `_calculatePages()` ve `_getSurahPages()` metotları
+
+#### FAB Bağlantısı (main.dart)
+- Ortadaki `+` FAB → `LogEntryBottomSheet.show(context)` çağrısı
+- `widgets/log_entry_bottom_sheet.dart` import'u eklendi
+
+#### Firestore Şeması
+```
+users/{uid}/hatims/{hatimId}
+  type: 'arapca' | 'meal'
+  currentPage: int
+  totalPages: 604
+  createdAt: Timestamp
+  updatedAt: Timestamp
+
+users/{uid}/logs/{logId}
+  type: 'arapca' | 'meal'
+  method: 'hatim' | 'surah' | 'pages'
+  pagesRead: int
+  surahId: int?
+  startPage: int?
+  endPage: int?
+  hatimId: string?
+  createdAt: Timestamp
+```
+
+---
+
+### Modül 8, 9 & 13 — Hasanat + Kuran Haritası Veri Bağlantısı + Profil (2026-04-25)
+
+> Collaborator tarafından geliştirildi.
+
+#### Hasanat Sistemi (Modül 8)
+- **Formül:** 1 sayfa = 10 hasanat
+- Log kaydında `FieldValue.increment(pagesRead * 10)` ile `hasanat` alanı güncellenir
+- `totalPages` da aynı batch'te `FieldValue.increment(pagesRead)` ile güncellenir
+
+#### Kuran Haritası Veri Bağlantısı (Modül 9)
+- `profil_screen.dart`'taki `_readings` map'i artık Firestore'dan dolduruluyor
+- `_buildReadingsFromLogs()` — log kayıtlarındaki `startPage`-`endPage` aralığını sayfa bazlı okuma sayısına çevirir
+- `_buildLogsQuery()` — filtre bazlı Firestore query:
+  - **Tüm zamanlar:** tüm loglar (filtre yok)
+  - **Son 1 ay:** `createdAt >= 30 gün önce` + `type == 'arapca'`
+  - **Son 1 yıl:** `createdAt >= 365 gün önce` + `type == 'arapca'`
+  - **Meal:** `type == 'meal'`
+- `StreamBuilder<QuerySnapshot>` ile gerçek zamanlı güncelleme
+
+---
+
 ## Öğrenilen Dersler
 
 - `withOpacity()` deprecated → `withValues(alpha: ...)` kullan
@@ -194,3 +270,6 @@ QuranData.cuzler                    // List<CuzInfo> — 30 cüz
 - JPEG'de alpha kanalı yok → `ColorFiltered(BlendMode.srcIn)` boş/siyah kutu gösterir; logo tinting için `Opacity` kullan
 - Yeni asset eklenince hot reload yetmez → `flutter clean` + tam `flutter run` gerekir
 - UI metni (buton, açıklama, başlık) yazılmadan önce kullanıcıya öner ve onay al — direkt yazma
+- Farklı Kuran veri sistemleri varsa (JSON+Provider vs Static Const) → ana projenin sistemini baz al, uyumluluk sağla
+- Collaborator entegrasyonunda Firestore alan isimlerini ana projeyle eşle (ör: `currentStreak` → `seri`)
+- `FieldValue.increment()` kullanarak batch içinde atomik güncelleme yap — race condition önlenir

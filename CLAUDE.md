@@ -10,6 +10,7 @@ README/ klasöründe 4 dosya var. Her birinin **tek** bir sorumluluğu var.
 | `README/todo.md` | Şu an ne yapılıyor? | Görev alırken / modül başlarken |
 | `README/vird_proje_dokumani.md` | Ne yapıyoruz? (Spec) | Yeni özellik, mimari soru |
 | `README/vird_tasarim.md` | Nasıl görünmeli? | **Her UI işinde — zorunlu** |
+| `README/lessons.md` | Ne öğrendik? (Teknik dersler) | Hata tekrarı önleme |
 
 ### STATUS.md
 Projenin hafızası. Şunları içerir:
@@ -46,8 +47,32 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 | Seri / hasanat hesabı | Client'ta hesapla, sonucu Firestore'a yaz | Her açılışta sunucuya sorgu atmamak için |
 | Offline mode | Firestore cache açık (`persistenceEnabled`) | Ayrı local storage mantığı yazmaya gerek yok |
 | Realtime Database | Kullanılmıyor — her şey Firestore'da | İki veritabanı = fazladan karmaşıklık ve maliyet |
+| Kuran veri sistemi | `QuranData` static const (`data/quran_cuz.dart`) | JSON+Provider'dan daha verimli, runtime yükü yok |
+| Log & Hatim batch | `batch.commit()` ile atomik yazma | Race condition önlenir, tek ağ çağrısı |
 
 **Firestore güvenlik kuralları notu:** Test modu 30 günde sürüyor. Yeni koleksiyon eklerken kurallara da ekle, yoksa yazma işlemleri hata verir.
+
+**Firestore Şeması (Log & Hatim):**
+```
+users/{uid}/hatims/{hatimId}
+  type: 'arapca' | 'meal'
+  currentPage: int
+  totalPages: 604
+  createdAt, updatedAt: Timestamp
+
+users/{uid}/logs/{logId}
+  type: 'arapca' | 'meal'
+  method: 'hatim' | 'surah' | 'pages'
+  pagesRead: int
+  surahId, startPage, endPage: int?
+  hatimId: string?
+  createdAt: Timestamp
+
+users/{uid} (root doc fields)
+  hasanat: int (FieldValue.increment ile güncellenir)
+  totalPages: int (FieldValue.increment ile güncellenir)
+  seri: int
+```
 
 ---
 

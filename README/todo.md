@@ -6,22 +6,22 @@
 
 ## Aktif
 
-*(Modül 4 ve 5 — arkadaş branch'inde: hatimlerim ekranı + log girişi)*
+*(Şu an aktif görev yok — MVP backlog'dan sıradaki modüle geçilecek)*
 
 ---
 
 ## MVP Backlog (sırayla)
 
-- [ ] 4 — Hatimlerim ekranı (aktif hatimler, yeni hatim ekleme, üstte özet) — arkadaş yapıyor
-- [ ] 5 — Log girişi (sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi) — arkadaş yapıyor
+- [x] 4 — Hatimlerim ekranı (aktif hatimler, yeni hatim ekleme, üstte özet) ✅
+- [x] 5 — Log girişi (sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi) ✅
 - [ ] 6 — Seri sistemi (sayaç, freeze, repair, perfect seri, Cuma bonusu)
 - [ ] 7 — Sure serii (sure seçme, günlük log, sure bazlı sayaç)
-- [ ] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç)
-- [ ] 9 — Kuran Haritası veri bağlantısı (UI hazır, Firestore log modülüne bağlanacak)
+- [x] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç) ✅
+- [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅
 - [ ] 10 — Offline mode (cihaza kayıt, bağlantı gelince senkronizasyon)
 - [ ] 11 — Ekip sistemi (oluşturma, katılım, yönetim, ceza sistemi)
 - [ ] 12 — Liderboard (haftalık sıralama, Cuma 13:00 sıfırlama, madalyalar)
-- [ ] 13 — Profil veri bağlantısı (UI hazır, istatistik ve rozet verisi bağlanacak)
+- [x] 13 — Profil veri bağlantısı (ısı haritası Firestore loglarına bağlandı) ✅
 - [ ] 14 — Bildirimler (tüm bildirim tipleri)
 - [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri)
 - [x] 16 — Vird sekmesi (öneri formu, yol haritası, hakkında) ✅

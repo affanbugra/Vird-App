@@ -34,7 +34,7 @@
 | **Mobil Framework** | Flutter |
 | **Backend** | Firebase |
 | **Geliştirme** | Claude Code (terminal + VS Code) |
-| **Kuran Verisi** | Quran.com API'den geliştirme aşamasında bir kere çekilir, JSON olarak projeye gömülür |
+| **Kuran Verisi** | `lib/data/quran_cuz.dart` — Static Dart const (114 sure, 30 cüz, sayfa haritası) |
 | **Test** | Windows bilgisayar, Android emülatör |
 | **iOS Build** | Zamanı gelince Mac erişimi sağlanacak |
 | **Offline Mode** | Log girişleri internet yokken cihaza kaydedilir, bağlantı gelince otomatik senkronize olur |

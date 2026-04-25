@@ -14,6 +14,7 @@ import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
 import 'screens/vird_screen.dart';
+import 'widgets/log_entry_bottom_sheet.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -139,7 +140,7 @@ class _LogFABState extends State<_LogFAB> {
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
       onTap: () {
-        // TODO: Log girişi ekranını aç (Modül 5)
+        LogEntryBottomSheet.show(context);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
