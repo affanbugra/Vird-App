@@ -14,8 +14,8 @@
 
 - [ ] 4 — Hatimlerim ekranı (aktif hatimler, yeni hatim ekleme, üstte özet) — arkadaş yapıyor
 - [ ] 5 — Log girişi (sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi) — arkadaş yapıyor
-- [ ] 6 — Streak sistemi (sayaç, freeze, repair, perfect streak, Cuma bonusu)
-- [ ] 7 — Sure streaki (sure seçme, günlük log, sure bazlı sayaç)
+- [ ] 6 — Seri sistemi (sayaç, freeze, repair, perfect seri, Cuma bonusu)
+- [ ] 7 — Sure serii (sure seçme, günlük log, sure bazlı sayaç)
 - [ ] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç)
 - [ ] 9 — Kuran Haritası veri bağlantısı (UI hazır, Firestore log modülüne bağlanacak)
 - [ ] 10 — Offline mode (cihaza kayıt, bağlantı gelince senkronizasyon)
@@ -23,8 +23,8 @@
 - [ ] 12 — Liderboard (haftalık sıralama, Cuma 13:00 sıfırlama, madalyalar)
 - [ ] 13 — Profil veri bağlantısı (UI hazır, istatistik ve rozet verisi bağlanacak)
 - [ ] 14 — Bildirimler (tüm bildirim tipleri)
-- [ ] 15 — Rozetler (streak, hatim, okuma, ekip rozetleri)
-- [ ] 16 — Vird sekmesi (öneri formu, duyurular)
+- [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri)
+- [x] 16 — Vird sekmesi (öneri formu, yol haritası, hakkında) ✅
 - [ ] QA & Yayın öncesi test — tüm modüller bitince her akış için bug testi; `/systematic-debugging` ve `/tdd` skill'leri kullanılacak
 
 ---
@@ -58,16 +58,22 @@
 
 ### Hesap & Ayarlar
 - [ ] Google ile giren kullanıcılar için şifre oluşturma (Ayarlar ekranından e-posta + yeni şifre belirleme)
+- [ ] Profil avatarı — fotoğraf yükleme veya avatar oluşturma/seçme
+- [ ] Ayarlar sekmesi — gizlilik ayarları (kim neyi görebilir: sadece ben / arkadaşlar / herkes)
+- [ ] Profil düzenleme ekranı — isim, kullanıcı adı, şehir, üniversite/meslek bilgisi güncelleme
+- [ ] Üniversite okumayanlar için profil alanı — meslek bilgisi veya lise öğrencisi seçeneği
 
 ### Ayet & Hadis
 - [ ] Günlük ayet ve hadis bildirimi
 - [ ] Favori ayet/hadis seçme ve kategorize etme (koleksiyonlar, etiketler)
 - [ ] Ayet/Hadis keşif sayfası
 
-### İslami Kulüpler
+### İslami Kulüpler & Topluluk
 - [ ] Öğrenci kulüplerini takip etme (YTÜ Fark ve benzeri İslami kulüpler)
 - [ ] Kulüp etkinlikleri listeleme ve takvim görünümü
 - [ ] Kulüp duyuru bildirimleri
+- [ ] Lise grupları — lise öğrencileri kendi okullarında grup kurup uygulamayı yayabilir
+- [ ] Üniversiteler ligi — üniversiteler arası haftalık okuma rekabeti ve sıralama
 
 ### Yeni Özellikler
 - [ ] Namaz takibi
@@ -86,4 +92,3 @@
 ## Açık Kararlar
 
 - [ ] 5-6 renk paletinin tüm rolleri netleştirilecek
-- [ ] Logo tasarlanacak

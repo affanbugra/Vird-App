@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
+import 'app_assets.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
@@ -276,26 +277,26 @@ class _NavItem extends StatelessWidget {
             ),
             // İkon
             if (isVird)
-              ColorFiltered(
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                child: Image.asset('assets/images/vird_logo.png', height: 22),
+              Opacity(
+                opacity: active ? 1.0 : 0.4,
+                child: Image.asset(AppAssets.logo, height: 38),
               )
-            else
+            else ...[
               Icon(
                 active ? (activeIcon ?? icon) : icon,
                 color: color,
                 size: 24,
               ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: GoogleFonts.nunito(
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: color,
-                letterSpacing: isVird ? 1.0 : 0,
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.nunito(
+                  fontSize: 11,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

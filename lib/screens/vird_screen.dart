@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
+import '../app_assets.dart';
 
 IconData _iconFromName(String name) {
   switch (name) {
@@ -23,7 +24,7 @@ IconData _iconFromName(String name) {
 }
 
 const _allUpdates = [
-  _Update(iconName: 'book',     title: 'Kuran Okuma & Hatim Takibi',  desc: 'Günlük okuma alışkanlığı, hatim takibi, Streak, Hasanat ve Kuran Haritası.',  eta: 'Yayında ✓', released: true),
+  _Update(iconName: 'book',     title: 'Kuran Okuma & Hatim Takibi',  desc: 'Günlük okuma alışkanlığı, hatim takibi, Seri, Hasanat ve Kuran Haritası.',  eta: 'Yayında ✓', released: true),
   _Update(iconName: 'people',   title: 'Arkadaşlarınla Takipleş',     desc: 'Arkadaşlarını ekle, okuma aktivitelerini takip et, birlikte ilerle.',          eta: 'Yakında'),
   _Update(iconName: 'quote',    title: 'Ayet & Hadisler',              desc: 'Günlük bildirimler, favori ayet ve hadisleri seç ve kategorize et.',           eta: 'Yakında'),
   _Update(iconName: 'bookmark', title: 'Tefsir Takibi',                desc: 'Tefsir okumak isteyenler için ayrı takip ve ilerleme sistemi.',                eta: 'Yakında'),
@@ -53,7 +54,6 @@ class _VirdScreenState extends State<VirdScreen> {
   bool _submitting = false;
   bool _sent = false;
   String? _submitError;
-  bool _showAllUpdates = false;
 
   @override
   void dispose() {
@@ -101,90 +101,51 @@ class _VirdScreenState extends State<VirdScreen> {
 
   // ─── Header ──────────────────────────────────────────────────────────────
   Widget _buildHeader() {
-    return Container(
-      color: AppColors.teal,
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 28,
-        bottom: 36, left: 24, right: 24,
-      ),
-      child: Column(
-        children: [
-          // Logo
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 18, offset: const Offset(0, 6))],
-            ),
-            child: ClipOval(
-              child: Container(
-                width: 112, height: 112,
-                color: AppColors.white,
-                padding: const EdgeInsets.all(10),
-                child: Image.asset('assets/images/vird_logo.png', fit: BoxFit.contain),
+    return Column(
+      children: [
+        // Hadis — teal zemin
+        Container(
+          color: AppColors.teal,
+          width: double.infinity,
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 28,
+            bottom: 36, left: 24, right: 24,
+          ),
+          child: Column(
+            children: [
+              Text(
+                'Hz. Âişe\'den rivayet edildiğine göre, Resûlullah\'a (sav),\n"Allah katında amellerin en sevimlisi hangisidir?" diye soruldu.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(fontSize: 14, height: 1.6, color: Colors.white.withValues(alpha: 0.92), fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
               ),
-            ),
+              const SizedBox(height: 6),
+              Text(
+                '"Az da olsa devamlı olanıdır." buyurdu.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(fontSize: 15, height: 1.6, color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'M1828 Müslim, Müsâfirîn, 216',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w600, letterSpacing: 0.3),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-
-          // Arapça
-          Directionality(
-            textDirection: TextDirection.rtl,
-            child: Text(
-              'عَنْ عَائِشَةَ: أَنَّ رَسُولَ اللَّهِ (صَلَّى اللَّهُ عَلَيْهِ وَ سَلَّمْ) سُئِلَ:\nأَيُّ الْعَمَلِ أَحَبُّ إِلَى اللَّهِ؟ قَالَ: "أَدْوَمُهُ وَإِنْ قَلَّ."',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.amiri(fontSize: 18, height: 1.9, color: Colors.white),
-            ),
-          ),
-
-          // Ayırıcı
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (_) => Container(
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: 4, height: 4,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.5), shape: BoxShape.circle),
-              )),
-            ),
-          ),
-
-          // Türkçe meal
-          Text(
-            'Hz. Âişe\'den rivayet edildiğine göre, Resûlullah\'a (sav),\n"Allah katında amellerin en sevimlisi hangisidir?" diye soruldu.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 14, height: 1.6, color: Colors.white.withValues(alpha: 0.92), fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '"Az da olsa devamlı olanıdır." buyurdu.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 15, height: 1.6, color: Colors.white, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'M1828 Müslim, Müsâfirîn, 216',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w600, letterSpacing: 0.3),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   // ─── Yakında geliyor ─────────────────────────────────────────────────────
   Widget _buildComingSection() {
     const mainCount = 4;
-    final extra = _allUpdates.sublist(mainCount);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHead(kicker: 'Yol Haritası', title: 'Yakında geliyor'),
-
-          // İlk 4 kart — MVP yeşil, kalanlar giderek şeffaflaşır
           ...List.generate(mainCount, (i) {
             final op = i < 2 ? 1.0 : (1.0 - (i - 1) * 0.35).clamp(0.2, 1.0);
             return Opacity(
@@ -195,31 +156,97 @@ class _VirdScreenState extends State<VirdScreen> {
               ),
             );
           }),
-
-          // Genişletilmiş kartlar
-          if (_showAllUpdates)
-            ...List.generate(extra.length, (i) {
-              final op = (0.85 - i * 0.2).clamp(0.15, 1.0);
-              return Opacity(
-                opacity: op,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _UpdateCard(update: extra[i]),
-                ),
-              );
-            }),
-
           const SizedBox(height: 4),
           Center(
             child: GestureDetector(
-              onTap: () => setState(() => _showAllUpdates = !_showAllUpdates),
+              onTap: () => _showRoadmapSheet(context),
               child: Text(
-                _showAllUpdates ? 'daha az göster' : 've daha fazlası…',
+                'Tüm sürüm geçmişini gör →',
                 style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.4),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showRoadmapSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, controller) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 4),
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderGrey,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: Text('Yol Haritası',
+                  style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                      itemCount: _allUpdates.length,
+                      itemBuilder: (_, i) {
+                        final op = (_allUpdates[i].released ? 1.0 : (1.0 - i * 0.12)).clamp(0.08, 1.0);
+                        return Opacity(
+                          opacity: op,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _UpdateCard(update: _allUpdates[i]),
+                          ),
+                        );
+                      },
+                    ),
+                    // Sonsuzluk hissi — alta doğru beyaz gradient
+                    Positioned(
+                      bottom: 0, left: 0, right: 0,
+                      child: IgnorePointer(
+                        child: Container(
+                          height: 140,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                AppColors.white.withValues(alpha: 0),
+                                AppColors.white,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -245,7 +272,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 Text('Bir fikrin var mı?',
                   style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark)),
                 const SizedBox(height: 4),
-                Text('Vird\'i birlikte büyütüyoruz. Eklenmesini istediğin özelliği yaz.',
+                Text('Paylaşacağın bir fikir, birçok kişi için hayra vesile olabilir.',
                   style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.45)),
                 const SizedBox(height: 14),
                 TextField(
@@ -321,7 +348,7 @@ class _VirdScreenState extends State<VirdScreen> {
                       const TextSpan(text: 'Vird, ibadetin '),
                       TextSpan(text: 'devamlı',
                         style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.teal, fontWeight: FontWeight.w700, height: 1.6)),
-                      const TextSpan(text: ' olmasına katkı sunmak için tasarlandı. Az ama düzenli — Resûlullah\'ın (sav) en sevdiği amel.'),
+                      const TextSpan(text: ' olmasına katkı sunmak için tasarlandı. Az ama düzenli — Allah katında amellerin en sevimlisi.'),
                     ],
                   ),
                 ),
@@ -333,11 +360,17 @@ class _VirdScreenState extends State<VirdScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 48),
           Center(
-            child: Text(
-              'YTÜ · İstanbul · v 1.00',
-              style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            child: Column(
+              children: [
+                Image.asset(AppAssets.logo, height: 96, fit: BoxFit.contain),
+                const SizedBox(height: 16),
+                Text(
+                  'YTÜ · İstanbul · 2026 · v 1.00',
+                  style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+                ),
+              ],
             ),
           ),
         ],

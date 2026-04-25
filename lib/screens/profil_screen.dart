@@ -76,7 +76,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final avatarSeed = data?['avatarSeed'] as String?;
         final isPro = (data?['isPro'] as bool?) ?? false;
         final isHafiz = (data?['isHafiz'] as bool?) ?? false;
-        final streak = (data?['streak'] as int?) ?? 0;
+        final seri = (data?['seri'] as int?) ?? 0;
         final hasanat = (data?['hasanat'] as int?) ?? 0;
         final hatimCount = (data?['hatimCount'] as int?) ?? 0;
         final totalPages = (data?['totalPages'] as int?) ?? 0;
@@ -102,7 +102,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   children: [
                     const SizedBox(height: 12),
                     _StatGrid(
-                      streak: streak,
+                      seri: seri,
                       hasanat: hasanat,
                       hatimCount: hatimCount,
                       totalPages: totalPages,
@@ -300,13 +300,13 @@ class _ProfileHeader extends StatelessWidget {
 // ─── İstatistik Grid ──────────────────────────────────────────────────────────
 
 class _StatGrid extends StatelessWidget {
-  final int streak;
+  final int seri;
   final int hasanat;
   final int hatimCount;
   final int totalPages;
 
   const _StatGrid({
-    required this.streak,
+    required this.seri,
     required this.hasanat,
     required this.hatimCount,
     required this.totalPages,
@@ -318,7 +318,7 @@ class _StatGrid extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _StatCard(icon: '🔥', value: _fmt(streak), label: 'STREAK', color: AppColors.orange)),
+          Expanded(child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange)),
           const SizedBox(width: 8),
           Expanded(child: _StatCard(icon: '✨', value: _fmt(hasanat), label: 'HASANAT', color: AppColors.gold)),
           const SizedBox(width: 8),

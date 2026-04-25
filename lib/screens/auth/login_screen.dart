@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../app_colors.dart';
+import '../../app_assets.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -48,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/images/vird_logo.png', height: 80),
+              Image.asset(AppAssets.logo, height: 80),
               const SizedBox(height: 32),
               const Text(
                 'Tekrar Hoş Geldin!',

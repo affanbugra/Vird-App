@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-04-25)
+## Genel Durum (2026-04-25 — güncellendi)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi)
@@ -22,8 +22,8 @@
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
 | 4 | Hatimlerim ekranı | ⬜ |
 | 5 | Log girişi | ⬜ |
-| 6 | Streak sistemi | ⬜ |
-| 7 | Sure streaki | ⬜ |
+| 6 | Seri sistemi | ⬜ |
+| 7 | Sure serii | ⬜ |
 | 8 | Hasanat sistemi | ⬜ |
 | 9 | Kuran Haritası (UI ✅, veri bağlantısı ⬜) | 🔶 Kısmen |
 | 10 | Offline mode | ⬜ |
@@ -32,7 +32,7 @@
 | 13 | Profil (UI ✅) | 🔶 Kısmen |
 | 14 | Bildirimler | ⬜ |
 | 15 | Rozetler | ⬜ |
-| 16 | Vird sekmesi | ✅ Tamamlandı |
+| 16 | Vird sekmesi (UI + Firestore form) | ✅ Tamamlandı |
 
 ---
 
@@ -70,7 +70,7 @@
 
 #### Profil Ekranı Yapısı
 1. **`_ProfileHeader`** — 96dp teal banner, overlap avatar (radius 39, hafız ise gold border), dişli ikon, ad / PRO badge / username / şehir·üniversite
-2. **`_StatGrid`** — `IntrinsicHeight` + `Row` + 4× `Expanded _StatCard` (Streak / Hasanat / Hatim / Sayfa)
+2. **`_StatGrid`** — `IntrinsicHeight` + `Row` + 4× `Expanded _StatCard` (Seri / Hasanat / Hatim / Sayfa)
 3. **`_KuranHaritasiCard`** — filtre chips (`HeatFilter` enum), stat şeridi, `_HeatGrid`, lejant, detay paneli
 
 #### Isı Haritası (_HeatGrid) Kararları
@@ -105,7 +105,7 @@ enum HeatFilter { month, year, all, meal }
 
 ## Kuran Veri Sistemi (`lib/data/quran_cuz.dart`)
 
-> Bu dosya tüm modüllerde (log, hatim takip, streak, harita) kullanılır. Dokunmadan önce oku.
+> Bu dosya tüm modüllerde (log, hatim takip, seri, harita) kullanılır. Dokunmadan önce oku.
 
 ### Sayfa Sistemi
 - **Türkiye Diyanet mushafı** baz alındı
@@ -155,9 +155,42 @@ QuranData.cuzler                    // List<CuzInfo> — 30 cüz
 
 ---
 
+---
+
+### Modül 16 — Vird Sekmesi (2026-04-25)
+
+#### Dosyalar
+- `lib/screens/vird_screen.dart` — Vird sekmesi tamamlandı
+- `lib/app_assets.dart` — Merkezi logo sabiti (`AppAssets.logo`)
+- `assets/images/vird_logo.jpeg` — Yeni logo
+
+#### Ekran Yapısı
+1. **Header** — Teal banner, Türkçe hadis (Âişe hadisi, Müslim M1828), Arapça metin yok
+2. **Yakında Geliyor** — `_allUpdates` const listesi (7 kart); MVP kartı yeşil (`released: true`), kalanlar teal ve alta doğru şeffaflaşır
+3. **"Tüm sürüm geçmişini gör →"** — `showModalBottomSheet` + `DraggableScrollableSheet`, alt kısımda beyaz gradient sonsuzluk hissi
+4. **Bir özellik öner** — `TextField` + Firestore `feature_requests` write, `_PrimaryButton` 3D depth
+5. **Hakkında** — Vird'in tasavvuf terimi tanımı + açıklama
+6. **Footer** — Logo (96dp, ortalı) + "YTÜ · İstanbul · 2026 · v 1.00"
+
+#### Teknik Kararlar
+- `coming_soon` Firestore StreamBuilder → hardcoded `_allUpdates` (Admin paneli MVP sonrasına alındı)
+- `_Feature` → `_Update` (`released: bool` alanı eklendi); `_FeatureCard` → `_UpdateCard` (yeşil/teal renk ayrımı)
+- `feature_requests` Firestore write korundu — kullanıcı önerileri Firebase'e yazılıyor
+- Nav bar: "VİRD" yazısı kaldırıldı, logo 38dp `Opacity` ile aktif/pasif
+
+#### Logo Sistemi (`lib/app_assets.dart`)
+- `AppAssets.logo` tek merkezi sabit — logo değişirse sadece bu satır güncellenir
+- Bağlı dosyalar: `main.dart`, `vird_screen.dart`, `login_screen.dart`, `splash_screen.dart`
+- **Not:** Nav bar'da `ColorFiltered(BlendMode.srcIn)` yerine `Opacity` kullanılır çünkü JPEG'de alpha kanalı yoktur
+
+---
+
 ## Öğrenilen Dersler
 
 - `withOpacity()` deprecated → `withValues(alpha: ...)` kullan
 - Isı haritasında `GridView` kullanma — cüz etiketi zorlaşır; `Column` içinde 30 `Row` daha iyi
 - Detay panelinde sureleri `QuranData.surahsOnPage()` ile çek, hard-code yazma
 - `unnecessary_non_null_assertion` lint: `e!.isNotEmpty` yerine `e.isNotEmpty`
+- JPEG'de alpha kanalı yok → `ColorFiltered(BlendMode.srcIn)` boş/siyah kutu gösterir; logo tinting için `Opacity` kullan
+- Yeni asset eklenince hot reload yetmez → `flutter clean` + tam `flutter run` gerekir
+- UI metni (buton, açıklama, başlık) yazılmadan önce kullanıcıya öner ve onay al — direkt yazma

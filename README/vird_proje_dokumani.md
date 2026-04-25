@@ -19,9 +19,9 @@
 | | |
 |---|---|
 | **Ana Renk** | `#2A7F8C` (mavi-eflatun-yeşil arası) |
-| **Streak Rengi** | Turuncu |
+| **Seri Rengi** | Turuncu |
 | **Zemin** | Beyaz |
-| **Palet Sistemi** | 5-6 temel renk. Streak gibi sabit anlam taşıyanların rengi sabittir, diğerleri bu paletten seçilir |
+| **Palet Sistemi** | 5-6 temel renk. Seri gibi sabit anlam taşıyanların rengi sabittir, diğerleri bu paletten seçilir |
 | **Estetik** | Duolingo ve Quranly benzeri his. Beyaz zemin, ferah, minimal |
 | **Logo** | Henüz tasarlanıyor |
 
@@ -47,7 +47,7 @@
 
 | Sekme | İçerik |
 |---|---|
-| **Hatimlerim** | Ana giriş ekranı. Aktif hatimler, yeni hatim ekleme. Üstte streak ve hasanat özeti. |
+| **Hatimlerim** | Ana giriş ekranı. Aktif hatimler, yeni hatim ekleme. Üstte seri ve hasanat özeti. |
 | **Ekipler** | Ekip listesi ve haftalık liderboard |
 | **Profil** | İstatistikler, rozetler, gizlilik ayarları, Kuran Haritası |
 | **Vird** | Marka sayfası: görüş/öneri formu, gelecek güncellemelerin duyuruları, uygulama hakkında bilgi |
@@ -64,13 +64,13 @@
 
 **Profilde görünenler:**
 - Kimlik: profil fotoğrafı, isim, kullanıcı adı, şehir, üniversite
-- İstatistikler: mevcut streak, en uzun streak, toplam sayfa, toplam hasanat, tamamlanan hatim sayısı, son 1 aylık istatistikler
+- İstatistikler: mevcut seri, en uzun seri, toplam sayfa, toplam hasanat, tamamlanan hatim sayısı, son 1 aylık istatistikler
 - Kuran Haritası (kişisel toplam ısı haritası)
 - Rozetler — iki sekme:
-  - Başarılar: streak rozetleri, hatim tamamlama rozetleri, okuma rozetleri
+  - Başarılar: seri rozetleri, hatim tamamlama rozetleri, okuma rozetleri
   - Ekip rozetleri: haftalık ilk 3 madalyaları
 
-**Gizlilik ayarı:** Tek ayar, tüm profil için — Sadece ben / Ekip arkadaşları / Herkes. Streak ve rozetler her zaman herkese açık.
+**Gizlilik ayarı:** Tek ayar, tüm profil için — Sadece ben / Ekip arkadaşları / Herkes. Seri ve rozetler her zaman herkese açık.
 
 **Pro kullanıcı:** MVP'de ücretsiz, pro yetki geliştirici tarafından manuel atanır. Pro kullanıcılar ekip açıp yönetebilir.
 
@@ -88,7 +88,7 @@
   - Sayfa aralığı girerek
   - Hatim devam: +X sayfa, kaldığı yerden otomatik ilerler
 - Log girerken üstte Arapça / Meal sekmesi
-- Okumalar birbirine sayılır: sure streaki ve ana hedef aynı anda düşer
+- Okumalar birbirine sayılır: sure serii ve ana hedef aynı anda düşer
 
 ---
 
@@ -101,23 +101,23 @@
 
 ### 5.4 Serbest Okuma
 - Hatim olmadan da log girilebilir
-- Kişisel Kuran Haritasına işlenir, streak ve hedefe sayılır
+- Kişisel Kuran Haritasına işlenir, seri ve hedefe sayılır
 
 ---
 
-### 5.5 Sure Streaki
+### 5.5 Sure Serii
 - Kişi bir veya birkaç sure seçer, her gün o sureyi okuyunca log girer
-- Her sureye özel ayrı streak
-- Ana streakten bağımsız ama okuma ana hedefe de sayılır
+- Her sureye özel ayrı seri
+- Ana seriten bağımsız ama okuma ana hedefe de sayılır
 
 ---
 
-### 5.6 Streak Sistemi
-- Günlük hedef tamamlanırsa streak +1, kaçırılırsa sıfırlanır
+### 5.6 Seri Sistemi
+- Günlük hedef tamamlanırsa seri +1, kaçırılırsa sıfırlanır
 - Freeze: önceden kazanılır, kaçırılan günü korur, max 2 adet
 - Repair: kaçırdıktan sonra kısa süre içinde ekstra okuyarak geri kazanılır
 - Turuncu alev ikonu, tehlikedeyse animasyon ve bildirim
-- Perfect Streak: freeze kullanmadan devam edince streak altın olur
+- Perfect Seri: freeze kullanmadan devam edince seri altın olur
 - Cuma günü tamamlayınca ekstra hasanat
 
 ---
@@ -182,7 +182,7 @@
 
 ### 5.11 Başarılar & Rozetler
 
-**Streak rozetleri:** 7 gün, 30 gün, 100 gün, 365 gün
+**Seri rozetleri:** 7 gün, 30 gün, 100 gün, 365 gün
 
 **Hatim rozetleri:** İlk hatim, 3. hatim, 10. hatim
 
@@ -194,8 +194,8 @@
 
 ### 5.12 Bildirimler
 - Günlük hatırlatma: kişi kendi saatini seçer
-- Streak tehlike: gün bitmeden 2-3 saat kala okumamışsa uyarı
-- Streak kırıldı: repair hakkı olduğu bildirimi
+- Seri tehlike: gün bitmeden 2-3 saat kala okumamışsa uyarı
+- Seri kırıldı: repair hakkı olduğu bildirimi
 - Cuma bildirimi: hafta bitiyor, sıralamana bak
 - Ekip bildirimi: biri seni geçince veya ilk 3'e girince
 

@@ -43,7 +43,7 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 |---|---|---|
 | Kuran Haritası verisi | `{sayfa: okumaAdedi}` map, tek dokümanda | 604 ayrı doküman = gereksiz okuma maliyeti |
 | Liderboard | Cloud Function haftalık snapshot alır, istemci sadece okur | Gerçek zamanlı sıralama hesabı pahalı |
-| Streak / hasanat hesabı | Client'ta hesapla, sonucu Firestore'a yaz | Her açılışta sunucuya sorgu atmamak için |
+| Seri / hasanat hesabı | Client'ta hesapla, sonucu Firestore'a yaz | Her açılışta sunucuya sorgu atmamak için |
 | Offline mode | Firestore cache açık (`persistenceEnabled`) | Ayrı local storage mantığı yazmaya gerek yok |
 | Realtime Database | Kullanılmıyor — her şey Firestore'da | İki veritabanı = fazladan karmaşıklık ve maliyet |
 
@@ -62,7 +62,7 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 
 - Çalıştığını kanıtlamadan görevi tamamlandı sayma
 - Kendine sor: "Kıdemli bir Flutter geliştirici bunu onaylar mıydı?"
-- Streak, hasanat, offline sync gibi kritik modüllerde test koş
+- Seri, hasanat, offline sync gibi kritik modüllerde test koş
 - Logları kontrol et, doğruluğu kanıtla
 
 ## 3. Zarafet — Dengeli
@@ -98,7 +98,7 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 ## Commit Kuralları
 
 - Commit mesajı Türkçe
-- Format: `tip: kısa açıklama` — örn: `feat: streak freeze sistemi eklendi`
+- Format: `tip: kısa açıklama` — örn: `feat: seri freeze sistemi eklendi`
 - Tipler: `feat` (yeni özellik), `fix` (hata), `style` (UI), `refactor`, `docs`
 - Mesaj 50 karakteri geçmesin
 - **Sen sormadan commit atma** — sadece "commit at" deyince at
@@ -111,6 +111,7 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 - **Root cause:** Geçici fix yok, gerçek sebebi bul
 - **Tasarıma sadık:** Her UI kararı `README/vird_tasarim.md`'e uygun olmalı
 - **Dinî hassasiyet:** Metin ve ton her zaman `README/vird_tasarim.md` Bölüm 13'e göre
+- **UI metni yazmadan önce sor:** Buton, açıklama, başlık gibi kullanıcıya gösterilen metinler yazılacaksa önce öneriyi sun ve onay al. "Şu şekilde yazmayı düşünüyorum, uygun mu?" — onaylanmadan koda yazma.
 
 ---
 
@@ -120,5 +121,5 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 |---|---|
 | Yeni büyük özellik başlamadan önce | `/grill-me` |
 | Bir şey bozuldu, neden bilinmiyor | `/systematic-debugging` |
-| Kritik iş mantığı (streak, hasanat) | `/tdd` |
+| Kritik iş mantığı (seri, hasanat) | `/tdd` |
 | Flutter widget tasarımı | `/frontend-design` |

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app_colors.dart';
+import '../../app_assets.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -15,7 +16,7 @@ class SplashScreen extends StatelessWidget {
             // Assuming we have a white logo version for teal background,
             // or just use a text for now if logo is not suitable
             Image.asset(
-              'assets/images/vird_logo.png',
+              AppAssets.logo,
               height: 120,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.menu_book,

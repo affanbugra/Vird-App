@@ -46,9 +46,9 @@
 | **Teal (Marka)** | `#2A7F8C` | Primary butonlar, aktif sekmeler, logo, vurgu |
 | **Teal Koyu** | `#1F6370` | Buton alt gölgesi (3D depth efekti), pressed state |
 | **Teal Açık** | `#E8F5F7` | Seçili kart arka planı, light badge bg |
-| **Turuncu (Streak)** | `#FF9600` | Streak sayacı, alev ikonu — anlam sabit, başka yerde kullanılmaz |
-| **Turuncu Koyu** | `#CC7A00` | Streak buton gölgesi |
-| **Altın** | `#FFC200` | Hasanat puanı, ödül ikonları, perfect streak |
+| **Turuncu (Seri)** | `#FF9600` | Seri sayacı, alev ikonu — anlam sabit, başka yerde kullanılmaz |
+| **Turuncu Koyu** | `#CC7A00` | Seri buton gölgesi |
+| **Altın** | `#FFC200` | Hasanat puanı, ödül ikonları, perfect seri |
 | **Beyaz** | `#FFFFFF` | Ana arka plan |
 | **Açık Gri** | `#F7F7F7` | Kart arka planı, disabled alan |
 | **Border Gri** | `#E5E5E5` | Kart kenarlıkları, ayraçlar, disabled buton bg |
@@ -68,7 +68,7 @@
 
 ### Renk Anlam Kuralı
 Renklerin anlamı sabittir, bağlamdan bağımsız olarak değişmez:
-- Streak → her zaman `#FF9600` (turuncu)
+- Seri → her zaman `#FF9600` (turuncu)
 - Hasanat → her zaman `#FFC200` (altın)
 - Başarı/tamamlandı → her zaman `#58CC02` (yeşil)
 - Hata → her zaman `#FF4B4B` (kırmızı)
@@ -206,7 +206,7 @@ Ana ekranlarda ve log girişi ekranında sabit kalır — kullanıcı bağlamın
 ```
 [🔥 12]  [✨ 527]  [📖 3]
 
-Streak:  #FF9600 (turuncu alev ikonu + sayı)
+Seri:  #FF9600 (turuncu alev ikonu + sayı)
 Hasanat: #FFC200 (altın yıldız ikonu + sayı)
 3. slot: aktif hatim sayısı veya bugün okunan sayfa (#2A7F8C)
 
@@ -219,7 +219,7 @@ Font: Body Large, Bold
 ```
 Kart 1 — HASANAT: altın border (#FFC200), ✨ ikon, değer altın
 Kart 2 — SAYFA:   yeşil border (#58CC02), 📖 ikon, değer yeşil
-Kart 3 — STREAK:  turuncu border (#FF9600), 🔥 ikon, değer turuncu
+Kart 3 — SERİ:  turuncu border (#FF9600), 🔥 ikon, değer turuncu
 
 Her kart:
   Etiket:        ALL CAPS, Label, renkli
@@ -237,14 +237,14 @@ Başarı:
   Sol:    ✅ yeşil daire + "Harika! X sayfa eklendi." (bold, #3C3C3C)
   Sağ:    +XX hasanat (count-up animasyonu, #FFC200)
   Alt:    Yeşil primary buton "DEVAM ET"
-  Ekstra: Streak güncellendiyse 🔥 +1 animasyonu panel içinde
+  Ekstra: Seri güncellendiyse 🔥 +1 animasyonu panel içinde
 
 Hata (zaten loglandı):
   Zemin:  #FFDFE0
   Sol:    ❌ ikon + "Bu cüzü bugün zaten kaydettin."
   Alt:    Teal primary buton "TAMAM"
 
-Streak tehlikede:
+Seri tehlikede:
   Zemin:  #FFF3CD
   Metin:  Turuncu uyarı metni
   Alt:    Turuncu primary buton
@@ -272,7 +272,7 @@ Padding:       12dp
 Font:          Body Large
 ```
 
-### 6.9 Streak Takvimi (Haftalık şerit)
+### 6.9 Seri Takvimi (Haftalık şerit)
 ```
 7 gün: Pzt Sal Çar Per Cum Cmt Paz
 Her gün daire:
@@ -367,7 +367,7 @@ Pasif:           #ABABAB ikon + etiket
 
 ### 7.6 Hatimlerim Ekranı (Ana sekme)
 ```
-[Üst bar: logo | 🔥 streak | ✨ hasanat]
+[Üst bar: logo | 🔥 seri | ✨ hasanat]
 ─────
 [Aktif hatim başlık kartı]
   Teal banner: "KURAN-I KERİM — ArapçaHatim"
@@ -407,7 +407,7 @@ Günlük hedef veya hatim tamamlanınca full-screen geçiş (modal değil):
 ↑ Display başlık:
     Günlük hedef: "Günlük Hedef Tamamlandı!" (teal)
     Hatim:        "Hatim Tamamlandı! 🎉" (teal, konfeti)
-↑ 3'lü stat kartı (HASANAT | SAYFA | STREAK)
+↑ 3'lü stat kartı (HASANAT | SAYFA | SERİ)
 ↑ Whitespace
 ↓ Teal primary buton "DEVAM ET"
 ```
@@ -416,7 +416,7 @@ Günlük hedef veya hatim tamamlanınca full-screen geçiş (modal değil):
 ```
 [Avatar | İsim | Kullanıcı adı | Şehir/Üniversite]
 ─────
-[İstatistikler: streak, en uzun streak, toplam sayfa, hasanat, tamamlanan hatim]
+[İstatistikler: seri, en uzun seri, toplam sayfa, hasanat, tamamlanan hatim]
 ─────
 [Kuran Haritası — ısı haritası]
 ─────
@@ -453,7 +453,7 @@ Merkez hizalı:
 | Ekran geçişi | 300ms | easeInOut |
 | Kutlama burst / konfeti | 400ms | easeOut |
 | Progress bar dolumu | 500ms | easeOut |
-| Streak pulse | 1000ms | sinüsoidal, döngü |
+| Seri pulse | 1000ms | sinüsoidal, döngü |
 
 ### Spesifik Animasyonlar
 
@@ -464,9 +464,9 @@ Merkez hizalı:
 **Log başarısı:**
 - Feedback panel slide-up (250ms)
 - Hasanat sayacı count-up (+XX, altın)
-- Streak güncellenince: 🔥 +1 scale-in
+- Seri güncellenince: 🔥 +1 scale-in
 
-**Streak tehlike:**
+**Seri tehlike:**
 - Alev ikonu: sallama (300ms, 3 tekrar)
 - Turuncu renk parlaması
 
@@ -493,7 +493,7 @@ Merkez hizalı:
 | Başarılı log | Medium impact |
 | Hata | Notification error (çift) |
 | Buton tap | Light impact |
-| Streak kırıldı | Heavy impact |
+| Seri kırıldı | Heavy impact |
 | Hatim tamamlandı | Success notification |
 
 ---
@@ -508,10 +508,10 @@ Merkez hizalı:
 ### Anlam Sabitleri
 | İkon | Anlam | Renk |
 |---|---|---|
-| 🔥 Alev | Streak | `#FF9600` — değişmez |
+| 🔥 Alev | Seri | `#FF9600` — değişmez |
 | ✨ Işıltı | Hasanat | `#FFC200` — değişmez |
-| ❄️ Kar | Streak freeze | `#1CB0F6` |
-| 🔧 Tamir | Streak repair | `#FF9600` |
+| ❄️ Kar | Seri freeze | `#1CB0F6` |
+| 🔧 Tamir | Seri repair | `#FF9600` |
 | 🏆 Kupa | Liderboard sırası | Altın/gümüş/bronz |
 | ✅ Daire onay | Tamamlandı | `#58CC02` |
 | 🔒 Kilit | Kilitli içerik | `#ABABAB` |
@@ -573,7 +573,7 @@ Border:        1px solid #E5E5E5
 1. **Her ekranda tek ana aksiyon** — buton her zaman tekil ve altta
 2. **Disabled → enabled geçişi anlık** — seçim yapılınca bekletmeden aktif olur
 3. **Whitespace agresif kullanılır** — ekranı doldurmak zorunda değilsin
-4. **Renk anlamı sabittir** — streak her zaman turuncu, başarı her zaman yeşil, asla karıştırılmaz
+4. **Renk anlamı sabittir** — seri her zaman turuncu, başarı her zaman yeşil, asla karıştırılmaz
 5. **Konuşma balonu yönlendirir** — onboarding'de metin duvarı yerine logo + balon
 6. **İstatistik barı her ekranda sabit** — kullanıcı bağlamını hiç kaybetmez
 7. **Tamamlama kutlaması full-screen** — modal değil, ayrı ekran geçişi
@@ -581,7 +581,7 @@ Border:        1px solid #E5E5E5
 9. **Kart etiketi ALL CAPS** — hiyerarşiyi sayı boyutu değil etiket stili kurar
 10. **Seçim kartlarında ikon + metin** — sadece metinden daha hızlı taranır
 11. **Cesur ol** — logo büyük, renkler canlı, ses heyecanlı; küçük düşünme
-12. **Duygusallık taşı** — her başarı, her streak, her hatim anı duygusal anlam taşır; tasarım bunu yansıtır
+12. **Duygusallık taşı** — her başarı, her seri, her hatim anı duygusal anlam taşır; tasarım bunu yansıtır
 13. **Gri soğuktur** — açık gri alanlar yerine pastel tercih edilir; gri yalnızca disabled/border için kullanılır
 14. **Sivri şekil yoktur** — her köşe, her buton, her kart, her ikon yuvarlak kenarlıdır
 
@@ -601,10 +601,10 @@ Border:        1px solid #E5E5E5
 
 ### Ton Değişimi
 Ses sabittir; ton duruma göre ayarlanır:
-- **Kutlama anları** (hatim, streak): coşkulu, ünlem serbestçe
+- **Kutlama anları** (hatim, seri): coşkulu, ünlem serbestçe
 - **Hata/uyarı**: yönlendirici, eleştirmez — "Henüz okumadın" değil, "Bugün okumayı unutma!"
 - **Onboarding**: sıcak karşılama, adım adım yönlendirme
-- **Streak tehlikesi**: hafif endişe yaratır ama yıkıcı değil
+- **Seri tehlikesi**: hafif endişe yaratır ama yıkıcı değil
 
 ### Metin Kuralları
 
@@ -618,20 +618,20 @@ Ses sabittir; ton duruma göre ayarlanır:
 - Nokta ile bitmez; ünlem ile bitilebilir
 
 **Bildirimler:**
-- Kişisel, doğrudan: "Streak'in tehlikede 🔥" değil "Kullanıcı streak'i tehlikede"
-- Destekleyici ton: "Bugün de oku, streak'ini koru!" ✓ / "Okumadın, streak gitti." ✗
+- Kişisel, doğrudan: "Seri'in tehlikede 🔥" değil "Kullanıcı seri'i tehlikede"
+- Destekleyici ton: "Bugün de oku, seri'ini koru!" ✓ / "Okumadın, seri gitti." ✗
 
 **Sayılar:** Her zaman rakamla — "3 sayfa", "10 gün", "1 cüz" (kelimeyle yazılmaz)
 
 **Uygulama içi terimler** (Vird'e özgü, büyük harfle):
-- Streak, Hatim, Hasanat, Freeze, Repair, Kuran Haritası
+- Seri, Hatim, Hasanat, Freeze, Repair, Kuran Haritası
 - Genel terimler küçük: sayfa, cüz, sure, hedef, ekip
 
 ### Örnek Metinler
 | Durum | ✓ Doğru | ✗ Yanlış |
 |---|---|---|
 | Hatim tamamlama | "Hatim tamamlandı! Maşallah 🎉" | "Tebrikler kullanıcı, görevi tamamladınız." |
-| Streak kırıldı | "Bugün okuyarak Streak'ini geri kazan!" | "Streak kırıldı. Yarın tekrar dene." |
+| Seri kırıldı | "Bugün okuyarak Seri'ini geri kazan!" | "Seri kırıldı. Yarın tekrar dene." |
 | İlk giriş | "Bismillah. Okuma yolculuğuna hoş geldin." | "Hesabınız oluşturuldu. Lütfen devam edin." |
 | Boş hatim | "Henüz hatim yok. İlk hatimini başlat!" | "Herhangi bir hatim bulunamadı." |
 
@@ -745,7 +745,7 @@ Profil header:
             Şehir · Üniversite (Caption, #ABABAB)
 
 2×2 İstatistik grid:
-  Sol üst:  🔥 Streak — "12 GÜN" (sayı büyük, etiket küçük)
+  Sol üst:  🔥 Seri — "12 GÜN" (sayı büyük, etiket küçük)
   Sağ üst:  ✨ Toplam Hasanat — "9.770"
   Sol alt:  📖 Tamamlanan Hatim — "3"
   Sağ alt:  📄 Toplam Sayfa — "1.204"
@@ -789,7 +789,7 @@ Devam eden görev kartı:
 
 ### 15.7 Üst Bar Veri Hiyerarşisi
 
-Lesson Track'teki üst bar 4 metrik içeriyor: dil skoru · streak · gems · can. Vird'de 3 metrik var. Duolingo'dan öğrenilen ders: **her metriğin kendi ikon rengi var, ikon+sayı birlikte tek birim oluşturuyor**, aralarında boşluk eşit.
+Lesson Track'teki üst bar 4 metrik içeriyor: dil skoru · seri · gems · can. Vird'de 3 metrik var. Duolingo'dan öğrenilen ders: **her metriğin kendi ikon rengi var, ikon+sayı birlikte tek birim oluşturuyor**, aralarında boşluk eşit.
 
 **Pekiştirilen kural:** Üst bar'da ikon ve sayı arasında `space-xs` (4px), metrikler arası `space-md` (16px). İkonlar 20dp, sayılar Body Large Bold.
 
@@ -847,7 +847,7 @@ Hata state (inline, buton altında değil, input altında):
 
 Activities seçim ekranında: küçük pill chip'ler 3 sütun grid içinde, sol üstte "5/20" sayaç badge'i, seçilenler marka rengiyle vurgulanıyor.
 
-**Vird'e uyarlama — Sure Streaki seçimi:**
+**Vird'e uyarlama — Sure Serii seçimi:**
 ```
 Sure seçim ekranı:
   Layout:   Wrap grid (3 sütun değil, responsive wrap)
@@ -863,7 +863,7 @@ Sure seçim ekranı:
 
 ### 16.3 Geri Sayım Sayacı — Üst Bar'da Dinamik Metrik
 
-Trip aktifken Duolingo'nun üst barında streak/gems yanına "91" günlük geri sayım ekleniyor. Bu pattern Vird için çok güçlü:
+Trip aktifken Duolingo'nun üst barında seri/gems yanına "91" günlük geri sayım ekleniyor. Bu pattern Vird için çok güçlü:
 
 **Vird'e uyarlama:**
 ```
@@ -925,8 +925,8 @@ Duolingo profilinde "Upcoming Trips" bölümü: her trip için gün sayısı bü
 Duolingo'nun core insight'ı: *"Kullanıcılar öğrendikleri içeriğin kendi hayatlarıyla ilgili olduğunu hissederse çok daha sık geri döner."*
 
 **Vird için bu ilke:**
-- Kullanıcı "Cuma namazı sureleri" veya "Ramazan sure streaki" gibi **kişisel bağlamlı hedefler** koyabilmeli
-- Sistem bunu önerebilir: *"Ramazan'a 30 gün kaldı — Teravih için Mülk ve Yasin sure streaki başlatmak ister misin?"*
+- Kullanıcı "Cuma namazı sureleri" veya "Ramazan sure serii" gibi **kişisel bağlamlı hedefler** koyabilmeli
+- Sistem bunu önerebilir: *"Ramazan'a 30 gün kaldı — Teravih için Mülk ve Yasin sure serii başlatmak ister misin?"*
 - Bu UX prensibi ilerideki özellikler için temel motivasyon: **deadline + kişiselleşme = yüksek bağlılık**
 
 ---
@@ -960,7 +960,7 @@ NOT: Bu ekranda stat kartı yok — hatim tamamlama değil, başlangıç.
 
 Trip lesson tamamlama ekranında "Bu hafta kaç gün tamamladın" bilgisi küçük hücre grid'i ile gösteriliyor: `Fr Sa Su Mo Tu We Th` — tamamlanan gün dolu, yapılmayan boş.
 
-**Vird'e uyarlama — Streak takvimi bileşenini güçlendirme:**
+**Vird'e uyarlama — Seri takvimi bileşenini güçlendirme:**
 ```
 Haftalık okuma grid'i (Hatimlerim üst kısmı):
   7 daire, yatay: Pzt Sal Çar Per Cum Cmt Paz
@@ -971,7 +971,7 @@ Haftalık okuma grid'i (Hatimlerim üst kısmı):
 
   Altında küçük metin: "Bu hafta 5 gün okudun 🔥" (Caption, #777)
 ```
-Bu Bölüm 6.9'daki streak takvimini tamamlıyor — haftalık motivasyon sayacı olarak kullanılabilir.
+Bu Bölüm 6.9'daki seri takvimini tamamlıyor — haftalık motivasyon sayacı olarak kullanılabilir.
 
 ---
 
@@ -1037,7 +1037,7 @@ Seçim listesinde limit dolunca:
 Discovery banner (dismiss edilene kadar gösterilir):
   Zemin:    #E8F5F7 (teal açık)
   Sol:      ✨ ikon (24dp, #2A7F8C)
-  Metin:    "Yeni: Sure Streaki özelliği eklendi!" (Body Medium, Bold)
+  Metin:    "Yeni: Sure Serii özelliği eklendi!" (Body Medium, Bold)
   Sağ:      X kapat ikonu (20dp, #ABABAB)
   Border:   1.5px solid #2A7F8C, radius-lg
   Konum:    Üst bar'ın hemen altı, full-width (16px margin)
@@ -1062,26 +1062,26 @@ Offline durumunda Hatimlerim ekranı üstü:
 
 ---
 
-## 18. Duolingo Analiz Notları — 5. Tur (Streak Progress, Where to Start, User Journey Steps)
+## 18. Duolingo Analiz Notları — 5. Tur (Seri Progress, Where to Start, User Journey Steps)
 
-*Son 3 PDF: Streak commitment ekranı ve onboarding başlangıç seçimi.*
+*Son 3 PDF: Seri commitment ekranı ve onboarding başlangıç seçimi.*
 
 ---
 
-### 18.1 Streak Commitment Ekranı
+### 18.1 Seri Commitment Ekranı
 
-Streek Progress PDF'i özel bir ekran gösteriyor: streak sayısı ekranın odak noktası, haftalık grid alt kısımda, altta taahhüt butonu. Tek renkli ekran — her şey turuncu.
+Streek Progress PDF'i özel bir ekran gösteriyor: seri sayısı ekranın odak noktası, haftalık grid alt kısımda, altta taahhüt butonu. Tek renkli ekran — her şey turuncu.
 
-**Vird'e uyarlama — "Streak Sözü" ekranı (ilk streak kurulunca veya repair sonrası):**
+**Vird'e uyarlama — "Seri Sözü" ekranı (ilk seri kurulunca veya repair sonrası):**
 ```
 ↑ Büyük whitespace
 ↑ Büyük alev ikonu — ortalanmış, 96dp, pill gölge altında
-↑ Streak sayısı: Display (28sp → 48sp'ye çıkarılabilir), #FF9600
-↑ "günlük streak" (Body Medium, #FF9600)
+↑ Seri sayısı: Display (28sp → 48sp'ye çıkarılabilir), #FF9600
+↑ "günlük seri" (Body Medium, #FF9600)
 ↑ Haftalık grid kartı (radius-lg, border #E5E5E5):
     Üst bölge: 7 daire — tamamlanan ✓ turuncu dolu, 
                gelecek günler #E5E5E5 boş
-    Alt bölge: "Her gün oku, streak'in korunsun." 
+    Alt bölge: "Her gün oku, seri'in korunsun." 
                (Body Medium, #777, ortalı)
 ↓ Teal primary buton "DEVAM EDECEĞİM"
 
@@ -1094,9 +1094,9 @@ Tek renk prensip: ikon + sayı + etiket + grid checkmark → hepsi #FF9600
 
 Streek Progress'te haftalık grid kartının içi ikiye bölünmüş: üst yarı = gün daireleri, alt yarı = motivasyon metni. Aralarında ince divider.
 
-**Vird'e uyarlama — Hatimlerim ekranı streak widget'ı:**
+**Vird'e uyarlama — Hatimlerim ekranı seri widget'ı:**
 ```
-Streak widget kartı (Hatimlerim üstü):
+Seri widget kartı (Hatimlerim üstü):
   ┌─────────────────────────────────┐
   │  Pzt  Sal  Çar  Per  Cum  Cmt  Paz  │
   │  🟠   🟠   🟠   🟠   🟠   ○    ○   │
