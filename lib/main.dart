@@ -19,7 +19,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
+
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;
 
@@ -69,29 +69,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
     _showHome = widget.initialShowHome;
   }
 
-  void _completeOnboarding() {
-    setState(() {
-      _showHome = true;
-    });
-  }
+  void _completeOnboarding() => setState(() => _showHome = true);
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
-        if (auth.isLoading) {
-          return const SplashScreen();
-        }
-        if (auth.isAuthenticated) {
-          return const MainScreen();
-        }
-        return _showHome 
-            ? const LoginScreen() 
+        if (auth.isLoading) return const SplashScreen();
+        if (auth.isAuthenticated) return const MainScreen();
+        return _showHome
+            ? const LoginScreen()
             : OnboardingScreen(onCompleted: _completeOnboarding);
       },
     );
   }
 }
+
+// ─── Ana ekran ─────────────────────────────────────────────────────────────
+// Sekme sırası: Hatimlerim · Ekipler · [+ LOG FAB] · VİRD · Profil
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -106,58 +101,203 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = const [
     HatimlerimScreen(),
     EkiplerScreen(),
-    ProfilScreen(),
     VirdScreen(),
+    ProfilScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      floatingActionButton: _LogFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: _MainBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.teal,
-        unselectedItemColor: AppColors.textLight,
-        backgroundColor: AppColors.white,
-        elevation: 8,
-        selectedLabelStyle: GoogleFonts.nunito(
-          fontWeight: FontWeight.w700,
-          fontSize: 11,
+        onTap: (i) => setState(() => _currentIndex = i),
+      ),
+    );
+  }
+}
+
+// ─── Log girişi FAB ────────────────────────────────────────────────────────
+class _LogFAB extends StatefulWidget {
+  @override
+  State<_LogFAB> createState() => _LogFABState();
+}
+
+class _LogFABState extends State<_LogFAB> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        // TODO: Log girişi ekranını aç (Modül 5)
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        transform: Matrix4.translationValues(0, _pressed ? 3 : 0, 0),
+        width: 62,
+        height: 62,
+        decoration: BoxDecoration(
+          color: AppColors.teal,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.tealDark,
+              offset: Offset(0, _pressed ? 2 : 5),
+              blurRadius: 0,
+            ),
+            BoxShadow(
+              color: AppColors.tealDark.withValues(alpha: 0.35),
+              offset: const Offset(0, 8),
+              blurRadius: 14,
+            ),
+          ],
         ),
-        unselectedLabelStyle: GoogleFonts.nunito(
-          fontWeight: FontWeight.w600,
-          fontSize: 11,
-        ),
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
+        child: const Icon(Icons.add, color: Colors.white, size: 30),
+      ),
+    );
+  }
+}
+
+// ─── Alt navigasyon ────────────────────────────────────────────────────────
+class _MainBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final void Function(int) onTap;
+
+  const _MainBottomNav({required this.currentIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomAppBar(
+      notchMargin: 8,
+      shape: const CircularNotchedRectangle(),
+      color: AppColors.white,
+      elevation: 8,
+      height: 68,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          _NavItem(
+            icon: Icons.menu_book_outlined,
+            activeIcon: Icons.menu_book,
             label: 'Hatimlerim',
+            active: currentIndex == 0,
+            onTap: () => onTap(0),
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
+          _NavItem(
+            icon: Icons.group_outlined,
+            activeIcon: Icons.group,
             label: 'Ekipler',
+            active: currentIndex == 1,
+            onTap: () => onTap(1),
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+          // FAB için boşluk + اِقْرَأْ etiketi (diğer sekmelerle aynı hizada)
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 36), // indicator(9) + icon(24) + gap(3)
+                Text(
+                  'اِقْرَأْ',
+                  style: GoogleFonts.amiri(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.teal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _NavItem(
+            isVird: true,
+            label: 'VİRD',
+            active: currentIndex == 2,
+            onTap: () => onTap(2),
+          ),
+          _NavItem(
+            icon: Icons.person_outline,
+            activeIcon: Icons.person,
             label: 'Profil',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: const EdgeInsets.only(top: 13),
-              child: Image.asset('assets/images/vird_logo.png', height: 38),
-            ),
-            activeIcon: Padding(
-              padding: const EdgeInsets.only(top: 13),
-              child: Image.asset('assets/images/vird_logo.png', height: 38),
-            ),
-            label: '',
+            active: currentIndex == 3,
+            onTap: () => onTap(3),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData? icon;
+  final IconData? activeIcon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final bool isVird;
+
+  const _NavItem({
+    this.icon,
+    this.activeIcon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.isVird = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.teal : AppColors.textLight;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Aktif göstergesi — üstte ince teal çizgi
+            Container(
+              height: 3,
+              width: 24,
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                color: active ? AppColors.teal : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            // İkon
+            if (isVird)
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                child: Image.asset('assets/images/vird_logo.png', height: 22),
+              )
+            else
+              Icon(
+                active ? (activeIcon ?? icon) : icon,
+                color: color,
+                size: 24,
+              ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                color: color,
+                letterSpacing: isVird ? 1.0 : 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

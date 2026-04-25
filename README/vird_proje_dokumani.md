@@ -208,28 +208,7 @@
 
 ---
 
-## 6. Claude Code Modül Sırası
-
-1. Proje kurulumu — Flutter + Firebase, klasör yapısı, 4 sekme iskeleti
-2. Auth — kayıt, giriş (Google + email), profil oluşturma
-3. Kuran verisi — JSON dosyası projeye gömme, sure/sayfa/cüz yapısı
-4. Hatimlerim ekranı — aktif hatimler, yeni hatim ekleme, üstte özet
-5. Log girişi — sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi
-6. Streak sistemi — sayaç, freeze, repair, perfect streak, Cuma bonusu
-7. Sure streaki — sure seçme, günlük log, sure bazlı sayaç
-8. Hasanat sistemi — sayfa bazlı hesaplama, görsel sayaç
-9. Kuran Haritası — ısı haritası, hatim şeması, gradyan sistem
-10. Offline mode — cihaza kayıt, senkronizasyon
-11. Ekip sistemi — oluşturma, katılım, yönetim, ceza sistemi
-12. Liderboard — haftalık sıralama, Cuma 13:00 sıfırlama, madalyalar
-13. Profil — istatistikler, rozetler, gizlilik, hafızlık rozeti
-14. Bildirimler — tüm bildirim tipleri
-15. Başarılar & Rozetler — streak, hatim, okuma, ekip rozetleri
-16. Vird sekmesi — öneri formu, duyurular
-
----
-
-## 7. Yayınlama
+## 6. Yayınlama
 
 - Google Play ve App Store hesapları şahıs şirketi adına açılacak
 - Google Play: $25 tek seferlik
@@ -237,30 +216,3 @@
 
 ---
 
-## 8. Gelecek Güncellemeler
-
-### 8.1 Sistemi Olgunlaştırma
-- İçerik filtreleme (uygunsuz metin engeli — kullanıcı adı, grup adı, açıklama vb.)
-- Pro mode (ödemeli sistem)
-- Hafızlık belge doğrulama sistemi
-- Ölçekleme ve performans iyileştirmeleri
-
-### 8.2 Yeni Özellikler
-- Namaz takibi
-- İslami oyun/quiz (Zip benzeri)
-- Kuran ve Meal uygulama içi okuma entegrasyonu
-- Tefsir takibi
-- Kuran Arapçası öğrenme (Duolingo tarzı)
-- Ramazan güncellemesi (oruç, teravih takip)
-- Günlük ayet ve hadis
-- Önemli günler hatırlatması (Kadir Gecesi, Mevlid, Regaib vb.)
-- Yıllık özet (Spotify Wrapped tarzı)
-- Hatim sertifikası (tamamlayınca indirilebilir dijital sertifika)
-- Favori camiler profilde gösterme gibi topluluk özellikleri
-
----
-
-## 9. Açık Kararlar (Henüz Konuşulmadı)
-
-- 5-6 renk paletinin tamamı
-- Logo

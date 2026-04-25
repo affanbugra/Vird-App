@@ -1,45 +1,74 @@
 # Vird — Claude Çalışma Kuralları
 
-**Oturum başında HER ZAMAN oku:** `README/lessons.md` (proje durumu + dersler + Kuran veri sistemi)
-Tüm notlar `README/` klasöründedir — proje dışı hafıza dosyası kullanılmaz.
+## Dokümantasyon Sistemi
 
-Proje dokümanı: `README/vird_proje_dokumani.md`
-Tasarım sistemi: `README/vird_tasarim.md`
-Görev listesi: `README/todo.md`
-Dersler & bağlam: `README/lessons.md`
-Stack: Flutter + Firebase
+README/ klasöründe 4 dosya var. Her birinin **tek** bir sorumluluğu var.
 
-## Hangi Durumda Hangi Dosya
+| Dosya | Soru | Ne zaman okunur |
+|---|---|---|
+| `README/STATUS.md` | Neredeyiz? Ne öğrendik? | **Her oturum başında — zorunlu** |
+| `README/todo.md` | Şu an ne yapılıyor? | Görev alırken / modül başlarken |
+| `README/vird_proje_dokumani.md` | Ne yapıyoruz? (Spec) | Yeni özellik, mimari soru |
+| `README/vird_tasarim.md` | Nasıl görünmeli? | **Her UI işinde — zorunlu** |
 
-| Durum | Oku |
-|---|---|
-| Yeni özellik / genel soru | `README/vird_proje_dokumani.md` |
-| UI, widget, ekran tasarımı | `README/vird_tasarim.md` |
-| Renk, tipografi, animasyon | `README/vird_tasarim.md` |
-| Görev takibi | `README/todo.md` |
-| Geliştirme ortamı, geçmiş dersler | `README/lessons.md` |
-| Ne yapılacak belirsiz | İkisini de oku |
+### STATUS.md
+Projenin hafızası. Şunları içerir:
+- Modül tablosu: hangi modül bitti, hangisi sırada
+- Tamamlanan modüllerin teknik kararları ve dosya yapısı
+- Kuran veri sistemi dökümantasyonu (`lib/data/quran_cuz.dart`)
+- Öğrenilen dersler — tekrar edilmeyecek hatalar
+
+### todo.md
+Tüm yapılacaklar — aktif görevler, MVP backlog, MVP sonrası fikirler, açık kararlar. Tamamlanan modüller buradan silinir, STATUS.md'ye taşınır.
+
+### vird_proje_dokumani.md
+Uygulamanın neyi, neden yaptığı. MVP özellikleri, ekran yapıları, iş kuralları. Değişmez referans — bir karar netleşince buraya girer.
+
+### vird_tasarim.md
+Renkler, tipografi, spacing, animasyon, her bileşenin tam tasarım kararları. **UI yazmadan önce okunmadan kod yazılmaz.** Tasarım dışına çıkıldıysa geri dönülür.
+
+---
+
+## Stack
+
+Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu nedeniyle kullanılmıyor).
+
+---
+
+## Mimari Kararlar
+
+> Bu kararlar netleşmiş — yeniden tartışmaya açma, maliyeti ve karmaşıklığı göz önünde tutarak verildi.
+
+| Konu | Karar | Sebep |
+|---|---|---|
+| Kuran Haritası verisi | `{sayfa: okumaAdedi}` map, tek dokümanda | 604 ayrı doküman = gereksiz okuma maliyeti |
+| Liderboard | Cloud Function haftalık snapshot alır, istemci sadece okur | Gerçek zamanlı sıralama hesabı pahalı |
+| Streak / hasanat hesabı | Client'ta hesapla, sonucu Firestore'a yaz | Her açılışta sunucuya sorgu atmamak için |
+| Offline mode | Firestore cache açık (`persistenceEnabled`) | Ayrı local storage mantığı yazmaya gerek yok |
+| Realtime Database | Kullanılmıyor — her şey Firestore'da | İki veritabanı = fazladan karmaşıklık ve maliyet |
+
+**Firestore güvenlik kuralları notu:** Test modu 30 günde sürüyor. Yeni koleksiyon eklerken kurallara da ekle, yoksa yazma işlemleri hata verir.
 
 ---
 
 ## 1. Plan Önce, Kod Sonra
 
-- 3+ adım veya mimari karar içeren HER görev için önce plan yaz
+- 3+ adım veya mimari karar içeren her görev için önce plan yaz
 - Belirsizlik varsa spec netleşmeden koda girme
-- Bir şeyler ters giderse DUR, yeniden planla — ilerlemeye devam etme
+- Bir şeyler ters giderse DUR, yeniden planla
 - Doğrulama adımları da plana dahil edilir
 
 ## 2. Bitmeden Doğrula
 
 - Çalıştığını kanıtlamadan görevi tamamlandı sayma
 - Kendine sor: "Kıdemli bir Flutter geliştirici bunu onaylar mıydı?"
-- Streak hesaplama, hasanat, offline sync gibi kritik modüllerde test koş
+- Streak, hasanat, offline sync gibi kritik modüllerde test koş
 - Logları kontrol et, doğruluğu kanıtla
 
 ## 3. Zarafet — Dengeli
 
 - Önemsiz olmayan değişikliklerde: "Daha temiz bir yol var mı?" diye sor
-- Hacky hissettiren bir fix varsa: şu an bildiklerinle zarif çözümü uygula
+- Hacky bir fix varsa: şu an bildiklerinle zarif çözümü uygula
 - Basit fixlerde bunu atlat — aşırı mühendislik yapma
 
 ## 4. Bug Düzeltme — Otonom
@@ -50,9 +79,9 @@ Stack: Flutter + Firebase
 
 ## 5. Öz-İyileştirme
 
-- Herhangi bir düzeltme sonrası `README/lessons.md` güncelle
-- Aynı hatanın tekrarını önleyecek kural yaz
-- Session başında `README/lessons.md` gözden geçir
+- Her düzeltme veya tamamlanan modül sonrası `README/STATUS.md` güncelle
+- Öğrenilen dersi yaz, aynı hatanın tekrarını önle
+- Oturum başında STATUS.md oku
 
 ---
 
@@ -61,18 +90,18 @@ Stack: Flutter + Firebase
 1. `README/todo.md`'ye checkable maddeler olarak plan yaz
 2. Uygulamaya başlamadan önce planı doğrula
 3. Giderken tamamlananları işaretle
-4. Her adımda kısa özet ver
-5. Düzeltmelerden sonra `README/lessons.md` güncelle
+4. Modül bitince: STATUS.md güncelle → todo.md temizle
+5. Her adımda kısa özet ver
 
 ---
 
 ## Commit Kuralları
 
-- Commit mesajı Türkçe yaz
+- Commit mesajı Türkçe
 - Format: `tip: kısa açıklama` — örn: `feat: streak freeze sistemi eklendi`
 - Tipler: `feat` (yeni özellik), `fix` (hata), `style` (UI), `refactor`, `docs`
 - Mesaj 50 karakteri geçmesin
-- Sen sormadan commit atma — sadece "commit at" deyince at
+- **Sen sormadan commit atma** — sadece "commit at" deyince at
 
 ---
 
