@@ -7,7 +7,8 @@ import '../app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
 
-enum HeatFilter { month, year, all, meal }
+enum HeatTypeFilter { arapca, meal }
+enum HeatTimeFilter { all, month, year }
 
 String _fmt(int n) {
   final s = n.toString();
@@ -30,7 +31,8 @@ class ProfilScreen extends StatefulWidget {
 }
 
 class _ProfilScreenState extends State<ProfilScreen> {
-  HeatFilter _filter = HeatFilter.all;
+  HeatTypeFilter _typeFilter = HeatTypeFilter.arapca;
+  HeatTimeFilter _timeFilter = HeatTimeFilter.all;
   int? _selectedPage;
 
   void _showSettings(BuildContext context) {
@@ -50,53 +52,40 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
-  /// Firestore loglarından sayfa bazlı okuma sayılarını hesaplar
+  /// Firestore loglarından sayfa bazlı okuma sayılarını hesaplar (zaman filtresi client-side)
   Map<int, int> _buildReadingsFromLogs(List<QueryDocumentSnapshot> logs) {
     final Map<int, int> readings = {};
+    final now = DateTime.now();
+    final DateTime? cutoff = _timeFilter == HeatTimeFilter.month
+        ? now.subtract(const Duration(days: 30))
+        : _timeFilter == HeatTimeFilter.year
+            ? now.subtract(const Duration(days: 365))
+            : null;
+
     for (final doc in logs) {
       final data = doc.data() as Map<String, dynamic>;
+      if (cutoff != null) {
+        final ts = data['createdAt'] as Timestamp?;
+        if (ts == null || ts.toDate().isBefore(cutoff)) continue;
+      }
       final startPage = data['startPage'] as int?;
       final endPage = data['endPage'] as int?;
-
       if (startPage != null && endPage != null) {
-        // Sayfa aralığındaki tüm sayfaları say
         for (int p = startPage; p <= endPage && p <= 604; p++) {
           readings[p] = (readings[p] ?? 0) + 1;
         }
-      } else {
-        // startPage/endPage yoksa pagesRead ile hatim ilerlemesi — genel sayaç
-        // Bu loglar haritada gösterilmez ama hasanat/totalPages'te sayılır
       }
     }
     return readings;
   }
 
-  /// Filtreye göre Firestore query oluşturur
+  /// Tür filtresine göre Firestore query — zaman filtresi client-side yapılır
   Query<Map<String, dynamic>> _buildLogsQuery(String uid) {
-    var query = FirebaseFirestore.instance
+    return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('logs')
-        .orderBy('createdAt', descending: true);
-
-    // Meal filtresi — sadece meal tipindeki loglar
-    if (_filter == HeatFilter.meal) {
-      query = query.where('type', isEqualTo: 'meal');
-    } else if (_filter != HeatFilter.all) {
-      // Arapça logları göster (meal hariç tüm filtreler arapça bazlı)
-      query = query.where('type', isEqualTo: 'arapca');
-    }
-
-    // Tarih filtreleri
-    if (_filter == HeatFilter.month) {
-      final cutoff = DateTime.now().subtract(const Duration(days: 30));
-      query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff));
-    } else if (_filter == HeatFilter.year) {
-      final cutoff = DateTime.now().subtract(const Duration(days: 365));
-      query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff));
-    }
-
-    return query;
+        .where('type', isEqualTo: _typeFilter == HeatTypeFilter.meal ? 'meal' : 'arapca');
   }
 
   @override
@@ -163,11 +152,16 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                         const SizedBox(height: 12),
                         _KuranHaritasiCard(
-                          filter: _filter,
+                          typeFilter: _typeFilter,
+                          timeFilter: _timeFilter,
                           readings: readings,
                           selectedPage: _selectedPage,
-                          onFilterChanged: (f) => setState(() {
-                            _filter = f;
+                          onTypeFilterChanged: (f) => setState(() {
+                            _typeFilter = f;
+                            _selectedPage = null;
+                          }),
+                          onTimeFilterChanged: (f) => setState(() {
+                            _timeFilter = f;
                             _selectedPage = null;
                           }),
                           onPageTap: (p) => setState(() => _selectedPage = p),
@@ -441,26 +435,35 @@ class _StatCard extends StatelessWidget {
 // ─── Kuran Haritası Kartı ─────────────────────────────────────────────────────
 
 class _KuranHaritasiCard extends StatelessWidget {
-  final HeatFilter filter;
+  final HeatTypeFilter typeFilter;
+  final HeatTimeFilter timeFilter;
   final Map<int, int> readings;
   final int? selectedPage;
-  final ValueChanged<HeatFilter> onFilterChanged;
+  final ValueChanged<HeatTypeFilter> onTypeFilterChanged;
+  final ValueChanged<HeatTimeFilter> onTimeFilterChanged;
   final ValueChanged<int> onPageTap;
 
   const _KuranHaritasiCard({
-    required this.filter,
+    required this.typeFilter,
+    required this.timeFilter,
     required this.readings,
     required this.selectedPage,
-    required this.onFilterChanged,
+    required this.onTypeFilterChanged,
+    required this.onTimeFilterChanged,
     required this.onPageTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isMeal = filter == HeatFilter.meal;
-    final readPages = readings.values.where((v) => v > 0).length;
+    final isMeal = typeFilter == HeatTypeFilter.meal;
+    final readPages = readings.keys.where((p) => p >= 1 && (readings[p] ?? 0) > 0).length;
     final totalReadings = readings.values.fold(0, (a, b) => a + b);
-    final coveragePct = readPages == 0 ? 0 : ((readPages / 604.0) * 100).round();
+    final completedCuz = QuranData.cuzler.where((c) {
+      for (int p = c.startPage; p <= c.endPage; p++) {
+        if ((readings[p] ?? 0) == 0) return false;
+      }
+      return true;
+    }).length;
 
     return Container(
       decoration: BoxDecoration(
@@ -506,36 +509,64 @@ class _KuranHaritasiCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.tealLight,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  isMeal ? 'MEAL' : 'ARAPÇA',
-                  style: GoogleFonts.nunito(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.teal,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => onTypeFilterChanged(HeatTypeFilter.arapca),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: !isMeal ? AppColors.teal : AppColors.lightGrey,
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
+                      ),
+                      child: Text('ARAPÇA', style: GoogleFonts.nunito(
+                        fontSize: 10, fontWeight: FontWeight.w700,
+                        color: !isMeal ? Colors.white : AppColors.textMid,
+                      )),
+                    ),
                   ),
-                ),
+                  GestureDetector(
+                    onTap: () => onTypeFilterChanged(HeatTypeFilter.meal),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isMeal ? AppColors.teal : AppColors.lightGrey,
+                        borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
+                      ),
+                      child: Text('MEAL', style: GoogleFonts.nunito(
+                        fontSize: 10, fontWeight: FontWeight.w700,
+                        color: isMeal ? Colors.white : AppColors.textMid,
+                      )),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 10),
-          // Filtre chip'leri
+          // Zaman filtresi
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _FilterChip(label: 'Son 1 ay', value: HeatFilter.month, selected: filter, onTap: onFilterChanged),
+                _FilterChip(
+                  label: 'Tüm zamanlar',
+                  isSelected: timeFilter == HeatTimeFilter.all,
+                  onTap: () => onTimeFilterChanged(HeatTimeFilter.all),
+                ),
                 const SizedBox(width: 6),
-                _FilterChip(label: 'Son 1 yıl', value: HeatFilter.year, selected: filter, onTap: onFilterChanged),
+                _FilterChip(
+                  label: 'Son 1 ay',
+                  isSelected: timeFilter == HeatTimeFilter.month,
+                  onTap: () => onTimeFilterChanged(HeatTimeFilter.month),
+                ),
                 const SizedBox(width: 6),
-                _FilterChip(label: 'Tüm zamanlar', value: HeatFilter.all, selected: filter, onTap: onFilterChanged),
-                const SizedBox(width: 6),
-                _FilterChip(label: 'Meal', value: HeatFilter.meal, selected: filter, onTap: onFilterChanged),
+                _FilterChip(
+                  label: 'Son 1 yıl',
+                  isSelected: timeFilter == HeatTimeFilter.year,
+                  onTap: () => onTimeFilterChanged(HeatTimeFilter.year),
+                ),
               ],
             ),
           ),
@@ -544,11 +575,11 @@ class _KuranHaritasiCard extends StatelessWidget {
           IntrinsicHeight(
             child: Row(
               children: [
+                _StatStrip(value: _fmt(readPages), label: 'SAYFA'),
+                const VerticalDivider(color: AppColors.borderGrey, thickness: 1, width: 32),
                 _StatStrip(value: _fmt(totalReadings), label: 'OKUMA'),
                 const VerticalDivider(color: AppColors.borderGrey, thickness: 1, width: 32),
-                _StatStrip(value: '%$coveragePct', label: 'KAPSAM'),
-                const VerticalDivider(color: AppColors.borderGrey, thickness: 1, width: 32),
-                _StatStrip(value: _fmt(readPages), label: 'SAYFA'),
+                _StatStrip(value: '$completedCuz/30', label: 'CÜZ'),
               ],
             ),
           ),
@@ -569,22 +600,19 @@ class _KuranHaritasiCard extends StatelessWidget {
 
 class _FilterChip extends StatelessWidget {
   final String label;
-  final HeatFilter value;
-  final HeatFilter selected;
-  final ValueChanged<HeatFilter> onTap;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   const _FilterChip({
     required this.label,
-    required this.value,
-    required this.selected,
+    required this.isSelected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = value == selected;
     return GestureDetector(
-      onTap: () => onTap(value),
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
@@ -696,7 +724,7 @@ class _HeatGrid extends StatelessWidget {
         final sq = _squareSize(constraints.maxWidth);
         final radius = (sq * 0.22).clamp(1.5, 4.0);
         final maxCount = readings.isEmpty ? 0 : readings.values.fold(0, (a, b) => a > b ? a : b);
-        final fatihaCount = readings[0] ?? 0;
+        final fatihaCount = readings[1] ?? 0; // Fatiha rengi Bakara 1. sayfayla aynı
         final fatihaSelected = selectedPage == 0;
 
         final labelStyle = GoogleFonts.nunito(

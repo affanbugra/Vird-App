@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-04-26 — güncellendi)
+## Genel Durum (2026-04-27 — güncellendi)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi)
@@ -20,8 +20,8 @@
 | 1 | Kurulum | ✅ Tamamlandı |
 | 2 | Auth (Google + email, Firebase) | ✅ Tamamlandı |
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
-| 4 | Hatimlerim ekranı | ✅ Tamamlandı |
-| 5 | Log girişi | ✅ Tamamlandı |
+| 4 | Hatimlerim + Tamamlanan Hatimler + Isı Haritası | ✅ Tamamlandı |
+| 5 | Log girişi (kilitleme modu + fazla sayfa uyarısı) | ✅ Tamamlandı |
 | 6 | Seri sistemi | ⬜ |
 | 7 | Sure serii | ⬜ |
 | 8 | Hasanat sistemi | ✅ Tamamlandı |
@@ -80,13 +80,27 @@
 - **Cüz 1–29:** 20'şer kare, standart satır
 - **Cüz 30:** 2 satıra bölünür — satır 1: sayfa 581–600, satır 2: sayfa 601–604 + "İhlâs · Felak · Nâs" etiketi
 
-#### State
+#### State (güncel)
 ```dart
-enum HeatFilter { month, year, all, meal }
+enum HeatTypeFilter { arapca, meal }   // Tür filtresi — ARAPÇA/MEAL segmented badge
+enum HeatTimeFilter { all, month, year } // Zaman filtresi — chip satırı
+// _typeFilter: HeatTypeFilter — Firestore query'de where('type', ...) ile kullanılır
+// _timeFilter: HeatTimeFilter — client-side filtreleme; composite index gerektirmez
 // _readings: Map<int, int> — {sayfa: okumaSayısı}
-// MVP: boş harita. Firestore log modülünde doldurulacak.
 // _selectedPage: int? — detay paneli için
 ```
+
+#### Filtre Mimarisi (güncel)
+- Tür ve zaman filtreleri **bağımsız** — önceki `HeatFilter` enum'u ikisini birleştiriyordu, hata yapıyordu
+- `_buildLogsQuery`: yalnızca `.where('type', ...)` — tek alan filtresi, index gerekmez
+- `_buildReadingsFromLogs`: zaman filtresi `createdAt` karşılaştırmasıyla client-side uygulanır
+- Tür filtresi: ARAPÇA/MEAL badge'i başlık satırının sağında (segmented toggle görünümü)
+- Zaman filtresi: Tüm zamanlar | Son 1 ay | Son 1 yıl — altta chip satırı olarak kalır
+
+#### Metrikler (güncel)
+- **Profil:** SAYFA (benzersiz) | OKUMA (toplam) | CÜZ (X/30 — tamamlanan cüz sayısı)
+- **Hatim:** SAYFA | CÜZ | KALAN
+- KAPSAM % metriği kaldırıldı — genel haritada yanıltıcıydı
 
 ---
 
@@ -188,55 +202,87 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 ---
 
-### Modül 4 & 5 — Hatimlerim + Log Girişi (2026-04-25 başladı, 2026-04-26 tamamlandı)
+### Modül 4 & 5 — Hatimlerim + Log Girişi (2026-04-25 başladı, 2026-04-27 son güncelleme)
 
 #### Dosyalar
-- `lib/screens/hatimlerim_screen.dart` — Hatimlerim sekmesi (tam fonksiyonel)
-- `lib/widgets/log_entry_bottom_sheet.dart` — 4 tab'lı okuma kaydı bottom sheet
+- `lib/screens/hatimlerim_screen.dart` — Aktif hatimler sekmesi
+- `lib/screens/tamamlanan_hatimler_screen.dart` — Tamamlanan hatimler listesi (YENİ)
+- `lib/widgets/hatim_heat_map_sheet.dart` — Per-hatim ısı haritası bottom sheet (YENİ)
+- `lib/widgets/log_entry_bottom_sheet.dart` — 4 tab'lı okuma kaydı (kilitleme modu + uyarı)
 - `lib/widgets/log_history_sheet.dart` — Kayıt geçmişi (düzenleme + silme)
-- `lib/models/hatim_model.dart` — Hatim veri modeli
-- `lib/models/reading_log_model.dart` — Okuma log veri modeli (`cuz` metodu eklendi)
+- `lib/models/hatim_model.dart` — Hatim veri modeli (`isCompleted`, `completedAt` alanları eklendi)
+- `lib/models/reading_log_model.dart` — Okuma log veri modeli
+
+#### Hatim Model (`hatim_model.dart`)
+```dart
+isCompleted: (data['isCompleted'] as bool?) ?? false,   // geriye uyumlu — null → false
+completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
+```
+- Eski Firestore dokümanlarında `isCompleted` alanı yok → `false` varsayılan
+- Tamamlanma şartı: `newCurrentPage >= 604 && !linkedHatim.isCompleted`
+- Tamamlanınca: `batch.update(hatimRef, {'isCompleted': true, 'completedAt': serverTimestamp()})`
+- Aynı batch'te `users/{uid}` altında `hatimCount: increment(1)` eklenir
 
 #### Hatimlerim Ekranı
 1. **Seri & Hasanat kartları** — Firestore'dan `seri` ve `hasanat` alanları canlı
 2. **Aktif Hatimler listesi** — StreamBuilder + `_deletingIds Set` (Dismissible/StreamBuilder çakışma önlemi)
 3. **Yeni Hatim Başlat** — FAB; Arapça ≤ 3 / Meal ≤ 1 limit, sayaç badge'leri, opsiyonel isim alanı
 4. **Hatim silme** — Sola swipe → kırmızı zemin → AlertDialog onayı → Firestore delete
-5. **Hatim kartı** — Özel isim varsa başlık olarak gösterilir, altında "Arapça Hatim" / "Meal Hatimi" subtitle; `XX/604 sayfa` + sağda `X. cüz` (mevcut cüz numarası); cüz bazlı progress bar (completedCuz/30); DEVAM ET butonu doğrudan o hatimle LogEntryBottomSheet açar
+5. **Hatim kartı** — Minimal: ikon + başlık + `XX/604 sayfa · X. cüz` + progress bar + sağda grid ikonu
+6. **Kart tıklama** — Kartın herhangi yerine veya grid ikonuna basmak → `HatimHeatMapSheet.show()` açar
+7. **Tamamlanan hatimler butonu** — Liste altında; tamamlanan sayısı varsa görünür, `TamamlananHatimlerScreen`'e yönlendirir
+8. **DEVAM ET** — Kart'tan kaldırıldı; ısı haritası sayfasının üstünde yer alır
 
-#### Log Girişi Bottom Sheet
-- **4 tab:** Devam | Sayfa | Cüz | Sure
-- **Paylaşımlı `_TypeToggle`** — TabBar'ın üstünde, tek global kontrol; hatim seçiliyken veya Devam tab'ındayken kilitlenir (hatim tipini yansıtır, değiştirilemez)
-- **`_globalType`** — `initialHatim` ile açılırsa o hatimin tipiyle başlar; tip değişince Sayfa/Cüz'deki seçili hatim otomatik temizlenir
-- **Devam tab:** Seçili hatim bilgi kartı (`X. cüzden Y sayfa okundu` formatı + sure adı), +X sayfa giriş; birden fazla hatim varsa "Değiştir" linki
-- **Sayfa tab:** Başlangıç–Bitiş aralığı; hatim chip'leri `_globalType`'a göre filtrelenmiş
-- **Cüz tab:** `DropdownSearch<CuzInfo>`, sayfa sayısı otomatik; hatim chip'leri `_globalType`'a göre filtrelenmiş
-- **Sure tab:** `DropdownSearch<SurahInfo>` arama destekli; hatimle ilişkilendirilemez (info notu)
-- **`_OptionalHatimChips`:** Chip etiketi `hatim.displayName` kullanır; "Serbest Okuma" chip'i
-- **Firestore işlemleri:** Log + hatim ilerlemesi + hasanat/totalPages — tek `batch.commit()`
-- **Devam tab:** `newCurrentPage = currentPage + pagesRead`; Sayfa/Cüz tab'ı: `max(currentPage, endPage)` (geri gitmez)
-- **History butonu:** Başlık satırında saat ikonu → `LogHistorySheet.show()`
+#### Tamamlanan Hatimler Ekranı (`tamamlanan_hatimler_screen.dart`)
+- Firestore query: `.where('isCompleted', isEqualTo: true)` — composite index gerektirmesin diye `orderBy` YOK
+- Client-side sort: `completedAt ?? updatedAt` desc
+- Kart: yeşil border, "604/604 sayfa · tarih", TAMAM badge, grid ikonu
+- Kart herhangi yerine tıklama → `HatimHeatMapSheet.show()` (onDevamEt: null, buton gösterilmez)
+- Swipe-to-delete + AlertDialog onayı
+
+#### Hatim Isı Haritası (`hatim_heat_map_sheet.dart`)
+- Yalnızca o hatimin logları: `.where('hatimId', isEqualTo: hatim.id)`
+- **Binary renk:** okundu = `Color(0xFF38A474)` (yeşil-teal), okunmadı = `AppColors.borderGrey`
+- **Fatiha karesi:** `usePage1Color: true` → `readPages.contains(1)` ile renk belirlenir (page 1 ile aynı)
+- **Tıklama → detay:** `_selectedPage` state; seçilen sayfa numarası + sure adı + okundu/okunmadı badge
+- **Metrikler:** SAYFA | CÜZ (tamamlanan cüz/30) | KALAN
+- **DEVAM ET butonu:** `onDevamEt` callback varsa sayfanın en üstünde; `Navigator.pop` + `addPostFrameCallback` ile hatim log sheet açılır
+- **Kilitleme:** `onDevamEt` ile açılınca `LogEntryBottomSheet` o hatim kilitli açılır
+- **Tarih bilgileri (`_HatimDatesRow`):** başlangıç tarihi; tamamlananlar için bitiş + süre (`_fmtDuration`: <30 gün → "X gün", ≥30 gün → "X ay Y gün")
+- **Son Okumalar:** son 3 log (client-side sort); dişli ikon + "Tümünü gör (N)" → `_AllLogsSheet`
+- **`_AllLogsSheet`:** Tüm hatim logları StreamBuilder ile canlı; swipe-to-delete → `batch(doc.delete, hasanat -= pagesRead×10, totalPages -= pagesRead)`; NOT: hatim `currentPage` güncellenmez (geriye dönük hesap karmaşıklığı)
+
+#### Log Girişi Bottom Sheet — Güncellemeler
+- **Kilitleme modu** (`_lockedToHatim = initialHatim != null`):
+  - TabController length: 3 (Sure sekmesi gizlenir)
+  - `_devamHatim`, `_sayfaHatim`, `_cuzHatim` hepsi `initialHatim` ile başlatılır
+  - Devam tab'da "Değiştir" butonu gizlenir
+  - Sayfa/Cüz tab'larında chip seçimi yerine `_LockedHatimBadge` gösterilir
+- **Fazla sayfa uyarısı:** Devam tab'da `currentPage + pagesRead > 604` ise dialog:
+  - "X sayfa kaldı ama Y sayfa girdin. Hatim tamamlandı olarak işaretlenecek."
+  - İptal / Tamam; İptal → kayıt yapılmaz
 
 #### Log Geçmişi Bottom Sheet (`log_history_sheet.dart`)
 - Ekran yüksekliğinin %68'i, tüm loglar StreamBuilder ile (limit yok)
-- Her satır: yöntem ikonu + başlık (metoda özel) + tip badge + göreli zaman + düzenle/sil ikonları
+- Her satır: yöntem ikonu + başlık + tip badge + göreli zaman + düzenle/sil ikonları
 - **Silme:** AlertDialog → batch(log sil, hasanat -= pagesRead×10, totalPages -= pagesRead)
-- **Düzenleme (`_LogEditSheet`):** Metoda özel form (hatim→pagesRead, sayfa→start/end, cüz→dropdown, sure→arama destekli dropdown); batch ile fark hesabı (Δhasanat, ΔtotalPages)
-- Hatim bağlantılı loglarda hatim `currentPage` güncellenmez (geriye dönük hesap karmaşıklığı)
+- **Düzenleme (`_LogEditSheet`):** Metoda özel form; batch ile fark hesabı (Δhasanat, ΔtotalPages)
 
 #### Firestore Şeması (güncel)
 ```
 users/{uid}/hatims/{hatimId}
   type: 'arapca' | 'meal'
-  name: string?          ← YENİ (opsiyonel özel isim)
+  name: string?
   currentPage: int
   totalPages: 604
+  isCompleted: bool          ← YENİ (eski dokümanlarda yok → false kabul edilir)
+  completedAt: Timestamp?    ← YENİ (sadece tamamlanan hatimlerde)
   createdAt: Timestamp
-  updatedAt: Timestamp   ← FieldValue.serverTimestamp() ile güncellenir
+  updatedAt: Timestamp       ← FieldValue.serverTimestamp()
 
 users/{uid}/logs/{logId}
   type: 'arapca' | 'meal'
-  method: 'hatim' | 'surah' | 'pages' | 'cuz'   ← 'cuz' YENİ
+  method: 'hatim' | 'surah' | 'pages' | 'cuz'
   pagesRead: int
   surahId: int?
   startPage: int?
@@ -248,6 +294,7 @@ users/{uid} (root doc)
   hasanat: int
   totalPages: int
   seri: int
+  hatimCount: int            ← YENİ (tamamlanan hatim sayacı)
 ```
 
 ---
@@ -290,3 +337,9 @@ users/{uid} (root doc)
 - **Göreli ısı haritası taban:** Saf `count/maxCount` oranı — max=1 iken tek okuma en koyu rengi alır, saçma görünür. Taban `max(maxCount, 10)` ile hem göreli hem gerçekçi dağılım sağlanır
 - **Paylaşımlı toggle + başlangıç tipi:** `LogEntryBottomSheet` dışarıdan `initialHatim` ile açılırsa `_globalType = initialHatim.type` ile başlatmak gerekir; aksi hâlde sekme değiştirince tip sıfırlanır
 - **Chip filtresi:** Arapça/Meal toggle'ı değişince hatim chip listesi de filtrelenmeli — aksi hâlde yanlış tipteki hatimler gösterilir ve yanlış log yazılır
+- **Firestore composite index tuzağı:** `orderBy + where` birden fazla alan içerince composite index oluşturmak gerekir; `orderBy` kaldırılıp sıralama client-side yapılırsa index gerekmez ve query basitleşir
+- **Geriye uyumlu model alanı:** Yeni bool alan eklenince `(data['isCompleted'] as bool?) ?? false` — null-safe default olmadan eski dokümanlar crash yapar
+- **`Dismissible` + `StreamBuilder` çakışması (tamamlanan):** `_deletingIds Set` ile client-side filtreleme; hem `hatimlerim_screen.dart` hem `tamamlanan_hatimler_screen.dart` hem `_AllLogsSheet`'te aynı pattern kullanılır
+- **Log silme sınırı:** `_AllLogsSheet`'te log silinince `hasanat` ve `totalPages` güncellenir ama hatim `currentPage` güncellenmez (geriye dönük hesap karmaşık); kullanıcı yeni doğru log ekleyebilir
+- **Fazla sayfa kontrolü:** `pagesRead <= 0` kontrolünden sonra, `setState` öncesinde; dialog await'i öncesinde hiç `async` olmadığından `context` güvenli kullanılır
+- **TabController length dinamik:** `_lockedToHatim` true iken `length: 3` (Sure sekmesi yok); `initState`'te `widget.initialHatim != null` kontrolüyle belirlenir — `initState`'te `widget` erişilebilir

@@ -33,7 +33,7 @@
 
 - [ ] **Isı haritası stres testi** — profil ekranında geçici "test verisi yükle" butonu ekle; rastgele sayfa değerleri (0–50 okuma arası) ile haritanın uç değerlerde nasıl göründüğünü test et; renk dağılımı, Fatiha karesi, 30. cüz kırık satır dahil kontrol edilecek
 - [ ] **Sure bazlı ısı haritası düşün** — bir kullanıcı her gün aynı sure'yi okursa o sayfalar çok yüksek count alacak, çevresindeki sayfalar hep gri kalacak; bu görsel dengesizliğin harita için ne anlama geldiğine bakılacak (heatColorRelative zaten yardımcı oluyor ama özellikle sure seviyesinde test edilmeli)
-- [ ] **Hatimler ekranı UI sadeleştirme** — kart boyutları küçültülecek, gereksiz boşluklar kısaltılacak, scroll azaltılacak; daha minimal ve sade bir görünüm hedefleniyor; tasarım kararları `README/vird_tasarim.md`'e göre yapılacak
+- [x] **Hatimler ekranı UI sadeleştirme** — kart boyutları küçültüldü, DEVAM ET ısı haritasına taşındı ✅
 
 ---
 

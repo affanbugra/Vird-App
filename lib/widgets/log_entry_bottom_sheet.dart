@@ -57,12 +57,16 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   // ── Ortak tür seçici ───────────────────────────────────────────────
   HatimType _globalType = HatimType.arapca;
 
+  bool get _lockedToHatim => widget.initialHatim != null;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    if (widget.initialHatim != null) {
+    _tabController = TabController(length: _lockedToHatim ? 3 : 4, vsync: this);
+    if (_lockedToHatim) {
       _devamHatim = widget.initialHatim;
+      _sayfaHatim = widget.initialHatim;
+      _cuzHatim = widget.initialHatim;
       _globalType = widget.initialHatim!.type;
     }
     _fetchHatims();
@@ -91,7 +95,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         .get();
     if (!mounted) return;
     setState(() {
-      _hatims = snap.docs.map((d) => Hatim.fromFirestore(d)).toList();
+      _hatims = snap.docs
+          .map((d) => Hatim.fromFirestore(d))
+          .where((h) => !h.isCompleted)
+          .toList();
       _loadingHatims = false;
       // Devam sekmesinde tek hatim varsa otomatik seç
       if (widget.initialHatim == null && _hatims.length == 1) {
@@ -165,6 +172,45 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     }
 
     if (pagesRead <= 0) return;
+
+    // Devam sekmesinde hatim kapasitesini aşan sayfa uyarısı
+    if (_tabController.index == 0 && linkedHatim != null && !linkedHatim.isCompleted) {
+      final h = linkedHatim;
+      final projected = h.currentPage + pagesRead;
+      if (projected > 604) {
+        final remaining = 604 - h.currentPage;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Fazla sayfa girdin',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Text(
+              '${h.displayName} hatiminde $remaining sayfa kaldı ama $pagesRead sayfa girdin.\n\n'
+              'Hatim tamamlandı olarak işaretlenecek.',
+              style: const TextStyle(color: AppColors.textMid),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Tamam',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ) ?? false;
+        if (!confirmed) return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -203,17 +249,23 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
         final int newCurrentPage;
         if (_tabController.index == 0) {
-          // Devam: kaldığı yerden ilerle
           newCurrentPage = (linkedHatim.currentPage + pagesRead).clamp(0, 604);
         } else {
-          // Sayfa/Cüz: bitiş sayfasına götür (geri gitmez)
           newCurrentPage = math.max(linkedHatim.currentPage, endPage);
         }
+
+        final bool justCompleted = newCurrentPage >= 604 && !linkedHatim.isCompleted;
 
         batch.update(hatimRef, {
           'currentPage': newCurrentPage,
           'updatedAt': FieldValue.serverTimestamp(),
+          if (justCompleted) 'isCompleted': true,
+          if (justCompleted) 'completedAt': FieldValue.serverTimestamp(),
         });
+
+        if (justCompleted) {
+          batch.update(userRef, {'hatimCount': FieldValue.increment(1)});
+        }
       }
 
       await batch.commit();
@@ -294,8 +346,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                     ],
                   ),
                 ),
-                // Birden fazla hatim varsa değiştir seçeneği
-                if (_hatims.length > 1)
+                // Birden fazla hatim varsa ve kilitli değilse değiştir seçeneği
+                if (_hatims.length > 1 && !_lockedToHatim)
                   GestureDetector(
                     onTap: () => setState(() => _devamHatim = null),
                     child: const Text('Değiştir',
@@ -409,7 +461,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               ),
             ],
           ),
-          if (_hatims.isNotEmpty) ...[
+          if (_lockedToHatim) ...[
+            const SizedBox(height: 12),
+            _LockedHatimBadge(hatim: widget.initialHatim!),
+          ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('Hatimle ilişkilendir (opsiyonel):',
                 style: TextStyle(color: AppColors.textMid, fontSize: 13)),
@@ -457,7 +512,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                   color: AppColors.teal, fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ],
-          if (_hatims.isNotEmpty) ...[
+          if (_lockedToHatim) ...[
+            const SizedBox(height: 12),
+            _LockedHatimBadge(hatim: widget.initialHatim!),
+          ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('Hatimle ilişkilendir (opsiyonel):',
                 style: TextStyle(color: AppColors.textMid, fontSize: 13)),
@@ -601,11 +659,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             indicatorColor: AppColors.teal,
             labelPadding: EdgeInsets.zero,
             onTap: (_) => setState(() {}),
-            tabs: const [
-              Tab(text: 'Devam'),
-              Tab(text: 'Sayfa'),
-              Tab(text: 'Cüz'),
-              Tab(text: 'Sure'),
+            tabs: [
+              const Tab(text: 'Devam'),
+              const Tab(text: 'Sayfa'),
+              const Tab(text: 'Cüz'),
+              if (!_lockedToHatim) const Tab(text: 'Sure'),
             ],
           ),
           const SizedBox(height: 16),
@@ -617,7 +675,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 _buildDevamTab(),
                 _buildSayfaTab(),
                 _buildCuzTab(),
-                _buildSureTab(),
+                if (!_lockedToHatim) _buildSureTab(),
               ],
             ),
           ),
@@ -700,6 +758,35 @@ class _HatimSelectCard extends StatelessWidget {
               const Icon(Icons.check_circle, color: AppColors.teal, size: 20),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LockedHatimBadge extends StatelessWidget {
+  final Hatim hatim;
+  const _LockedHatimBadge({required this.hatim});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.tealLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.link, size: 14, color: AppColors.teal),
+          const SizedBox(width: 6),
+          Text(
+            hatim.displayName,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.teal),
+          ),
+        ],
       ),
     );
   }

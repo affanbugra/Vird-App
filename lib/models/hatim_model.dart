@@ -8,6 +8,8 @@ class Hatim {
   final String? name;
   final int currentPage;
   final int totalPages;
+  final bool isCompleted;
+  final DateTime? completedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +19,8 @@ class Hatim {
     this.name,
     this.currentPage = 0,
     this.totalPages = 604,
+    this.isCompleted = false,
+    this.completedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -34,6 +38,8 @@ class Hatim {
       name: data['name'] as String?,
       currentPage: data['currentPage'] ?? 0,
       totalPages: data['totalPages'] ?? 604,
+      isCompleted: (data['isCompleted'] as bool?) ?? false,
+      completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );

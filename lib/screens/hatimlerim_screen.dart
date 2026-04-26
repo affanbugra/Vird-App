@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
 import '../widgets/log_entry_bottom_sheet.dart';
+import '../widgets/hatim_heat_map_sheet.dart';
+import 'tamamlanan_hatimler_screen.dart';
 
 const int _arapcaLimit = 3;
 const int _mealLimit = 1;
@@ -81,11 +84,14 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
             return const Center(child: CircularProgressIndicator(color: AppColors.teal));
           }
 
-          final hatims = (snap.data?.docs
+          final allHatims = (snap.data?.docs
                   .map((d) => Hatim.fromFirestore(d))
                   .where((h) => !_deletingIds.contains(h.id))
                   .toList()) ??
               [];
+
+          final hatims = allHatims.where((h) => !h.isCompleted).toList();
+          final completedCount = allHatims.where((h) => h.isCompleted).length;
 
           final arapcaCount = hatims.where((h) => h.type == HatimType.arapca).length;
           final mealCount = hatims.where((h) => h.type == HatimType.meal).length;
@@ -128,14 +134,34 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
                     child: hatims.isEmpty
                         ? _EmptyState(onAdd: () => _showNewHatimSheet(context, hatims))
                         : ListView.builder(
-                            itemCount: hatims.length,
+                            itemCount: hatims.length + (completedCount > 0 ? 1 : 0),
                             itemBuilder: (context, i) {
-                              final hatim = hatims[i];
-                              return _DismissibleHatimCard(
-                                hatim: hatim,
-                                onDelete: () => _deleteHatim(hatim),
-                                onDevamEt: () =>
-                                    LogEntryBottomSheet.show(context, initialHatim: hatim),
+                              if (i < hatims.length) {
+                                final hatim = hatims[i];
+                                return _DismissibleHatimCard(
+                                  hatim: hatim,
+                                  onDelete: () => _deleteHatim(hatim),
+                                  onHeatMap: () => HatimHeatMapSheet.show(
+                                    context,
+                                    hatim: hatim,
+                                    uid: user!.uid,
+                                    onDevamEt: () => LogEntryBottomSheet.show(
+                                        context, initialHatim: hatim),
+                                  ),
+                                );
+                              }
+                              // Tamamlanan hatimler butonu
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4, bottom: 16),
+                                child: _TamamlananButton(
+                                  count: completedCount,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const TamamlananHatimlerScreen(),
+                                    ),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -252,12 +278,12 @@ class _StatCard extends StatelessWidget {
 class _DismissibleHatimCard extends StatelessWidget {
   final Hatim hatim;
   final VoidCallback onDelete;
-  final VoidCallback onDevamEt;
+  final VoidCallback onHeatMap;
 
   const _DismissibleHatimCard({
     required this.hatim,
     required this.onDelete,
-    required this.onDevamEt,
+    required this.onHeatMap,
   });
 
   @override
@@ -308,7 +334,10 @@ class _DismissibleHatimCard extends StatelessWidget {
           ) ?? false;
         },
         onDismissed: (_) => onDelete(),
-        child: _HatimCardContent(hatim: hatim, onDevamEt: onDevamEt),
+        child: GestureDetector(
+          onTap: onHeatMap,
+          child: _HatimCardContent(hatim: hatim, onHeatMap: onHeatMap),
+        ),
       ),
     );
   }
@@ -316,9 +345,9 @@ class _DismissibleHatimCard extends StatelessWidget {
 
 class _HatimCardContent extends StatelessWidget {
   final Hatim hatim;
-  final VoidCallback onDevamEt;
+  final VoidCallback onHeatMap;
 
-  const _HatimCardContent({required this.hatim, required this.onDevamEt});
+  const _HatimCardContent({required this.hatim, required this.onHeatMap});
 
   int _completedCuzCount(int currentPage) {
     if (currentPage <= 0) return 0;
@@ -328,7 +357,6 @@ class _HatimCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isArapca = hatim.type == HatimType.arapca;
-    final hasCustomName = hatim.name != null && hatim.name!.isNotEmpty;
     final completedCuz = _completedCuzCount(hatim.currentPage);
     const totalCuz = 30;
     final cuzProgress = completedCuz / totalCuz;
@@ -345,86 +373,69 @@ class _HatimCardContent extends StatelessWidget {
         side: const BorderSide(color: AppColors.borderGrey),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: AppColors.tealLight,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     isArapca ? Icons.menu_book : Icons.translate,
                     color: AppColors.teal,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         hatim.displayName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: AppColors.textDark),
-                      ),
-                      if (hasCustomName)
-                        Text(
-                          isArapca ? 'Arapça Hatim' : 'Meal Hatimi',
-                          style: const TextStyle(
-                              color: AppColors.textLight, fontSize: 12),
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: AppColors.textDark,
                         ),
+                      ),
                       Text(
-                        '${hatim.currentPage}/604 sayfa',
-                        style: const TextStyle(
-                            color: AppColors.textMid, fontSize: 13),
+                        '${hatim.currentPage}/604 sayfa · $currentCuzNo. cüz',
+                        style: GoogleFonts.nunito(
+                          color: AppColors.textMid,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Text(
-                  '$currentCuzNo. cüz',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.teal,
-                      fontSize: 15),
+                // Isı haritası ikonu
+                GestureDetector(
+                  onTap: onHeatMap,
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.grid_view_rounded, size: 16, color: AppColors.textMid),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: cuzProgress,
-                minHeight: 8,
+                minHeight: 6,
                 backgroundColor: AppColors.borderGrey,
                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
-              ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: onDevamEt,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999)),
-                  elevation: 0,
-                ).copyWith(
-                  side: WidgetStateProperty.all(
-                      const BorderSide(color: AppColors.tealDark, width: 3)),
-                ),
-                child: const Text('DEVAM ET',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -684,6 +695,49 @@ class _TypeOption extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tamamlanan hatimler navigasyon butonu ────────────────────────────────────
+
+class _TamamlananButton extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _TamamlananButton({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF38A474).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF38A474).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.emoji_events_outlined, size: 18, color: Color(0xFF38A474)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$count tamamlanan hatim',
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF38A474),
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: Color(0xFF38A474)),
+          ],
         ),
       ),
     );
