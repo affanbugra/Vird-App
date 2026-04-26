@@ -217,4 +217,17 @@ class QuranData {
     if (count <= 20) return const Color(0xFF1F6370);
     return const Color(0xFF0F3A40);
   }
+
+  // Göreli ısı rengi — max=1 iken bile "en az okunan" seviyede kalır.
+  // Taban 10: 10+ okumaya sahip sayfalar tam karanlık eşiğine ulaşabilir.
+  static Color heatColorRelative(int count, int maxCount) {
+    if (count == 0) return const Color(0xFFEEEEEF);
+    final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
+    final ratio = count / denom;
+    if (ratio <= 0.1) return const Color(0xFFB8DFE4);
+    if (ratio <= 0.3) return const Color(0xFF7EC4CC);
+    if (ratio <= 0.55) return const Color(0xFF2A7F8C);
+    if (ratio <= 0.8) return const Color(0xFF1F6370);
+    return const Color(0xFF0F3A40);
+  }
 }

@@ -83,19 +83,22 @@
 
 ### 5.2 Günlük Okuma Hedefi
 - Kullanıcı kendi hedefini belirler: günlük X sayfa veya X cüz (tam sayı)
-- Üç log girişi yöntemi:
-  - Sure seçerek
-  - Sayfa aralığı girerek
-  - Hatim devam: +X sayfa, kaldığı yerden otomatik ilerler
-- Log girerken üstte Arapça / Meal sekmesi
+- Dört log girişi yöntemi (4 tab):
+  - **Devam:** Seçili hatim + kaç sayfa okundu; kaldığı yerden ilerler
+  - **Sayfa:** Başlangıç–bitiş sayfa aralığı; opsiyonel hatim ilişkilendirme
+  - **Cüz:** Tam cüz seçimi; opsiyonel hatim ilişkilendirme
+  - **Sure:** Sure seçimi; hatimle ilişkilendirilemez (serbest)
+- Log girerken üstte paylaşımlı Arapça / Meal toggle; hatim seçiliyken kilitlenir
+- Kayıt geçmişi: history ikonuyla açılan panel, log düzenleme ve silme destekli
 - Okumalar birbirine sayılır: sure serii ve ana hedef aynı anda düşer
 
 ---
 
 ### 5.3 Hatim Sistemi
-- Aynı anda max 2 aktif hatim: Arapça + Meal
-- Her hatim ayrı şema
-- Hatim sıralı ilerler
+- Aynı anda: Arapça ≤ 3, Meal ≤ 1 (toplam max 4)
+- Hatimlere opsiyonel özel isim verilebilir
+- Hatim sıralı ilerler; kart üstünde mevcut sayfa, cüz ve progress bar
+- Sola kaydırarak hatim silinebilir (onay dialogi)
 
 ---
 

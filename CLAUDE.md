@@ -56,13 +56,15 @@ Flutter + Firebase. Test ortamı: `flutter run -d chrome` (emülatör RAM sorunu
 ```
 users/{uid}/hatims/{hatimId}
   type: 'arapca' | 'meal'
+  name: string?          (opsiyonel özel isim)
   currentPage: int
   totalPages: 604
   createdAt, updatedAt: Timestamp
+  — NOT: updatedAt FieldValue.serverTimestamp() ile yazılır; fromFirestore'da null-safe cast gerekli
 
 users/{uid}/logs/{logId}
   type: 'arapca' | 'meal'
-  method: 'hatim' | 'surah' | 'pages'
+  method: 'hatim' | 'surah' | 'pages' | 'cuz'
   pagesRead: int
   surahId, startPage, endPage: int?
   hatimId: string?
@@ -73,6 +75,8 @@ users/{uid} (root doc fields)
   totalPages: int (FieldValue.increment ile güncellenir)
   seri: int
 ```
+
+**Hatim limitleri:** Arapça ≤ 3, Meal ≤ 1 (toplam max 4 aktif hatim)
 
 ---
 

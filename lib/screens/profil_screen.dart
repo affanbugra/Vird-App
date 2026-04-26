@@ -558,7 +558,7 @@ class _KuranHaritasiCard extends StatelessWidget {
           // Lejant
           _Legend(),
           // Detay paneli
-          _DetailPanel(page: selectedPage, readings: readings),
+          _DetailPanel(page: selectedPage, readings: readings, maxCount: readings.isEmpty ? 0 : readings.values.fold(0, (a, b) => a > b ? a : b)),
         ],
       ),
     );
@@ -671,7 +671,7 @@ class _HeatGrid extends StatelessWidget {
     return (squaresArea - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _buildSquare(int page, double sq, double radius) {
+  Widget _buildSquare(int page, double sq, double radius, int maxCount) {
     final count = readings[page] ?? 0;
     final isSelected = selectedPage == page;
     return GestureDetector(
@@ -681,7 +681,7 @@ class _HeatGrid extends StatelessWidget {
         height: sq,
         margin: const EdgeInsets.only(right: _squareGap),
         decoration: BoxDecoration(
-          color: QuranData.heatColor(count),
+          color: QuranData.heatColorRelative(count, maxCount),
           borderRadius: BorderRadius.circular(radius),
           border: isSelected ? Border.all(color: AppColors.textDark, width: 1) : null,
         ),
@@ -695,6 +695,7 @@ class _HeatGrid extends StatelessWidget {
       builder: (context, constraints) {
         final sq = _squareSize(constraints.maxWidth);
         final radius = (sq * 0.22).clamp(1.5, 4.0);
+        final maxCount = readings.isEmpty ? 0 : readings.values.fold(0, (a, b) => a > b ? a : b);
         final fatihaCount = readings[0] ?? 0;
         final fatihaSelected = selectedPage == 0;
 
@@ -719,7 +720,7 @@ class _HeatGrid extends StatelessWidget {
                   width: sq,
                   height: sq,
                   decoration: BoxDecoration(
-                    color: QuranData.heatColor(fatihaCount),
+                    color: QuranData.heatColorRelative(fatihaCount, maxCount),
                     borderRadius: BorderRadius.circular(radius),
                     border: fatihaSelected
                         ? Border.all(color: AppColors.textDark, width: 1)
@@ -746,7 +747,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('${cuz.cuzNo}', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(cuz.pageCount, (i) => _buildSquare(cuz.startPage + i, sq, radius)),
+                  ...List.generate(cuz.pageCount, (i) => _buildSquare(cuz.startPage + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -762,7 +763,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('30', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(20, (i) => _buildSquare(581 + i, sq, radius)),
+                  ...List.generate(20, (i) => _buildSquare(581 + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -773,7 +774,7 @@ class _HeatGrid extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(width: _labelW + _labelGap),
-                  ...List.generate(4, (i) => _buildSquare(601 + i, sq, radius)),
+                  ...List.generate(4, (i) => _buildSquare(601 + i, sq, radius, maxCount)),
                   const SizedBox(width: 3),
                   Text('İhlâs · Felak · Nâs', style: labelStyle),
                 ],
@@ -836,8 +837,9 @@ class _Legend extends StatelessWidget {
 class _DetailPanel extends StatelessWidget {
   final int? page;
   final Map<int, int> readings;
+  final int maxCount;
 
-  const _DetailPanel({required this.page, required this.readings});
+  const _DetailPanel({required this.page, required this.readings, required this.maxCount});
 
   @override
   Widget build(BuildContext context) {
@@ -853,7 +855,7 @@ class _DetailPanel extends StatelessWidget {
               'Detay için bir sayfaya dokun',
               style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
             )
-          : _PageDetail(page: page!, count: readings[page] ?? 0),
+          : _PageDetail(page: page!, count: readings[page] ?? 0, maxCount: maxCount),
     );
   }
 }
@@ -861,8 +863,9 @@ class _DetailPanel extends StatelessWidget {
 class _PageDetail extends StatelessWidget {
   final int page;
   final int count;
+  final int maxCount;
 
-  const _PageDetail({required this.page, required this.count});
+  const _PageDetail({required this.page, required this.count, required this.maxCount});
 
   @override
   Widget build(BuildContext context) {
@@ -907,7 +910,7 @@ class _PageDetail extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: count == 0 ? AppColors.textLight : QuranData.heatColor(count),
+              color: count == 0 ? AppColors.textLight : QuranData.heatColorRelative(count, maxCount),
             ),
           ),
         ),

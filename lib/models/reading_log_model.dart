@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'hatim_model.dart';
 
-enum LogMethod { hatim, surah, pages }
+enum LogMethod { hatim, surah, pages, cuz }
 
 class ReadingLog {
   final String id;
