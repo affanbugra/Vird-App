@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
+import '../app_assets.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
@@ -282,11 +283,20 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                           ),
                         ),
                         child: Center(
-                          child: Icon(
-                            Icons.shield,
-                            size: 56,
-                            color: Colors.white.withValues(alpha: 0.15),
-                          ),
+                          child: team.logoAsset == 'rical_i_fark'
+                              ? Opacity(
+                                  opacity: 0.25,
+                                  child: Image.asset(
+                                    AppAssets.ricalIFarkLogo,
+                                    height: 90,
+                                    fit: BoxFit.contain,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.shield,
+                                  size: 56,
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                ),
                         ),
                       ),
                     ),

@@ -8,6 +8,7 @@ class TeamModel {
   final String adminUid;
   final int memberCount;
   final DateTime createdAt;
+  final String? logoAsset;
 
   const TeamModel({
     required this.id,
@@ -17,6 +18,7 @@ class TeamModel {
     required this.adminUid,
     required this.memberCount,
     required this.createdAt,
+    this.logoAsset,
   });
 
   factory TeamModel.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +31,7 @@ class TeamModel {
       adminUid: data['adminUid'] as String? ?? '',
       memberCount: data['memberCount'] as int? ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      logoAsset: data['logoAsset'] as String?,
     );
   }
 
@@ -39,5 +42,6 @@ class TeamModel {
         'adminUid': adminUid,
         'memberCount': memberCount,
         'createdAt': Timestamp.fromDate(createdAt),
+        if (logoAsset != null) 'logoAsset': logoAsset,
       };
 }
