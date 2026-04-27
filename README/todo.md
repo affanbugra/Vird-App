@@ -50,6 +50,7 @@
 - [ ] Admin devri — admin başka bir üyeyi admin yaparak ayrılabilsin
 - [ ] Üye çıkarma — admin üyeleri ekipten çıkarabilsin
 - [ ] Davet kodu yenileme — admin mevcut kodu değiştirebilsin
+- [ ] Haftalık yarışma sistemi ve geçmiş haftaların özet tabloları (Cloud Function ile)
 
 ### Sistemi Olgunlaştırma
 - [ ] İçerik filtreleme (kullanıcı adı, grup adı, açıklama vb.)

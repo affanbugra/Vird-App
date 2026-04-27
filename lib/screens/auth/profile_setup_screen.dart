@@ -63,13 +63,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Doc register'da zaten oluşturuldu, sadece şehir/üni güncelle
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': widget.name,
           'email': user.email,
-          'city': _selectedCity ?? 'Şehir belirtilmedi',
-          'university': _selectedUniversity ?? 'Üniversite belirtilmedi',
+          'city': _selectedCity ?? '',
+          'university': _selectedUniversity ?? '',
           'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
       }
     } catch (e) {
       if (mounted) {
@@ -180,9 +181,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {
-                  // Atla butonu - Profil bilgilerini girmeden devam et
-                  Navigator.popUntil(context, (route) => route.isFirst);
+                onPressed: () async {
+                  // Atla butonuna basılsa bile kullanıcı dokümanı oluştur
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                      'name': widget.name,
+                      'email': user.email,
+                      'city': '',
+                      'university': '',
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+                  }
+                  if (context.mounted) {
+                    Navigator.popUntil(context, (route) => route.isFirst);
+                  }
                 },
                 child: const Text('Bu adımı atla', style: TextStyle(color: AppColors.textMid)),
               ),

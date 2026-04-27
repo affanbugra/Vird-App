@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../app_colors.dart';
 import '../../providers/auth_provider.dart';
 import 'profile_setup_screen.dart';
@@ -26,6 +28,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _emailController.text.trim(),
             _passwordController.text.trim(),
           );
+
+      // Auth state değişmeden önce hemen Firestore'da user doc oluştur
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final name = _nameController.text.trim();
+        await user.updateDisplayName(name);
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': name,
+          'email': user.email,
+          'city': '',
+          'university': '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       if (mounted) {
         Navigator.pushReplacement(
           context,

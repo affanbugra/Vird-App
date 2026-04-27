@@ -255,13 +255,15 @@ users/{uid}
 - **Admin: Bekleyen İstekler** — `StreamBuilder` ile `teams/{teamId}/requests` canlı; her satırda "Onayla" / "Reddet" butonları. Onayda: batch ile request sil + `users/{uid}.teamId` güncelle + `memberCount +1`
 - **Açıklama kartı:** gri bilgi kutusu (varsa gösterilir)
 - **Ceza Notu kartı:** sarı uyarı tasarımı (varsa gösterilir)
-- **Günlük Liderboard (`_LeaderboardSection`):**
-  - Gece yarısına geri sayım sayacı — `Timer.periodic(1s)`
+- **Dinamik Liderboard (`_LeaderboardSection`):**
+  - **Dinamik Dönem:** `_LeaderboardPeriod` enum ile `daily` (günlük) veya `weekly` (haftalık) mod. Şu an test için `daily`.
+  - **Geri Sayım Sayacı:** Dönem sonuna (örneğin yarın 00:00 veya haftaya Pazar gecesi 23:59) sayar.
   - Yenile butonu (manuel refresh)
   - **Tüm üyeler gösterilir** (0 hasanatlılar dahil)
-  - **İlk 3:** 🥇🥈🥉 madalya + yeşil/sarı arka plan
-  - **Son 3:** kırmızı arka plan (toplam üye > 3 ise)
-  - **"(sen)" etiketi:** teal vurgu
+  - **İlk 3:** 1. sıra güçlü yeşil, 2. ve 3. sıra giderek soluklaşan yeşil arka plan + 🥇🥈🥉 madalya
+  - **Son sıralar:** Grup kalabalıksa (en az 4+ kişi), ilk 3'e girmeyen en alt sıradakiler (kalabalığa göre son 1-3 kişi) kırmızı görünür.
+  - **0 Hasanat Kuralı:** 0 puanı olan herkes, ilk 3'te olsa bile **kırmızı** gösterilir.
+  - **"(sen)" etiketi:** Kendi satırın, sıralamadaki doğal renginde (yeşil, beyaz veya kırmızı) kalır; eski mavi zemin üzerine yazma (override) kaldırıldı.
   - Satıra tıklama → `KullaniciProfilScreen`
 
 #### Teknik Kararlar (güncel)
@@ -269,6 +271,8 @@ users/{uid}
 - Admin ayrılma: kilitli — admin devri MVP sonrasına alındı (`todo.md`)
 - Davet kodu: `_generateInviteCode()` — 6 haneli, karışık harf-rakam (O/0/I/1/L karıştırıcı karakterler hariç)
 - `requests` sub-collection: `orderBy` YOK — `serverTimestamp()` ile yazılan field'a `orderBy` konunca pending write aşamasında null dönüp query crash yapar; sıralama client-side yapılır veya sıralama gerekmez
+- **User Document Initialization:** "Bu adımı atla" seçeneğinde kullanıcının isimsiz kalmaması için, Firestore user dokümanı `ProfileSetupScreen` yerine **kayıt olur olmaz (`RegisterScreen`)** `set` ile oluşturuluyor. `ProfileSetupScreen` sadece bu dokümanı `merge: true` ile güncelliyor.
+- **DropdownSearch:** Profil düzenleme sheet'indeki şehir ve üniversite alanları artık onboarding ile aynı Türkçe duyarlı DropdownSearch yapısını kullanıyor.
 
 #### KullaniciProfilScreen
 - Başka kullanıcının profilini read-only gösterir
@@ -279,7 +283,8 @@ users/{uid}
 
 #### Teknik Kararlar
 - Admin atama: MVP'de Firebase Console'dan `adminUid` field'ı elle yazılıyor
-- Liderboard reset: Cloud Function yerine client-side — bugünün gece yarısını `DateTime(now.year, now.month, now.day + 1)` ile hesaplar, logları `createdAt >= todayMidnight` filtresiyle çeker; 00:00'da sayaç sıfırlanınca bir sonraki manual refresh doğru verileri getirir
+- Liderboard reset: Cloud Function yerine client-side — `periodStart` dinamik hesabı kullanılarak loglar bu tarihten itibaren çekilir; sayaç sıfırlanınca bir sonraki manual refresh doğru verileri getirir
+- Geçmiş Yarışmalar: Haftalık yarışmalar bittiğinde eski liderlik tablolarının özeti gösterilebilmesi için ileride Cloud Function ile `past_leaderboards` koleksiyonu yazılacak (MVP sonrası).
 - N+1 Firestore okuma (her üye için log query): küçük ekipler (MVP ~40 kişi) için kabul edilebilir
 - `KullaniciProfilScreen` heat map kodu `profil_screen.dart`'tan bağımsız (private widget'lar import edilemiyor); kod tekrarı bilinçli tercih
 

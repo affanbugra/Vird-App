@@ -107,6 +107,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   void initState() {
     super.initState();
     _tabController = TabController(length: _lockedToHatim ? 3 : 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
     if (_lockedToHatim) {
       _devamHatim = widget.initialHatim;
       _sayfaHatim = widget.initialHatim;
@@ -281,10 +284,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       ).toMap());
 
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      batch.update(userRef, {
+      batch.set(userRef, {
         'hasanat': FieldValue.increment(pagesRead * 10),
         'totalPages': FieldValue.increment(pagesRead),
-      });
+      }, SetOptions(merge: true));
 
       if (linkedHatim != null && hatimId != null) {
         final hatimRef = FirebaseFirestore.instance
@@ -307,8 +310,17 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       }
 
       if (mounted) Navigator.pop(context, justCompleted);
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e, st) {
+      debugPrint('LOG KAYDETME HATASI: $e\n$st');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kaydetme hatası: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
     }
   }
 

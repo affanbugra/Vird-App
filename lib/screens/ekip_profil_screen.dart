@@ -16,18 +16,20 @@ class _MemberEntry {
   final String name;
   final String username;
   final String? avatarSeed;
-  final int todayHasanat;
+  final int periodHasanat;
 
   const _MemberEntry({
     required this.uid,
     required this.name,
     required this.username,
     required this.avatarSeed,
-    required this.todayHasanat,
+    required this.periodHasanat,
   });
 }
 
 // ─── Ana ekran ─────────────────────────────────────────────────────────────────
+
+enum _LeaderboardPeriod { daily, weekly }
 
 class EkipProfilScreen extends StatefulWidget {
   final String teamId;
@@ -44,12 +46,15 @@ class EkipProfilScreen extends StatefulWidget {
 }
 
 class _EkipProfilScreenState extends State<EkipProfilScreen> {
+  // Şimdilik günlük mod. Haftalığa geçmek için sadece bunu .weekly yap.
+  final _periodMode = _LeaderboardPeriod.daily;
+
   List<_MemberEntry> _leaderboard = [];
   bool _leaderboardLoading = true;
   bool _isPending = false;
   bool _isJoinLoading = false;
   Timer? _countdownTimer;
-  Duration _untilMidnight = Duration.zero;
+  Duration _untilEnd = Duration.zero;
 
   @override
   void initState() {
@@ -65,6 +70,29 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     super.dispose();
   }
 
+  DateTime _getPeriodEnd() {
+    final now = DateTime.now();
+    if (_periodMode == _LeaderboardPeriod.daily) {
+      return DateTime(now.year, now.month, now.day + 1);
+    } else {
+      // Haftalık (Pazar gecesi biten)
+      final daysToSunday = DateTime.sunday - now.weekday;
+      // Eğer Pazar ise daysToSunday = 0, bu yüzden bir sonraki pazartesiye geçmemiz için day + daysToSunday + 1 (yani +1 gün gece yarısı)
+      return DateTime(now.year, now.month, now.day + daysToSunday + 1);
+    }
+  }
+
+  DateTime _getPeriodStart() {
+    final now = DateTime.now();
+    if (_periodMode == _LeaderboardPeriod.daily) {
+      return DateTime(now.year, now.month, now.day);
+    } else {
+      // Haftalık (Pazartesi başı)
+      final daysSinceMonday = now.weekday - DateTime.monday;
+      return DateTime(now.year, now.month, now.day - daysSinceMonday);
+    }
+  }
+
   void _startCountdown() {
     _tick();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
@@ -72,8 +100,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
   void _tick() {
     final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-    if (mounted) setState(() => _untilMidnight = tomorrow.difference(now));
+    final periodEnd = _getPeriodEnd();
+    if (mounted) setState(() => _untilEnd = periodEnd.difference(now));
   }
 
   Future<void> _checkPendingStatus() async {
@@ -93,8 +121,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     setState(() => _leaderboardLoading = true);
 
     try {
-      final now = DateTime.now();
-      final todayMidnight = DateTime(now.year, now.month, now.day);
+      final periodStart = _getPeriodStart();
 
       final membersSnap = await FirebaseFirestore.instance
           .collection('users')
@@ -111,14 +138,13 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             .collection('users')
             .doc(uid)
             .collection('logs')
-            .where('createdAt',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(todayMidnight))
+            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
             .get();
 
-        int todayHasanat = 0;
+        int periodHasanat = 0;
         for (final log in logsSnap.docs) {
           final logData = log.data();
-          todayHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
+          periodHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
         }
 
         entries.add(_MemberEntry(
@@ -126,11 +152,11 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           name: data['name'] as String? ?? 'İsimsiz',
           username: data['username'] as String? ?? '',
           avatarSeed: data['avatarSeed'] as String?,
-          todayHasanat: todayHasanat,
+          periodHasanat: periodHasanat,
         ));
       }
 
-      entries.sort((a, b) => b.todayHasanat.compareTo(a.todayHasanat));
+      entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
       if (mounted) {
         setState(() {
@@ -433,6 +459,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                 .doc(widget.currentUid)
                 .snapshots(),
             builder: (context, userSnap) {
+              if (userSnap.connectionState == ConnectionState.waiting &&
+                  !userSnap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
               final userData =
                   userSnap.data?.data() as Map<String, dynamic>?;
               final currentTeamId = userData?['teamId'] as String?;
@@ -1015,7 +1045,8 @@ class _LeaderboardSection extends StatelessWidget {
 
   Widget _buildList() {
     final count = leaderboard.length;
-    // İlk 3 yeşil madalyalı, son 3 kırmızılı (toplam > 3 ise)
+    // İlk 3 madalyalı, son kişiler kırmızı (top 3 ile çakışmaz)
+    // 4 kişi → son 1, 5 kişi → son 2, 6+ kişi → son 3
     final showRedZone = count > 3;
     final redStartIdx = count - 3;
 
@@ -1023,7 +1054,9 @@ class _LeaderboardSection extends StatelessWidget {
       children: List.generate(count, (i) {
         final entry = leaderboard[i];
         final isTop = i < 3;
-        final isRed = showRedZone && i >= redStartIdx;
+        // 0 hasanatı olan herkes (ilk 3 dahil) kırmızıdır.
+        // Değilse, sadece kırmızı bölgedekiler (ilk 3 hariç sonrakiler) kırmızıdır.
+        final isRed = entry.periodHasanat == 0 || (!isTop && showRedZone && i >= redStartIdx);
         final isMe = entry.uid == currentUid;
 
         return GestureDetector(
@@ -1075,16 +1108,18 @@ class _LeaderboardRow extends StatelessWidget {
   }
 
   Color get _bgColor {
-    if (isMe) return AppColors.tealLight;
-    if (isRed) return const Color(0xFFFFF0F0);
-    if (rank == 1) return const Color(0xFFFFFBE6);
+    if (isRed) return AppColors.errorBg;
+    if (rank == 1) return AppColors.successBg;
+    if (rank == 2) return AppColors.successBg.withValues(alpha: 0.6);
+    if (rank == 3) return AppColors.successBg.withValues(alpha: 0.3);
     return AppColors.white;
   }
 
   Color get _borderColor {
-    if (isMe) return AppColors.teal;
-    if (isRed) return const Color(0xFFFFCDD2);
-    if (rank == 1) return const Color(0xFFFFE57F);
+    if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
+    if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
+    if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.3);
+    if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.15);
     return AppColors.borderGrey;
   }
 

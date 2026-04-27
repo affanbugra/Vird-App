@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
+import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
 import '../widgets/duolingo_button.dart';
@@ -1099,25 +1101,48 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameCtrl;
   late TextEditingController _usernameCtrl;
-  late TextEditingController _cityCtrl;
-  late TextEditingController _uniCtrl;
+  String? _selectedCity;
+  String? _selectedUniversity;
   bool _isLoading = false;
+
+  late final List<String> _sortedCities;
+  late final List<String> _sortedUniversities;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.userData['name'] ?? widget.user.displayName ?? '');
     _usernameCtrl = TextEditingController(text: widget.userData['username'] ?? '');
-    _cityCtrl = TextEditingController(text: (widget.userData['city'] == 'Şehir belirtilmedi') ? '' : widget.userData['city']);
-    _uniCtrl = TextEditingController(text: (widget.userData['university'] == 'Üniversite belirtilmedi') ? '' : widget.userData['university']);
+
+    final cityRaw = widget.userData['city'] as String?;
+    _selectedCity = (cityRaw == null || cityRaw.isEmpty || cityRaw == 'Şehir belirtilmedi') ? null : cityRaw;
+
+    final uniRaw = widget.userData['university'] as String?;
+    _selectedUniversity = (uniRaw == null || uniRaw.isEmpty || uniRaw == 'Üniversite belirtilmedi') ? null : uniRaw;
+
+    _sortedCities = List.from(AppConstants.cities)..sort(_turkishCompare);
+    _sortedUniversities = List.from(AppConstants.universities)..sort(_turkishCompare);
+  }
+
+  int _turkishCompare(String a, String b) {
+    String norm(String t) => t.toLowerCase()
+        .replaceAll('ç', 'cz').replaceAll('ğ', 'gz').replaceAll('ı', 'hz')
+        .replaceAll('ö', 'oz').replaceAll('ş', 'sz').replaceAll('ü', 'uz');
+    return norm(a).compareTo(norm(b));
+  }
+
+  bool _turkishFilter(String item, String filter) {
+    if (filter.isEmpty) return true;
+    String norm(String t) => t.toLowerCase()
+        .replaceAll('ı', 'i').replaceAll('ğ', 'g').replaceAll('ü', 'u')
+        .replaceAll('ş', 's').replaceAll('ö', 'o').replaceAll('ç', 'c');
+    return norm(item).contains(norm(filter));
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _usernameCtrl.dispose();
-    _cityCtrl.dispose();
-    _uniCtrl.dispose();
     super.dispose();
   }
 
@@ -1129,8 +1154,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
         'name': _nameCtrl.text.trim(),
         'username': _usernameCtrl.text.trim(),
-        'city': _cityCtrl.text.trim(),
-        'university': _uniCtrl.text.trim(),
+        'city': _selectedCity ?? '',
+        'university': _selectedUniversity ?? '',
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -1153,64 +1178,118 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Text(
-              'Profili Düzenle',
-              style: GoogleFonts.nunito(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildField(_nameCtrl, 'Ad Soyad', isRequired: true),
-            const SizedBox(height: 12),
-            _buildField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
-            const SizedBox(height: 12),
-            _buildField(_cityCtrl, 'Şehir (Opsiyonel)'),
-            const SizedBox(height: 12),
-            _buildField(_uniCtrl, 'Üniversite (Opsiyonel)'),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: DuolingoButton(
-                color: AppColors.teal,
-                bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey,
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _save,
-                child: Text(
-                  'KAYDET',
-                  style: GoogleFonts.nunito(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.borderGrey,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-            ),
-          ],
+              Text(
+                'Profili Düzenle',
+                style: GoogleFonts.nunito(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true),
+              const SizedBox(height: 12),
+              _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
+              const SizedBox(height: 12),
+              DropdownSearch<String>(
+                items: (filter, _) => _sortedCities,
+                filterFn: _turkishFilter,
+                selectedItem: _selectedCity,
+                onSelected: (v) => setState(() => _selectedCity = v),
+                popupProps: const PopupProps.menu(
+                  showSearchBox: true,
+                  searchFieldProps: TextFieldProps(
+                    decoration: InputDecoration(
+                      hintText: 'Şehir ara...',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
+                ),
+                decoratorProps: DropDownDecoratorProps(
+                  decoration: InputDecoration(
+                    labelText: 'Şehir (Opsiyonel)',
+                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.teal, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownSearch<String>(
+                items: (filter, _) => _sortedUniversities,
+                filterFn: _turkishFilter,
+                selectedItem: _selectedUniversity,
+                onSelected: (v) => setState(() => _selectedUniversity = v),
+                popupProps: const PopupProps.menu(
+                  showSearchBox: true,
+                  searchFieldProps: TextFieldProps(
+                    decoration: InputDecoration(
+                      hintText: 'Üniversite ara...',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
+                ),
+                decoratorProps: DropDownDecoratorProps(
+                  decoration: InputDecoration(
+                    labelText: 'Üniversite (Opsiyonel)',
+                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    prefixIcon: const Icon(Icons.school, color: AppColors.teal),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.teal, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: DuolingoButton(
+                  color: AppColors.teal,
+                  bottomColor: AppColors.tealDark,
+                  disabledColor: AppColors.borderGrey,
+                  isLoading: _isLoading,
+                  onPressed: _isLoading ? null : _save,
+                  child: Text(
+                    'KAYDET',
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildField(TextEditingController controller, String label, {bool isRequired = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, {bool isRequired = false}) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(

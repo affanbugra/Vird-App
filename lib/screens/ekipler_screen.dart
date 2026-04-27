@@ -194,30 +194,28 @@ class _EkiplerBody extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (currentTeamId == null) ...[
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: () =>
-                                    _openInviteCodeSheet(context, currentTeamId),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: AppColors.teal),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: Text(
-                                  'Davet Koduyla Katıl',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.teal,
-                                  ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  _openInviteCodeSheet(context, currentTeamId),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.teal),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: Text(
+                                'Davet Koduyla Katıl',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.teal,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                          ],
+                          ),
+                          const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             height: 50,
@@ -675,7 +673,20 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
     });
 
     try {
-      final snap = await FirebaseFirestore.instance
+      final db = FirebaseFirestore.instance;
+
+      // 1. Önce kullanıcının zaten bir ekipte olup olmadığını kontrol et
+      final userDoc = await db.collection('users').doc(widget.uid).get();
+      final userData = userDoc.data() ?? {};
+      if (userData['teamId'] != null) {
+        if (mounted) {
+          setState(() { _error = 'Zaten bir ekipteysin. Önce mevcut ekibinden ayrıl.'; _isLoading = false; });
+        }
+        return;
+      }
+
+      // 2. Davet koduyla ekibi bul
+      final snap = await db
           .collection('teams')
           .where('inviteCode', isEqualTo: code)
           .limit(1)
@@ -689,6 +700,19 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
       if (!mounted) return;
 
       final teamId = snap.docs.first.id;
+
+      // 3. Kullanıcıyı ekibe kat (teamId güncelle + memberCount artır)
+      final batch = db.batch();
+      batch.update(db.collection('users').doc(widget.uid), {
+        'teamId': teamId,
+      });
+      batch.update(db.collection('teams').doc(teamId), {
+        'memberCount': FieldValue.increment(1),
+      });
+      await batch.commit();
+
+      if (!mounted) return;
+
       final cb = widget.onTeamFound;
 
       // Pop sheet önce, sonraki frame'de push yap — aynı frame'de pop+push → navigator crash
