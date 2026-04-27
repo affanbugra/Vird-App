@@ -9,6 +9,8 @@ class TeamModel {
   final int memberCount;
   final DateTime createdAt;
   final String? logoAsset;
+  final bool isPrivate;
+  final String inviteCode;
 
   const TeamModel({
     required this.id,
@@ -19,6 +21,8 @@ class TeamModel {
     required this.memberCount,
     required this.createdAt,
     this.logoAsset,
+    required this.isPrivate,
+    required this.inviteCode,
   });
 
   factory TeamModel.fromFirestore(DocumentSnapshot doc) {
@@ -32,6 +36,8 @@ class TeamModel {
       memberCount: data['memberCount'] as int? ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       logoAsset: data['logoAsset'] as String?,
+      isPrivate: data['isPrivate'] as bool? ?? false,
+      inviteCode: data['inviteCode'] as String? ?? '',
     );
   }
 
@@ -43,5 +49,7 @@ class TeamModel {
         'memberCount': memberCount,
         'createdAt': Timestamp.fromDate(createdAt),
         if (logoAsset != null) 'logoAsset': logoAsset,
+        'isPrivate': isPrivate,
+        'inviteCode': inviteCode,
       };
 }

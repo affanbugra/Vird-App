@@ -19,8 +19,8 @@
 - [x] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç) ✅
 - [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅
 - [ ] 10 — Offline mode (cihaza kayıt, bağlantı gelince senkronizasyon)
-- [ ] 11 — Ekip sistemi (Ekipler sekmesi UI iskeleti eklendi; yapılacaklar: oluşturma, katılım, yönetim, ceza)
-- [ ] 12 — Liderboard (haftalık sıralama, Cuma 13:00 sıfırlama, madalyalar)
+- [x] 11 — Ekip sistemi (liste, gizlilik, davet kodu, istek/onay sistemi, admin paneli, günlük liderboard) ✅
+- [x] 12 — Günlük liderboard (ekip içi, 0 puanlı üyeler dahil, ilk 3 yeşil/son 3 kırmızı) ✅
 - [x] 13 — Profil veri bağlantısı (ısı haritası Firestore loglarına bağlandı) ✅
 - [ ] 14 — Bildirimler (tüm bildirim tipleri)
 - [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri)
@@ -45,6 +45,11 @@
 - [ ] Yakında geliyor kartları → ekle / düzenle / sil
 - [ ] Duyurular → yaz / yayınla
 - [ ] Özellik önerileri → gelen istekleri listele / okundu işaretle
+
+### Ekip Sistemi (MVP Sonrası Eklemeler)
+- [ ] Admin devri — admin başka bir üyeyi admin yaparak ayrılabilsin
+- [ ] Üye çıkarma — admin üyeleri ekipten çıkarabilsin
+- [ ] Davet kodu yenileme — admin mevcut kodu değiştirebilsin
 
 ### Sistemi Olgunlaştırma
 - [ ] İçerik filtreleme (kullanıcı adı, grup adı, açıklama vb.)

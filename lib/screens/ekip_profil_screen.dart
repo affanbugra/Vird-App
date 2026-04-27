@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
@@ -45,6 +46,8 @@ class EkipProfilScreen extends StatefulWidget {
 class _EkipProfilScreenState extends State<EkipProfilScreen> {
   List<_MemberEntry> _leaderboard = [];
   bool _leaderboardLoading = true;
+  bool _isPending = false;
+  bool _isJoinLoading = false;
   Timer? _countdownTimer;
   Duration _untilMidnight = Duration.zero;
 
@@ -53,6 +56,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     super.initState();
     _loadLeaderboard();
     _startCountdown();
+    _checkPendingStatus();
   }
 
   @override
@@ -70,6 +74,18 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     final now = DateTime.now();
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
     if (mounted) setState(() => _untilMidnight = tomorrow.difference(now));
+  }
+
+  Future<void> _checkPendingStatus() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .doc(widget.currentUid)
+          .get();
+      if (mounted) setState(() => _isPending = doc.exists);
+    } catch (_) {}
   }
 
   Future<void> _loadLeaderboard() async {
@@ -127,17 +143,68 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     }
   }
 
-  Future<void> _joinTeam() async {
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    batch.update(db.collection('users').doc(widget.currentUid), {
-      'teamId': widget.teamId,
-    });
-    batch.update(db.collection('teams').doc(widget.teamId), {
-      'memberCount': FieldValue.increment(1),
-    });
-    await batch.commit();
-    _loadLeaderboard();
+  // ── Üyelik aksiyonları ────────────────────────────────────────────────────────
+
+  Future<void> _sendJoinRequest() async {
+    if (_isJoinLoading) return;
+    if (mounted) setState(() => _isJoinLoading = true);
+    try {
+      final db = FirebaseFirestore.instance;
+      final userDoc = await db.collection('users').doc(widget.currentUid).get();
+      final userData = userDoc.data() ?? {};
+
+      if (userData['teamId'] != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
+            backgroundColor: AppColors.teal,
+          ));
+        }
+        return;
+      }
+
+      await db
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .doc(widget.currentUid)
+          .set({
+        'name': userData['name'] as String? ?? 'İsimsiz',
+        'username': userData['username'] as String? ?? '',
+        'avatarSeed': userData['avatarSeed'] as String?,
+        'requestedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) setState(() => _isPending = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isJoinLoading = false);
+    }
+  }
+
+  Future<void> _cancelRequest() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .doc(widget.currentUid)
+          .delete();
+      if (mounted) setState(() => _isPending = false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    }
   }
 
   Future<void> _leaveTeam() async {
@@ -145,14 +212,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Ekipten Ayrıl',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
-        ),
-        content: Text(
-          'Ekipten ayrılmak istediğine emin misin?',
-          style: GoogleFonts.nunito(),
-        ),
+        title: Text('Ekipten Ayrıl',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text('Ekipten ayrılmak istediğine emin misin?',
+            style: GoogleFonts.nunito()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -163,13 +226,11 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Ayrıl',
                 style: GoogleFonts.nunito(
-                    color: AppColors.errorRed,
-                    fontWeight: FontWeight.w700)),
+                    color: AppColors.errorRed, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
     );
-
     if (confirmed != true) return;
 
     final db = FirebaseFirestore.instance;
@@ -184,11 +245,57 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     _loadLeaderboard();
   }
 
+  // ── Admin aksiyonları ─────────────────────────────────────────────────────────
+
+  Future<void> _approveRequest(String requesterUid) async {
+    try {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      batch.delete(db
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .doc(requesterUid));
+      batch.update(db.collection('users').doc(requesterUid), {
+        'teamId': widget.teamId,
+      });
+      batch.update(db.collection('teams').doc(widget.teamId), {
+        'memberCount': FieldValue.increment(1),
+      });
+      await batch.commit();
+      _loadLeaderboard();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    }
+  }
+
+  Future<void> _rejectRequest(String requesterUid) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .doc(requesterUid)
+          .delete();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    }
+  }
+
   void _showEditSheet(BuildContext context, TeamModel team, String field) {
     final current =
         field == 'description' ? team.description : team.penaltyNote;
-    final label =
-        field == 'description' ? 'Açıklama' : 'Ceza Notu';
+    final label = field == 'description' ? 'Açıklama' : 'Ceza Notu';
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -200,6 +307,102 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         field: field,
         label: label,
         current: current,
+      ),
+    );
+  }
+
+  // ── Üyelik widget'ı ──────────────────────────────────────────────────────────
+
+  Widget _buildMembershipWidget(bool isAdmin, bool isMember) {
+    if (isAdmin) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.tealLight,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          'Admin',
+          style: GoogleFonts.nunito(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.teal,
+          ),
+        ),
+      );
+    }
+
+    if (isMember) {
+      return OutlinedButton(
+        onPressed: _leaveTeam,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.borderGrey),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Text(
+          'Ayrıl',
+          style: GoogleFonts.nunito(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textMid,
+          ),
+        ),
+      );
+    }
+
+    if (_isPending) {
+      return GestureDetector(
+        onTap: _cancelRequest,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E1),
+            border: Border.all(color: const Color(0xFFFFE082)),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Beklemede',
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFFF59E0B),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.close, size: 14, color: Color(0xFFF59E0B)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 36,
+      child: DuolingoButton(
+        color: AppColors.teal,
+        bottomColor: AppColors.tealDark,
+        height: 36,
+        isLoading: _isJoinLoading,
+        onPressed: _isJoinLoading ? null : _sendJoinRequest,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'Katıl',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -265,7 +468,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                     ],
                     flexibleSpace: FlexibleSpaceBar(
                       centerTitle: false,
-                      titlePadding: const EdgeInsets.fromLTRB(56, 0, 48, 16),
+                      titlePadding:
+                          const EdgeInsets.fromLTRB(56, 0, 48, 16),
                       title: Text(
                         team.name,
                         style: GoogleFonts.nunito(
@@ -295,7 +499,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               : Icon(
                                   Icons.shield,
                                   size: 56,
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                  color:
+                                      Colors.white.withValues(alpha: 0.15),
                                 ),
                         ),
                       ),
@@ -307,7 +512,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        // Üye sayısı + üyelik butonu
+                        // Üye sayısı + üyelik widget'ı
                         Row(
                           children: [
                             const Icon(Icons.people_outline,
@@ -322,14 +527,65 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               ),
                             ),
                             const Spacer(),
-                            if (!isAdmin)
-                              _MembershipButton(
-                                isMember: isMember,
-                                onJoin: _joinTeam,
-                                onLeave: _leaveTeam,
-                              ),
+                            _buildMembershipWidget(isAdmin, isMember),
                           ],
                         ),
+
+                        // ── Admin: davet kodu kartı ──────────────────────
+                        if (isAdmin && team.inviteCode.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _InviteCodeCard(inviteCode: team.inviteCode),
+                        ],
+
+                        // ── Admin: bekleyen istekler ─────────────────────
+                        if (isAdmin)
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('teams')
+                                .doc(widget.teamId)
+                                .collection('requests')
+                                .snapshots(),
+                            builder: (ctx, reqSnap) {
+                              if (reqSnap.hasError) return const SizedBox.shrink();
+                              final docs = reqSnap.data?.docs ?? [];
+                              if (docs.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Bekleyen İstekler (${docs.length})',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...docs.map((doc) {
+                                    final data =
+                                        doc.data() as Map<String, dynamic>;
+                                    final requesterUid = doc.id;
+                                    final name =
+                                        data['name'] as String? ?? 'İsimsiz';
+                                    final username =
+                                        data['username'] as String? ?? '';
+                                    final avatarSeed =
+                                        data['avatarSeed'] as String?;
+                                    return _RequestRow(
+                                      name: name,
+                                      username: username,
+                                      avatarSeed: avatarSeed,
+                                      onApprove: () =>
+                                          _approveRequest(requesterUid),
+                                      onReject: () =>
+                                          _rejectRequest(requesterUid),
+                                    );
+                                  }),
+                                ],
+                              );
+                            },
+                          ),
 
                         // Açıklama
                         if (team.description.isNotEmpty) ...[
@@ -375,61 +631,184 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   }
 }
 
-// ─── Üyelik Butonu ─────────────────────────────────────────────────────────────
+// ─── Davet Kodu Kartı (admin-only) ────────────────────────────────────────────
 
-class _MembershipButton extends StatelessWidget {
-  final bool isMember;
-  final VoidCallback onJoin;
-  final VoidCallback onLeave;
+class _InviteCodeCard extends StatelessWidget {
+  final String inviteCode;
+  const _InviteCodeCard({required this.inviteCode});
 
-  const _MembershipButton({
-    required this.isMember,
-    required this.onJoin,
-    required this.onLeave,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.tealLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.key_outlined, size: 18, color: AppColors.teal),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Davet Kodu',
+                  style: GoogleFonts.nunito(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.teal,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                Text(
+                  inviteCode,
+                  style: GoogleFonts.nunito(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.teal,
+                    letterSpacing: 6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: inviteCode));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Kod kopyalandı: $inviteCode',
+                    style: GoogleFonts.nunito()),
+                backgroundColor: AppColors.teal,
+                duration: const Duration(seconds: 2),
+              ));
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+                  const Icon(Icons.copy_outlined, size: 18, color: AppColors.teal),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Bekleyen İstek Satırı ────────────────────────────────────────────────────
+
+class _RequestRow extends StatelessWidget {
+  final String name;
+  final String username;
+  final String? avatarSeed;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  const _RequestRow({
+    required this.name,
+    required this.username,
+    required this.avatarSeed,
+    required this.onApprove,
+    required this.onReject,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (isMember) {
-      return OutlinedButton(
-        onPressed: onLeave,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.borderGrey),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: Text(
-          'Ayrıl',
-          style: GoogleFonts.nunito(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textMid,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.tealLight,
+            backgroundImage: avatarSeed != null
+                ? NetworkImage(
+                    'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
+                  )
+                : null,
+            child: avatarSeed == null
+                ? Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.teal,
+                    ),
+                  )
+                : null,
           ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 36,
-      child: DuolingoButton(
-        color: AppColors.teal,
-        bottomColor: AppColors.tealDark,
-        height: 36,
-        onPressed: onJoin,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Katıl',
-            style: GoogleFonts.nunito(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                if (username.isNotEmpty)
+                  Text(
+                    '@$username',
+                    style: GoogleFonts.nunito(
+                        fontSize: 11, color: AppColors.textLight),
+                  ),
+              ],
             ),
           ),
-        ),
+          TextButton(
+            onPressed: onReject,
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Reddet',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.errorRed,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            height: 32,
+            child: DuolingoButton(
+              color: AppColors.teal,
+              bottomColor: AppColors.tealDark,
+              height: 32,
+              onPressed: onApprove,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'Onayla',
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -476,7 +855,6 @@ class _InfoCard extends StatelessWidget {
 
 class _PenaltyCard extends StatelessWidget {
   final String note;
-
   const _PenaltyCard({required this.note});
 
   @override
@@ -565,14 +943,14 @@ class _LeaderboardSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final memberCount = loading ? '' : ' · ${leaderboard.length} üye';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Başlık satırı
         Row(
           children: [
             Text(
-              'Günlük Liderboard',
+              'Günlük Liderboard$memberCount',
               style: GoogleFonts.nunito(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -595,18 +973,13 @@ class _LeaderboardSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        // Geri sayım
         Row(
           children: [
-            const Icon(Icons.access_time,
-                size: 13, color: AppColors.textLight),
+            const Icon(Icons.access_time, size: 13, color: AppColors.textLight),
             const SizedBox(width: 4),
             Text(
               'Sıfırlanmaya ${_fmtDuration(untilMidnight)} kaldı',
-              style: GoogleFonts.nunito(
-                fontSize: 12,
-                color: AppColors.textLight,
-              ),
+              style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
             ),
           ],
         ),
@@ -614,10 +987,11 @@ class _LeaderboardSection extends StatelessWidget {
 
         if (loading)
           const Center(
-              child: Padding(
-            padding: EdgeInsets.all(32),
-            child: CircularProgressIndicator(),
-          ))
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          )
         else if (leaderboard.isEmpty)
           Container(
             padding: const EdgeInsets.all(24),
@@ -627,11 +1001,9 @@ class _LeaderboardSection extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                'Bugün henüz okuma kaydedilmedi.',
+                'Henüz üye yok.',
                 style: GoogleFonts.nunito(
-                  fontSize: 13,
-                  color: AppColors.textLight,
-                ),
+                    fontSize: 13, color: AppColors.textLight),
               ),
             ),
           )
@@ -643,6 +1015,7 @@ class _LeaderboardSection extends StatelessWidget {
 
   Widget _buildList() {
     final count = leaderboard.length;
+    // İlk 3 yeşil madalyalı, son 3 kırmızılı (toplam > 3 ise)
     final showRedZone = count > 3;
     final redStartIdx = count - 3;
 
@@ -742,9 +1115,7 @@ class _LeaderboardRow extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: isRed
-                          ? AppColors.errorRed
-                          : AppColors.textMid,
+                      color: isRed ? AppColors.errorRed : AppColors.textMid,
                     ),
                   ),
           ),
@@ -807,9 +1178,7 @@ class _LeaderboardRow extends StatelessWidget {
                   Text(
                     '@${entry.username}',
                     style: GoogleFonts.nunito(
-                      fontSize: 11,
-                      color: AppColors.textLight,
-                    ),
+                        fontSize: 11, color: AppColors.textLight),
                   ),
               ],
             ),

@@ -203,7 +203,7 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 ---
 
-### Modül 11 & 12 — Ekip Sistemi + Günlük Liderboard (2026-04-27)
+### Modül 11 & 12 — Ekip Sistemi + Günlük Liderboard (2026-04-27, güncellendi 2026-04-27)
 
 #### Dosyalar
 - `lib/models/team_model.dart` — Team veri modeli (yeni)
@@ -211,43 +211,64 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 - `lib/screens/ekip_profil_screen.dart` — Ekip profili + liderboard (yeni)
 - `lib/screens/kullanici_profil_screen.dart` — Başka kullanıcı profiline read-only bakış (yeni)
 
-#### Firestore Şeması (eklendi)
+#### Firestore Şeması (güncel)
 ```
 teams/{teamId}
   name: string
   description: string           ← admin düzenleyebilir
-  penaltyNote: string           ← admin istediği zaman düzenleyebilir
-  adminUid: string              ← Firebase Console'dan elle atanır (MVP)
+  penaltyNote: string           ← admin düzenleyebilir
+  adminUid: string              ← team kurucusu; MVP'de elle de atanabilir
   memberCount: int              ← katılma/ayrılmada increment/decrement
+  isPrivate: bool               ← YENİ; true ise listede görünmez
+  inviteCode: string            ← YENİ; 6 haneli, otomatik üretilir (örn. "XK7P2Q")
   createdAt: Timestamp
 
+teams/{teamId}/requests/{uid}   ← YENİ sub-collection
+  name: string
+  username: string
+  avatarSeed: string?
+  requestedAt: Timestamp
+
 users/{uid}
-  teamId: string?               ← YENİ; bulunduğu ekibin ID'si
+  teamId: string?               ← bulunduğu ekibin ID'si
+  isPro: bool?                  ← YENİ; default false; Firestore Console'dan elle atanır
 ```
 
 #### EkiplerScreen
-- Tüm ekipleri `memberCount desc` sırasıyla listeler (StreamBuilder)
-- Kullanıcının kendi ekibi "Ekibim" badge'iyle vurgulanır
+- Sadece **açık** ekipler + **kullanıcının kendi ekibi** (gizli olsa bile) listelenir
+- Kullanıcının kendi ekibi "Ekibim" badge'iyle vurgulanır; gizli ekipler 🔒 ikonu gösterir
 - Ekip kartına tıklama → `EkipProfilScreen`
-- **"YENİ EKİP KUR" butonu:** `isPro == true` ise `_CreateTeamSheet` açar; değilse Pro dialog gösterir
-- `_CreateTeamSheet`: ad + açıklama formu; batch ile `teams` oluştur + `users/{uid}.teamId` güncelle, `memberCount: 1`
+- **"Yeni Grup Kur" butonu:** herkes görür; Pro değilse dialog açar. Pro ise `_CreateTeamSheet` açar
+- **"Davet Koduyla Katıl" butonu:** sadece ekipsiz kullanıcılara görünür → `_InviteCodeSheet`
+- `_CreateTeamSheet`: ad + açıklama + gizlilik toggle; batch ile `teams` oluştur + `users/{uid}.teamId` güncelle, `memberCount: 1`, `inviteCode` otomatik üret
+- `_InviteCodeSheet`: 6 haneli kod gir → `teams where inviteCode == X` → EkipProfilScreen'e yönlendir
 
 #### EkipProfilScreen
 - `SliverAppBar` collapsible header — teal degrade, kalkan ikonu
 - Admin PopupMenu: "Açıklamayı Düzenle" / "Ceza Notunu Düzenle" → `_EditFieldSheet`
-- Üye sayısı + **Katıl / Ayrıl butonu** (admin için gösterilmez)
-  - Katıl: batch ile `users/{uid}.teamId = teamId` + `memberCount +1`
-  - Ayrıl: AlertDialog onayı → `FieldValue.delete()` + `memberCount -1`
+- **Üyelik widget'ı** (duruma göre değişir):
+  - Admin → "Admin" badge (ayrılamaz; admin devri MVP sonrasına bırakıldı)
+  - Üye → "Ayrıl" butonu (AlertDialog onayı → `FieldValue.delete()` + `memberCount -1`)
+  - Beklemede → "Beklemede ✕" (tıklayınca isteği iptal eder)
+  - Dışarıdan → "Katıl" butonu (istek gönderir, direkt katılmaz)
+- **Admin: Davet Kodu kartı** — `_InviteCodeCard`; kodu gösterir + kopyala butonu
+- **Admin: Bekleyen İstekler** — `StreamBuilder` ile `teams/{teamId}/requests` canlı; her satırda "Onayla" / "Reddet" butonları. Onayda: batch ile request sil + `users/{uid}.teamId` güncelle + `memberCount +1`
 - **Açıklama kartı:** gri bilgi kutusu (varsa gösterilir)
 - **Ceza Notu kartı:** sarı uyarı tasarımı (varsa gösterilir)
 - **Günlük Liderboard (`_LeaderboardSection`):**
   - Gece yarısına geri sayım sayacı — `Timer.periodic(1s)`
   - Yenile butonu (manuel refresh)
-  - Veri yükleme: `users where teamId == X` → her üye için bugün (`createdAt >= gece yarısı`) logları → `pagesRead × 10` toplam hasanat → `todayHasanat` desc sıralama
-  - **Top 3:** 🥇🥈🥉 madalya, altın arka plan (#1)
-  - **Bottom 3:** kırmızı arka plan (sadece toplam üye > 3 ise)
-  - **"(sen)" etiketi:** current user'ın satırında teal vurgu
+  - **Tüm üyeler gösterilir** (0 hasanatlılar dahil)
+  - **İlk 3:** 🥇🥈🥉 madalya + yeşil/sarı arka plan
+  - **Son 3:** kırmızı arka plan (toplam üye > 3 ise)
+  - **"(sen)" etiketi:** teal vurgu
   - Satıra tıklama → `KullaniciProfilScreen`
+
+#### Teknik Kararlar (güncel)
+- `isPro` alanı: Firestore Console'dan elle `true` yapılır; uygulama içinde değiştirilemez
+- Admin ayrılma: kilitli — admin devri MVP sonrasına alındı (`todo.md`)
+- Davet kodu: `_generateInviteCode()` — 6 haneli, karışık harf-rakam (O/0/I/1/L karıştırıcı karakterler hariç)
+- `requests` sub-collection: `orderBy` YOK — `serverTimestamp()` ile yazılan field'a `orderBy` konunca pending write aşamasında null dönüp query crash yapar; sıralama client-side yapılır veya sıralama gerekmez
 
 #### KullaniciProfilScreen
 - Başka kullanıcının profilini read-only gösterir
@@ -435,3 +456,6 @@ users/{uid} (root doc)
 - **N+1 Firestore query (küçük ekipler):** Her üye için ayrı log query MVP ölçeğinde (~40 kişi) kabul edilebilir. Büyümede `weeklyHasanat` gibi denormalized field + Cloud Function reset daha iyi ölçeklenir.
 - **Private widget paylaşımı:** Dart'ta `_Widget` isimleri dosya dışından erişilemez. İki ekran aynı widget'ı paylaşacaksa ya `public` yap ve ayrı dosyaya taşı, ya da bilinçli olarak kodu tekrarla — yeniden kullanım için gereksiz refactor yapma.
 - **`SliverAppBar` + `FlexibleSpaceBar` title padding:** `titlePadding` ile başlık konumunu tam kontrol et; varsayılan padding back button'ın üstüne yazabilir.
+- **`serverTimestamp()` + `orderBy` crash:** Firestore'a `FieldValue.serverTimestamp()` yazınca pending write aşamasında o field `null` döner. `orderBy('fieldWithServerTimestamp')` olan bir query bu null'ı sıralayamaz ve crash verir. Çözüm: `orderBy` kaldır, sıralama gerekiyorsa client-side yap.
+- **Same-frame pop+push navigator crash:** `Navigator.pop(context)` hemen ardından `Navigator.push(...)` çağrılırsa (aynı frame içinde) navigator tutarsız duruma girer — defalarca "Unexpected null value" + `mouse_tracker.dart:199` assertion hatası ve beyaz ekran. Çözüm: push'u `WidgetsBinding.instance.addPostFrameCallback((_) => Navigator.push(...))` ile bir sonraki frame'e ertele.
+- **`finally` blok + navigation:** Sheet pop edildikten sonra `finally` içinde `setState` çağrısı `mounted` false olduğu için crash atar. Başarılı path'in `finally` resetine ihtiyacı yok — sadece `catch` içinde loading state sıfırla.
