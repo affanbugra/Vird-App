@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-04-27 — son güncelleme: hasanat düzeltmesi + profil live hatim sayısı + ayarlar okuma geçmişi)
+## Genel Durum (2026-04-27 — son güncelleme: Ekip Sistemi MVP tamamlandı)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi)
@@ -27,8 +27,8 @@
 | 8 | Hasanat sistemi | ✅ Tamamlandı |
 | 9 | Kuran Haritası (UI ✅, veri bağlantısı ✅) | ✅ Tamamlandı |
 | 10 | Offline mode | ⬜ |
-| 11 | Ekip sistemi | ⬜ |
-| 12 | Liderboard | ⬜ |
+| 11 | Ekip sistemi (liste + profil + günlük liderboard) | ✅ Tamamlandı |
+| 12 | Liderboard | ✅ Ekip içi günlük liderboard ✅ |
 | 13 | Profil (UI ✅, ısı haritası veri bağlantısı ✅) | ✅ Tamamlandı |
 | 14 | Bildirimler | ⬜ |
 | 15 | Rozetler | ⬜ |
@@ -203,10 +203,64 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 ---
 
-### Modül 11 (Başlangıç) — Ekipler Arayüzü (YENİ)
-- `EkiplerScreen` sayfası eklendi. Şimdilik "Çok yakında" mesajı ve örnek bir takım (`Ricâl-i Fark`) butonu barındırıyor.
-- `DuolingoButton` bileşenine `borderRadius` özelliği eklendi; böylece tam yuvarlak hap şeklinin yanında kare-yuvarlak formda takım/rozet butonları da yapılabiliyor.
-- `assets/images/rical_i_fark_logo.png` eklendi ve `pubspec.yaml`'a dahil edildi.
+### Modül 11 & 12 — Ekip Sistemi + Günlük Liderboard (2026-04-27)
+
+#### Dosyalar
+- `lib/models/team_model.dart` — Team veri modeli (yeni)
+- `lib/screens/ekipler_screen.dart` — Ekip listesi (tam yeniden yazıldı)
+- `lib/screens/ekip_profil_screen.dart` — Ekip profili + liderboard (yeni)
+- `lib/screens/kullanici_profil_screen.dart` — Başka kullanıcı profiline read-only bakış (yeni)
+
+#### Firestore Şeması (eklendi)
+```
+teams/{teamId}
+  name: string
+  description: string           ← admin düzenleyebilir
+  penaltyNote: string           ← admin istediği zaman düzenleyebilir
+  adminUid: string              ← Firebase Console'dan elle atanır (MVP)
+  memberCount: int              ← katılma/ayrılmada increment/decrement
+  createdAt: Timestamp
+
+users/{uid}
+  teamId: string?               ← YENİ; bulunduğu ekibin ID'si
+```
+
+#### EkiplerScreen
+- Tüm ekipleri `memberCount desc` sırasıyla listeler (StreamBuilder)
+- Kullanıcının kendi ekibi "Ekibim" badge'iyle vurgulanır
+- Ekip kartına tıklama → `EkipProfilScreen`
+- **"YENİ EKİP KUR" butonu:** `isPro == true` ise `_CreateTeamSheet` açar; değilse Pro dialog gösterir
+- `_CreateTeamSheet`: ad + açıklama formu; batch ile `teams` oluştur + `users/{uid}.teamId` güncelle, `memberCount: 1`
+
+#### EkipProfilScreen
+- `SliverAppBar` collapsible header — teal degrade, kalkan ikonu
+- Admin PopupMenu: "Açıklamayı Düzenle" / "Ceza Notunu Düzenle" → `_EditFieldSheet`
+- Üye sayısı + **Katıl / Ayrıl butonu** (admin için gösterilmez)
+  - Katıl: batch ile `users/{uid}.teamId = teamId` + `memberCount +1`
+  - Ayrıl: AlertDialog onayı → `FieldValue.delete()` + `memberCount -1`
+- **Açıklama kartı:** gri bilgi kutusu (varsa gösterilir)
+- **Ceza Notu kartı:** sarı uyarı tasarımı (varsa gösterilir)
+- **Günlük Liderboard (`_LeaderboardSection`):**
+  - Gece yarısına geri sayım sayacı — `Timer.periodic(1s)`
+  - Yenile butonu (manuel refresh)
+  - Veri yükleme: `users where teamId == X` → her üye için bugün (`createdAt >= gece yarısı`) logları → `pagesRead × 10` toplam hasanat → `todayHasanat` desc sıralama
+  - **Top 3:** 🥇🥈🥉 madalya, altın arka plan (#1)
+  - **Bottom 3:** kırmızı arka plan (sadece toplam üye > 3 ise)
+  - **"(sen)" etiketi:** current user'ın satırında teal vurgu
+  - Satıra tıklama → `KullaniciProfilScreen`
+
+#### KullaniciProfilScreen
+- Başka kullanıcının profilini read-only gösterir
+- `SliverAppBar` + avatar/isim/kullanıcı adı/şehir satırı
+- `_StatGrid` (Seri, Hasanat, Hatim, Sayfa) — canlı stream
+- Tam Kuran Haritası (profil_screen.dart ile aynı mantık — tür + zaman filtresi, sayfa detay paneli)
+- Ayarlar butonu yok
+
+#### Teknik Kararlar
+- Admin atama: MVP'de Firebase Console'dan `adminUid` field'ı elle yazılıyor
+- Liderboard reset: Cloud Function yerine client-side — bugünün gece yarısını `DateTime(now.year, now.month, now.day + 1)` ile hesaplar, logları `createdAt >= todayMidnight` filtresiyle çeker; 00:00'da sayaç sıfırlanınca bir sonraki manual refresh doğru verileri getirir
+- N+1 Firestore okuma (her üye için log query): küçük ekipler (MVP ~40 kişi) için kabul edilebilir
+- `KullaniciProfilScreen` heat map kodu `profil_screen.dart`'tan bağımsız (private widget'lar import edilemiyor); kod tekrarı bilinçli tercih
 
 
 ---
@@ -377,3 +431,7 @@ users/{uid} (root doc)
 - **Devam sekmesi pagesRead hatası:** `pagesRead = entered` (kullanıcı girişi) değil, `pagesRead = endPage - startPage + 1` (gerçek clamped sayfa) olmalı. Aksi hâlde hasanat fazla hesaplanır. Overflow dialog da bu gerçek sayıyı göstermeli.
 - **Sayaç field yerine live query:** Profil gibi kritik istatistikler için Firestore'daki sayaç field'ı (`hatimCount`) güvenilmez olabilir — sync bug'ları birikmez. Bunun yerine `where('isCompleted', isEqualTo: true).snapshots()` ile canlı sayım her zaman doğrudur.
 - **Switch case içi local variable:** Switch case içinde tanımlanan `final pages` gibi değişkenler case dışında erişilemez. Overflow check gibi switch sonrası kullanılacak değerler için switch öncesinde `int? cappedPages` gibi nullable değişken tanımla, case içinde set et.
+- **Liderboard reset client-side:** Cloud Function gerektirmeden günlük sıfırlama için `createdAt >= DateTime(now.year, now.month, now.day)` filtresi yeterli; saat değişince client yenilenince doğru veri gelir.
+- **N+1 Firestore query (küçük ekipler):** Her üye için ayrı log query MVP ölçeğinde (~40 kişi) kabul edilebilir. Büyümede `weeklyHasanat` gibi denormalized field + Cloud Function reset daha iyi ölçeklenir.
+- **Private widget paylaşımı:** Dart'ta `_Widget` isimleri dosya dışından erişilemez. İki ekran aynı widget'ı paylaşacaksa ya `public` yap ve ayrı dosyaya taşı, ya da bilinçli olarak kodu tekrarla — yeniden kullanım için gereksiz refactor yapma.
+- **`SliverAppBar` + `FlexibleSpaceBar` title padding:** `titlePadding` ile başlık konumunu tam kontrol et; varsayılan padding back button'ın üstüne yazabilir.
