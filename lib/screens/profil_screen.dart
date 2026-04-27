@@ -7,6 +7,7 @@ import '../app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
 import '../widgets/duolingo_button.dart';
+import '../widgets/log_history_sheet.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -117,7 +118,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final isHafiz = (data?['isHafiz'] as bool?) ?? false;
         final seri = (data?['seri'] as int?) ?? 0;
         final hasanat = (data?['hasanat'] as int?) ?? 0;
-        final hatimCount = (data?['hatimCount'] as int?) ?? 0;
         final totalPages = (data?['totalPages'] as int?) ?? 0;
 
         return StreamBuilder<QuerySnapshot>(
@@ -147,11 +147,22 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 12),
-                        _StatGrid(
-                          seri: seri,
-                          hasanat: hasanat,
-                          hatimCount: hatimCount,
-                          totalPages: totalPages,
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('hatims')
+                              .where('isCompleted', isEqualTo: true)
+                              .snapshots(),
+                          builder: (context, hatimSnap) {
+                            final completedCount = hatimSnap.data?.size ?? 0;
+                            return _StatGrid(
+                              seri: seri,
+                              hasanat: hasanat,
+                              hatimCount: completedCount,
+                              totalPages: totalPages,
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
                         _KuranHaritasiCard(
@@ -970,6 +981,15 @@ class _SettingsSheet extends StatelessWidget {
             icon: Icons.lock_outline,
             title: 'Şifre İşlemleri',
             onTap: () => _showPasswordSheet(context),
+          ),
+          const SizedBox(height: 12),
+          _SettingsItem(
+            icon: Icons.history,
+            title: 'Okuma Geçmişi',
+            onTap: () {
+              Navigator.pop(context);
+              LogHistorySheet.show(context);
+            },
           ),
           const SizedBox(height: 20),
           Text(

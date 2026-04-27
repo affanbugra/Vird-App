@@ -8,7 +8,8 @@ class HatimCalculator {
   /// - `currentPage`: Okunan benzersiz sayfa sayısı (Set boyutu)
   /// - `lastReadPage`: En yüksek okunan sayfa numarası (Devam sekmesi için)
   /// - `isCompleted`: 1-604 arası TÜM sayfalar okunmuşsa true
-  static Future<void> recalculate(String uid, String hatimId) async {
+  /// Returns true if the hatim was just completed (wasCompleted=false → isCompleted=true).
+  static Future<bool> recalculate(String uid, String hatimId) async {
     final db = FirebaseFirestore.instance;
     
     // 1. Hatime ait tüm logları çek
@@ -38,7 +39,13 @@ class HatimCalculator {
     // 3. Toplam okunan benzersiz sayfa sayısı
     final int calculatedPage = readPages.length.clamp(0, 604);
 
-    // 4. Hatim tamamlanması için 1-604 arası tüm sayfalar okunmuş olmalı
+    // 4. İlk okunmamış sayfa (Devam sekmesi için — lastReadPage >= 604 durumunda kullanılır)
+    int firstUnreadPage = 1;
+    for (int p = 1; p <= 604; p++) {
+      if (!readPages.contains(p)) { firstUnreadPage = p; break; }
+    }
+
+    // 5. Hatim tamamlanması için 1-604 arası tüm sayfalar okunmuş olmalı
     final bool isCompleted = readPages.length >= 604 &&
         List.generate(604, (i) => i + 1).every((p) => readPages.contains(p));
 
@@ -46,20 +53,24 @@ class HatimCalculator {
     final hatimRef = db.collection('users').doc(uid).collection('hatims').doc(hatimId);
     final userRef = db.collection('users').doc(uid);
 
+    bool justCompleted = false;
+
     await db.runTransaction((tx) async {
       final hatimDoc = await tx.get(hatimRef);
       if (!hatimDoc.exists) return;
-      
+
       final hatimData = hatimDoc.data()!;
       final bool wasCompleted = hatimData['isCompleted'] == true;
 
       final updateData = <String, dynamic>{
         'currentPage': calculatedPage,
         'lastReadPage': lastReadPage,
+        'firstUnreadPage': firstUnreadPage,
         'isCompleted': isCompleted,
       };
 
       if (isCompleted && !wasCompleted) {
+        justCompleted = true;
         updateData['completedAt'] = FieldValue.serverTimestamp();
         tx.update(userRef, {'hatimCount': FieldValue.increment(1)});
       } else if (!isCompleted && wasCompleted) {
@@ -69,5 +80,7 @@ class HatimCalculator {
 
       tx.update(hatimRef, updateData);
     });
+
+    return justCompleted;
   }
 }

@@ -15,8 +15,8 @@ class LogEntryBottomSheet extends StatefulWidget {
 
   const LogEntryBottomSheet({super.key, this.initialHatim});
 
-  static Future<void> show(BuildContext context, {Hatim? initialHatim}) {
-    return showModalBottomSheet(
+  static Future<void> show(BuildContext context, {Hatim? initialHatim}) async {
+    final justCompleted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -25,6 +25,49 @@ class LogEntryBottomSheet extends StatefulWidget {
         child: LogEntryBottomSheet(initialHatim: initialHatim),
       ),
     );
+    if (justCompleted == true && context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
+              const Text(
+                'Hatim Tamamlandı',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
+                style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Âmin',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -122,17 +165,21 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     String? hatimId;
     HatimType type;
     Hatim? linkedHatim;
+    int? devamEnteredPages; // kullanıcının girdiği sayfa — overflow tespiti için
 
     switch (_tabController.index) {
       case 0: // Devam
         if (_devamHatim == null) return;
-        final pages = int.tryParse(_devamPagesCtrl.text) ?? 0;
-        if (pages <= 0) return;
+        final entered = int.tryParse(_devamPagesCtrl.text) ?? 0;
+        if (entered <= 0) return;
         method = LogMethod.hatim;
         type = _devamHatim!.type;
-        pagesRead = pages;
-        startPage = (_devamHatim!.lastReadPage + 1).clamp(1, 604);
-        endPage = (_devamHatim!.lastReadPage + pages).clamp(1, 604);
+        startPage = _devamHatim!.lastReadPage >= 604
+            ? _devamHatim!.firstUnreadPage
+            : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+        endPage = (startPage + entered - 1).clamp(1, 604);
+        pagesRead = endPage - startPage + 1; // gerçek sayfa adedi (clamped)
+        devamEnteredPages = entered;
         hatimId = _devamHatim!.id;
         linkedHatim = _devamHatim;
 
@@ -174,42 +221,40 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     if (pagesRead <= 0) return;
 
-    // Devam sekmesinde hatim kapasitesini aşan sayfa uyarısı
-    if (_tabController.index == 0 && linkedHatim != null && !linkedHatim.isCompleted) {
-      final h = linkedHatim;
-      final projected = h.lastReadPage + pagesRead;
-      if (projected > 604) {
-        final remaining = 604 - h.lastReadPage;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Fazla sayfa girdin',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            content: Text(
-              '${h.displayName} hatiminde $remaining sayfa kaldı ama $pagesRead sayfa girdin.\n\n'
-              'Hatim tamamlandı olarak işaretlenecek.',
-              style: const TextStyle(color: AppColors.textMid),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Tamam',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ],
+    // Devam sekmesinde kullanıcı kalan sayfadan fazla girdiyse uyar
+    if (devamEnteredPages != null &&
+        devamEnteredPages > pagesRead &&
+        linkedHatim != null &&
+        !linkedHatim.isCompleted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Hatim bitiyor',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(
+            'Hatimini bitirmene $pagesRead sayfa kaldı.\n\n'
+            '$pagesRead sayfa okundu işaretlenecek ve ${pagesRead * 10} hasanat eklenecek.',
+            style: const TextStyle(color: AppColors.textMid),
           ),
-        ) ?? false;
-        if (!confirmed) return;
-      }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Tamam',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ) ?? false;
+      if (!confirmed) return;
     }
 
     setState(() => _isLoading = true);
@@ -256,13 +301,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       await batch.commit();
 
-      // Hatim tamamlanma kontrolünü dinamik olarak yap
-      // Tüm logları okuyup gerçekten tüm sayfalar okunmuş mu kontrol eder
+      bool justCompleted = false;
       if (hatimId != null) {
-        await HatimCalculator.recalculate(user.uid, hatimId);
+        justCompleted = await HatimCalculator.recalculate(user.uid, hatimId);
       }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, justCompleted);
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -289,8 +333,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     // Eğer initialHatim ile gelindiyse hatim zaten seçili — direk input göster
     if (_devamHatim != null) {
-      final nextPage = (_devamHatim!.lastReadPage + 1).clamp(1, 604);
-      final isFinished = _devamHatim!.lastReadPage >= 604;
+      final nextPage = _devamHatim!.lastReadPage >= 604
+          ? _devamHatim!.firstUnreadPage
+          : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
       final nextCuz = QuranData.cuzForPage(nextPage);
       final nextSurah = QuranData.surahsOnPage(nextPage);
 
@@ -355,60 +400,37 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             ),
           ),
           const SizedBox(height: 10),
-          // Devam bilgisi
-          if (isFinished)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.emoji_events, size: 16, color: AppColors.gold),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Tüm sayfalar sıralı olarak okundu! 🎉',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gold),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMid),
-                        children: [
-                          const TextSpan(text: 'Devam: '),
-                          TextSpan(
-                            text: 'Sayfa $nextPage',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
-                          ),
-                          if (nextCuz != null)
-                            TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
-                          if (nextSurah.isNotEmpty)
-                            TextSpan(text: ' · $nextSurah'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Row(
+              children: [
+                const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMid),
+                      children: [
+                        const TextSpan(text: 'Devam: '),
+                        TextSpan(
+                          text: 'Sayfa $nextPage',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
+                        ),
+                        if (nextCuz != null)
+                          TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
+                        if (nextSurah.isNotEmpty)
+                          TextSpan(text: ' · $nextSurah'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _devamPagesCtrl,

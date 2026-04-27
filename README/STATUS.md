@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-04-27 — güncellendi)
+## Genel Durum (2026-04-27 — son güncelleme: hasanat düzeltmesi + profil live hatim sayısı + ayarlar okuma geçmişi)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi)
@@ -215,22 +215,24 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 #### Dosyalar
 - `lib/screens/hatimlerim_screen.dart` — Aktif hatimler sekmesi
-- `lib/screens/tamamlanan_hatimler_screen.dart` — Tamamlanan hatimler listesi (YENİ)
-- `lib/widgets/hatim_heat_map_sheet.dart` — Per-hatim ısı haritası bottom sheet (YENİ)
-- `lib/widgets/log_entry_bottom_sheet.dart` — 4 tab'lı okuma kaydı (kilitleme modu + uyarı)
+- `lib/screens/tamamlanan_hatimler_screen.dart` — Tamamlanan hatimler listesi
+- `lib/widgets/hatim_heat_map_sheet.dart` — Per-hatim ısı haritası bottom sheet
+- `lib/widgets/log_entry_bottom_sheet.dart` — 4 tab'lı okuma kaydı (kilitleme modu + tebrik popup)
 - `lib/widgets/log_history_sheet.dart` — Kayıt geçmişi (düzenleme + silme)
-- `lib/models/hatim_model.dart` — Hatim veri modeli (`isCompleted`, `completedAt` alanları eklendi)
+- `lib/models/hatim_model.dart` — Hatim veri modeli (`isCompleted`, `completedAt`, `firstUnreadPage` alanları)
 - `lib/models/reading_log_model.dart` — Okuma log veri modeli
+- `lib/utils/hatim_calculator.dart` — `recalculate` artık `Future<bool>` döndürüyor (justCompleted)
 
 #### Hatim Model (`hatim_model.dart`)
 ```dart
-isCompleted: (data['isCompleted'] as bool?) ?? false,   // geriye uyumlu — null → false
+isCompleted: (data['isCompleted'] as bool?) ?? false,      // geriye uyumlu — null → false
 completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
+firstUnreadPage: data['firstUnreadPage'] ?? 1,             // geriye uyumlu — null → 1
 ```
 - Eski Firestore dokümanlarında `isCompleted` alanı yok → `false` varsayılan
-- Tamamlanma şartı: `newCurrentPage >= 604 && !linkedHatim.isCompleted`
-- Tamamlanınca: `batch.update(hatimRef, {'isCompleted': true, 'completedAt': serverTimestamp()})`
-- Aynı batch'te `users/{uid}` altında `hatimCount: increment(1)` eklenir
+- Eski Firestore dokümanlarında `firstUnreadPage` alanı yok → `1` varsayılan (ilk log sonrası recalculate ile güncellenir)
+- Tamamlanma şartı: 1-604 arası TÜM sayfalar `Set<int>`'te mevcut olmalı
+- Tamamlanınca: transaction ile `isCompleted: true`, `completedAt: serverTimestamp()`, `hatimCount: increment(1)`
 
 #### Hatimlerim Ekranı
 1. **Seri & Hasanat kartları** — Firestore'dan `seri` ve `hasanat` alanları canlı
@@ -263,8 +265,8 @@ completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
 - **Tüm Kayıtları Sil:** Geçmiş altındaki kırmızı buton. Logları 400'lük gruplar halinde (batch limit) güvenli şekilde siler, hasanat ve totalPages'i sıfırlar, etkilenen hatimleri `recalculate` ile günceller.
 
 #### HatimCalculator & HatimRemover (`utils/`)
-- **`HatimCalculator.recalculate`:** Bir hatimin tüm loglarını kronolojik olarak çeker. Okunan sayfaları bir `Set<int>` içine doldurur (benzersiz okunan sayfalar). Ayrıca `lastReadPage`'i (okunan en yüksek sayfa numarası) hesaplar. `Set.length >= 604` ise ve 1'den 604'e kadar tüm sayfalar okunmuşsa hatimi tamamlanmış sayar. Tamamlanma artık dinamiktir.
-- **`HatimRemover`:** Firestore batch 500 limitine takılmamak için logları 400'erli gruplar halinde siler. Hatim silinince tüm ilgili okuma loglarını silip profildeki hasanat ve toplam sayfa puanlarını geriye doğru eksiksiz düzeltir. Isı haritalarından kayıtları otomatik temizlemiş olur.
+- **`HatimCalculator.recalculate`:** `Future<bool>` döndürür — `true` ise o çağrıda hatim ilk kez tamamlandı demektir (wasCompleted=false → isCompleted=true). Tüm logları okur, `Set<int>` ile benzersiz sayfaları toplar, `lastReadPage` (en yüksek sayfa), `firstUnreadPage` (1-604 arası ilk boş sayfa) ve `isCompleted` (tüm 1-604 sayfaları okundu mu) hesaplar.
+- **`HatimRemover`:** Firestore batch 500 limitine takılmamak için logları 400'erli gruplar halinde siler. Hatim silinince tüm ilgili okuma loglarını silip profildeki hasanat ve toplam sayfa puanlarını geriye doğru eksiksiz düzeltir.
 
 #### Log Girişi Bottom Sheet — Güncellemeler
 - **Kilitleme modu** (`_lockedToHatim = initialHatim != null`):
@@ -272,9 +274,10 @@ completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
   - `_devamHatim`, `_sayfaHatim`, `_cuzHatim` hepsi `initialHatim` ile başlatılır
   - Devam tab'da "Değiştir" butonu gizlenir
   - Sayfa/Cüz tab'larında chip seçimi yerine `_LockedHatimBadge` gösterilir
-- **Fazla sayfa uyarısı:** Devam tab'da `currentPage + pagesRead > 604` ise dialog:
-  - "X sayfa kaldı ama Y sayfa girdin. Hatim tamamlandı olarak işaretlenecek."
-  - İptal / Tamam; İptal → kayıt yapılmaz
+- **Fazla sayfa uyarısı (düzeltildi):** Devam tab'da kullanıcı kalan sayfadan fazla girerse `pagesRead` gerçek kalan sayfa adedine (`endPage - startPage + 1`) sabitlenir. Dialog: "Hatimini bitirmene X sayfa kaldı. X sayfa okundu işaretlenecek ve X×10 hasanat eklenecek." Hasanat da bu gerçek sayıya göre hesaplanır.
+- **"Sıralı okundu" mesajı kaldırıldı:** Devam sekmesi artık her zaman sayfa girişine izin veriyor — `isFinished` durumu yok
+- **`firstUnreadPage` ile akıllı devam:** `lastReadPage >= 604` ise Devam sekmesi `lastReadPage + 1` yerine hatimin başından ilk boş sayfadan (`firstUnreadPage`) başlıyor. Log kaydedilirken `startPage` ve `endPage` de buna göre hesaplanıyor.
+- **Hatim tamamlanma popup:** `LogEntryBottomSheet.show()` artık `Future<bool>` sonucu bekliyor. `justCompleted == true` ise bottom sheet kapandıktan sonra parent context'te tebrik dialogu gösteriliyor: "Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin." — "Âmin" butonu ile kapatılır.
 
 #### Log Geçmişi Bottom Sheet (`log_history_sheet.dart`)
 - Ekran yüksekliğinin %68'i, tüm loglar StreamBuilder ile (limit yok)
@@ -290,10 +293,11 @@ users/{uid}/hatims/{hatimId}
   type: 'arapca' | 'meal'
   name: string?
   currentPage: int           ← Benzersiz okunan sayfa adedi (0-604)
-  lastReadPage: int          ← YENİ (Okunan en yüksek ardışık sayfa numarası)
+  lastReadPage: int          ← En yüksek okunan sayfa numarası
+  firstUnreadPage: int       ← 1-604 arası ilk okunmamış sayfa (Devam sekmesi için)
   totalPages: 604
-  isCompleted: bool          ← YENİ (eski dokümanlarda yok → false kabul edilir)
-  completedAt: Timestamp?    ← YENİ (sadece tamamlanan hatimlerde)
+  isCompleted: bool          ← Eski dokümanlarda yok → false kabul edilir
+  completedAt: Timestamp?    ← Sadece tamamlanan hatimlerde
   createdAt: Timestamp
   updatedAt: Timestamp       ← FieldValue.serverTimestamp()
 
@@ -311,7 +315,7 @@ users/{uid} (root doc)
   hasanat: int
   totalPages: int
   seri: int
-  hatimCount: int            ← YENİ (tamamlanan hatim sayacı)
+  hatimCount: int            ← tamamlanan hatim sayacı (Profil bu alanı değil, isCompleted query'sini kullanır)
 ```
 
 ---
@@ -334,6 +338,10 @@ users/{uid} (root doc)
   - **Son 1 yıl:** `createdAt >= 365 gün önce` + `type == 'arapca'`
   - **Meal:** `type == 'meal'`
 - `StreamBuilder<QuerySnapshot>` ile gerçek zamanlı güncelleme
+
+#### Profil — Son Güncellemeler
+- **HATİM stat live:** `hatimCount` user doc alanı yerine `users/{uid}/hatims where isCompleted==true` stream ile canlı sayılıyor. Kayıt silinince, hatim tamamlanınca veya iptal edilince otomatik güncellenir.
+- **Ayarlar → Okuma Geçmişi:** `_SettingsSheet`'e "Okuma Geçmişi" maddesi eklendi — "Şifre İşlemleri" altında, `LogHistorySheet.show()` açar.
 
 ---
 
@@ -363,3 +371,9 @@ users/{uid} (root doc)
 - **Dinamik Hatim Tamamlanma (Set Kontrolü):** Sadece "30. cüzü okudum" demekle veya son sayfa 604 olunca hatim tamamlanmamalıdır. `Set<int>` kullanılarak tüm sayfalar (1-604) tek tek okunmuş mu kontrol edilmelidir.
 - **Sıralı Okuma vs Benzersiz Sayfa Sayısı:** `currentPage` benzersiz okunan sayfa adedini, `lastReadPage` ise Devam sekmesindeki sıralı okumada en son nerede kalındığını (en yüksek sayfa numarası) tutmak üzere iki ayrı metrik olarak tasarlanmalıdır.
 - **Kullanıcı Kayıt Akışı Uyumluluğu:** Profil düzenleme gibi ekranlarda istenen bilgiler, onboarding/kayıt aşamasındaki zorunluluklarla tutarlı olmalıdır (Örn: Username girişte zorunlu değildi, bu yüzden profil düzenlemede de opsiyonel olmalıdır).
+- **ModalBottomSheet'ten dialog gösterme:** Bottom sheet kapandıktan sonra parent context'te dialog göstermek için `showModalBottomSheet<bool>` sonucunu `await` ile bekle, ardından `context.mounted` kontrolü yap ve `showDialog` çağır. Bottom sheet içinden pop ederek sonuç ilet: `Navigator.pop(context, true)`.
+- **`recalculate` dönüş değeri:** `Future<void>` yerine `Future<bool>` döndürmek için transaction dışında `bool justCompleted = false` tanımla, transaction içinde `justCompleted = true` ata, transaction sonrası return et. Transaction kendi değer döndüremediğinden dış değişken şart.
+- **`firstUnreadPage` geriye uyumluluğu:** Firestore'da alanı olmayan eski hatim dokümanları `null` döndürür → `data['firstUnreadPage'] ?? 1` ile varsayılan 1 ver. İlk log kaydedilince `recalculate` doğru değeri yazar.
+- **Devam sekmesi pagesRead hatası:** `pagesRead = entered` (kullanıcı girişi) değil, `pagesRead = endPage - startPage + 1` (gerçek clamped sayfa) olmalı. Aksi hâlde hasanat fazla hesaplanır. Overflow dialog da bu gerçek sayıyı göstermeli.
+- **Sayaç field yerine live query:** Profil gibi kritik istatistikler için Firestore'daki sayaç field'ı (`hatimCount`) güvenilmez olabilir — sync bug'ları birikmez. Bunun yerine `where('isCompleted', isEqualTo: true).snapshots()` ile canlı sayım her zaman doğrudur.
+- **Switch case içi local variable:** Switch case içinde tanımlanan `final pages` gibi değişkenler case dışında erişilemez. Overflow check gibi switch sonrası kullanılacak değerler için switch öncesinde `int? cappedPages` gibi nullable değişken tanımla, case içinde set et.
