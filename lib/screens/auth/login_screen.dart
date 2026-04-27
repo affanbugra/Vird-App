@@ -52,8 +52,14 @@ class _LoginScreenState extends State<LoginScreen> {
               Image.asset(AppAssets.logo, height: 80),
               const SizedBox(height: 32),
               const Text(
-                'Tekrar Hoş Geldin!',
+                "Vird'e Hoş Geldin!",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Düzenli okumalarla hasenatını artır, kalıcı bir alışkanlık kazan.",
+                style: TextStyle(fontSize: 14, color: AppColors.textMid),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),

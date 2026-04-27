@@ -183,7 +183,7 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 #### Ekran Yapısı
 1. **Header** — Teal banner, Türkçe hadis (Âişe hadisi, Müslim M1828), Arapça metin yok
-2. **Yakında Geliyor** — `_allUpdates` const listesi (7 kart); MVP kartı yeşil (`released: true`), kalanlar teal ve alta doğru şeffaflaşır
+2. **Yakında Geliyor** — `_allUpdates` const listesi (9 kart); Ekipler ve Uygulama İçi Okuma eklendi. MVP kartı yeşil (`released: true`), kalanlar teal ve alta doğru şeffaflaşır
 3. **"Tüm sürüm geçmişini gör →"** — `showModalBottomSheet` + `DraggableScrollableSheet`, alt kısımda beyaz gradient sonsuzluk hissi
 4. **Bir özellik öner** — `TextField` + Firestore `feature_requests` write, `_PrimaryButton` 3D depth
 5. **Hakkında** — Vird'in tasavvuf terimi tanımı + açıklama
@@ -197,8 +197,17 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 #### Logo Sistemi (`lib/app_assets.dart`)
 - `AppAssets.logo` tek merkezi sabit — logo değişirse sadece bu satır güncellenir
-- Bağlı dosyalar: `main.dart`, `vird_screen.dart`, `login_screen.dart`, `splash_screen.dart`
+- `AppAssets.ricalIFarkLogo` — Ekipler sayfası için takım logosu
+- Bağlı dosyalar: `main.dart`, `vird_screen.dart`, `login_screen.dart`, `splash_screen.dart`, `ekipler_screen.dart`
 - **Not:** Nav bar'da `ColorFiltered(BlendMode.srcIn)` yerine `Opacity` kullanılır çünkü JPEG'de alpha kanalı yoktur
+
+---
+
+### Modül 11 (Başlangıç) — Ekipler Arayüzü (YENİ)
+- `EkiplerScreen` sayfası eklendi. Şimdilik "Çok yakında" mesajı ve örnek bir takım (`Ricâl-i Fark`) butonu barındırıyor.
+- `DuolingoButton` bileşenine `borderRadius` özelliği eklendi; böylece tam yuvarlak hap şeklinin yanında kare-yuvarlak formda takım/rozet butonları da yapılabiliyor.
+- `assets/images/rical_i_fark_logo.png` eklendi ve `pubspec.yaml`'a dahil edildi.
+
 
 ---
 
@@ -244,13 +253,18 @@ completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
 - Yalnızca o hatimin logları: `.where('hatimId', isEqualTo: hatim.id)`
 - **Binary renk:** okundu = `Color(0xFF38A474)` (yeşil-teal), okunmadı = `AppColors.borderGrey`
 - **Fatiha karesi:** `usePage1Color: true` → `readPages.contains(1)` ile renk belirlenir (page 1 ile aynı)
-- **Tıklama → detay:** `_selectedPage` state; seçilen sayfa numarası + sure adı + okundu/okunmadı badge
+- **Tıklama → detay:** `ValueNotifier<int?> _selectedPage` state; `ValueListenableBuilder` ile lokal rebuild (tüm sayfa render'lanmaz, layout sıçraması/beyaz ekran önlenir). Sabit `_DetailPanel` profildeki gibi çalışır.
 - **Metrikler:** SAYFA | CÜZ (tamamlanan cüz/30) | KALAN
 - **DEVAM ET butonu:** `onDevamEt` callback varsa sayfanın en üstünde; `Navigator.pop` + `addPostFrameCallback` ile hatim log sheet açılır
 - **Kilitleme:** `onDevamEt` ile açılınca `LogEntryBottomSheet` o hatim kilitli açılır
 - **Tarih bilgileri (`_HatimDatesRow`):** başlangıç tarihi; tamamlananlar için bitiş + süre (`_fmtDuration`: <30 gün → "X gün", ≥30 gün → "X ay Y gün")
 - **Son Okumalar:** son 3 log (client-side sort); dişli ikon + "Tümünü gör (N)" → `_AllLogsSheet`
-- **`_AllLogsSheet`:** Tüm hatim logları StreamBuilder ile canlı; swipe-to-delete → `batch(doc.delete, hasanat -= pagesRead×10, totalPages -= pagesRead)`; NOT: hatim `currentPage` güncellenmez (geriye dönük hesap karmaşıklığı)
+- **`_AllLogsSheet`:** Tüm hatim logları StreamBuilder ile canlı; swipe-to-delete → `batch(doc.delete, hasanat -= pagesRead×10, totalPages -= pagesRead)` ve otomatik `HatimCalculator.recalculate`
+- **Tüm Kayıtları Sil:** Geçmiş altındaki kırmızı buton. Logları 400'lük gruplar halinde (batch limit) güvenli şekilde siler, hasanat ve totalPages'i sıfırlar, etkilenen hatimleri `recalculate` ile günceller.
+
+#### HatimCalculator & HatimRemover (`utils/`)
+- **`HatimCalculator.recalculate`:** Bir hatimin tüm loglarını kronolojik olarak çeker. Okunan sayfaları bir `Set<int>` içine doldurur (benzersiz okunan sayfalar). Ayrıca `lastReadPage`'i (okunan en yüksek sayfa numarası) hesaplar. `Set.length >= 604` ise ve 1'den 604'e kadar tüm sayfalar okunmuşsa hatimi tamamlanmış sayar. Tamamlanma artık dinamiktir.
+- **`HatimRemover`:** Firestore batch 500 limitine takılmamak için logları 400'erli gruplar halinde siler. Hatim silinince tüm ilgili okuma loglarını silip profildeki hasanat ve toplam sayfa puanlarını geriye doğru eksiksiz düzeltir. Isı haritalarından kayıtları otomatik temizlemiş olur.
 
 #### Log Girişi Bottom Sheet — Güncellemeler
 - **Kilitleme modu** (`_lockedToHatim = initialHatim != null`):
@@ -265,15 +279,18 @@ completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
 #### Log Geçmişi Bottom Sheet (`log_history_sheet.dart`)
 - Ekran yüksekliğinin %68'i, tüm loglar StreamBuilder ile (limit yok)
 - Her satır: yöntem ikonu + başlık + tip badge + göreli zaman + düzenle/sil ikonları
-- **Silme:** AlertDialog → batch(log sil, hasanat -= pagesRead×10, totalPages -= pagesRead)
-- **Düzenleme (`_LogEditSheet`):** Metoda özel form; batch ile fark hesabı (Δhasanat, ΔtotalPages)
+- **Silme:** AlertDialog → batch(log sil, hasanat -= pagesRead×10, totalPages -= pagesRead) ve `HatimCalculator.recalculate`
+- **Düzenleme (`_LogEditSheet`):** Metoda özel form; batch ile fark hesabı (Δhasanat, ΔtotalPages) ve otomatik `recalculate`.
+- **Tüm Kayıtları Sil Butonu:** Batch limit sorunu çözülerek 400'lü chunk'lar halinde loglar silinir. Puanlar eksi olarak hesaplanarak güncellenir.
+- **Tasarım:** Ana butonlar ("DEVAM ET", "KAYDET", "BAŞLAT") tutarlılık için `DuolingoButton` component'i yapıldı.
 
 #### Firestore Şeması (güncel)
 ```
 users/{uid}/hatims/{hatimId}
   type: 'arapca' | 'meal'
   name: string?
-  currentPage: int
+  currentPage: int           ← Benzersiz okunan sayfa adedi (0-604)
+  lastReadPage: int          ← YENİ (Okunan en yüksek ardışık sayfa numarası)
   totalPages: 604
   isCompleted: bool          ← YENİ (eski dokümanlarda yok → false kabul edilir)
   completedAt: Timestamp?    ← YENİ (sadece tamamlanan hatimlerde)
@@ -343,3 +360,6 @@ users/{uid} (root doc)
 - **Log silme sınırı:** `_AllLogsSheet`'te log silinince `hasanat` ve `totalPages` güncellenir ama hatim `currentPage` güncellenmez (geriye dönük hesap karmaşık); kullanıcı yeni doğru log ekleyebilir
 - **Fazla sayfa kontrolü:** `pagesRead <= 0` kontrolünden sonra, `setState` öncesinde; dialog await'i öncesinde hiç `async` olmadığından `context` güvenli kullanılır
 - **TabController length dinamik:** `_lockedToHatim` true iken `length: 3` (Sure sekmesi yok); `initState`'te `widget.initialHatim != null` kontrolüyle belirlenir — `initState`'te `widget` erişilebilir
+- **Dinamik Hatim Tamamlanma (Set Kontrolü):** Sadece "30. cüzü okudum" demekle veya son sayfa 604 olunca hatim tamamlanmamalıdır. `Set<int>` kullanılarak tüm sayfalar (1-604) tek tek okunmuş mu kontrol edilmelidir.
+- **Sıralı Okuma vs Benzersiz Sayfa Sayısı:** `currentPage` benzersiz okunan sayfa adedini, `lastReadPage` ise Devam sekmesindeki sıralı okumada en son nerede kalındığını (en yüksek sayfa numarası) tutmak üzere iki ayrı metrik olarak tasarlanmalıdır.
+- **Kullanıcı Kayıt Akışı Uyumluluğu:** Profil düzenleme gibi ekranlarda istenen bilgiler, onboarding/kayıt aşamasındaki zorunluluklarla tutarlı olmalıdır (Örn: Username girişte zorunlu değildi, bu yüzden profil düzenlemede de opsiyonel olmalıdır).

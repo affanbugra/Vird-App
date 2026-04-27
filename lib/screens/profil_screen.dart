@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
+import '../widgets/duolingo_button.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -35,7 +36,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   HeatTimeFilter _timeFilter = HeatTimeFilter.all;
   int? _selectedPage;
 
-  void _showSettings(BuildContext context) {
+  void _showSettings(BuildContext context, Map<String, dynamic> userData, User user) {
     final auth = context.read<AuthProvider>();
     showModalBottomSheet(
       context: context,
@@ -44,6 +45,8 @@ class _ProfilScreenState extends State<ProfilScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => _SettingsSheet(
+        userData: userData,
+        user: user,
         onSignOut: () {
           Navigator.of(context).pop();
           auth.signOut();
@@ -136,7 +139,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     avatarSeed: avatarSeed,
                     isPro: isPro,
                     isHafiz: isHafiz,
-                    onSettingsTap: () => _showSettings(context),
+                    onSettingsTap: () => _showSettings(context, data ?? {}, user),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -456,14 +459,6 @@ class _KuranHaritasiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMeal = typeFilter == HeatTypeFilter.meal;
-    final readPages = readings.keys.where((p) => p >= 1 && (readings[p] ?? 0) > 0).length;
-    final totalReadings = readings.values.fold(0, (a, b) => a + b);
-    final completedCuz = QuranData.cuzler.where((c) {
-      for (int p = c.startPage; p <= c.endPage; p++) {
-        if ((readings[p] ?? 0) == 0) return false;
-      }
-      return true;
-    }).length;
 
     return Container(
       decoration: BoxDecoration(
@@ -571,19 +566,6 @@ class _KuranHaritasiCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          // İstatistik şeridi
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                _StatStrip(value: _fmt(readPages), label: 'SAYFA'),
-                const VerticalDivider(color: AppColors.borderGrey, thickness: 1, width: 32),
-                _StatStrip(value: _fmt(totalReadings), label: 'OKUMA'),
-                const VerticalDivider(color: AppColors.borderGrey, thickness: 1, width: 32),
-                _StatStrip(value: '$completedCuz/30', label: 'CÜZ'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
           // Isı haritası
           _HeatGrid(readings: readings, selectedPage: selectedPage, onPageTap: onPageTap),
           // Lejant
@@ -630,45 +612,6 @@ class _FilterChip extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: isSelected ? AppColors.teal : AppColors.textMid,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── İstatistik Şeridi ────────────────────────────────────────────────────────
-
-class _StatStrip extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _StatStrip({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: GoogleFonts.nunito(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.teal,
-              ),
-            ),
-            Text(
-              label,
-              style: GoogleFonts.nunito(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textLight,
-                letterSpacing: 0.4,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -950,9 +893,39 @@ class _PageDetail extends StatelessWidget {
 // ─── Ayarlar Bottom Sheet ─────────────────────────────────────────────────────
 
 class _SettingsSheet extends StatelessWidget {
+  final Map<String, dynamic> userData;
+  final User user;
   final VoidCallback onSignOut;
 
-  const _SettingsSheet({required this.onSignOut});
+  const _SettingsSheet({
+    required this.userData,
+    required this.user,
+    required this.onSignOut,
+  });
+
+  void _showEditProfile(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _EditProfileSheet(userData: userData, user: user),
+    );
+  }
+
+  void _showPasswordSheet(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _PasswordSheet(user: user),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -985,6 +958,18 @@ class _SettingsSheet extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: AppColors.textDark,
             ),
+          ),
+          const SizedBox(height: 20),
+          _SettingsItem(
+            icon: Icons.person_outline,
+            title: 'Profili Düzenle',
+            onTap: () => _showEditProfile(context),
+          ),
+          const SizedBox(height: 12),
+          _SettingsItem(
+            icon: Icons.lock_outline,
+            title: 'Şifre İşlemleri',
+            onTap: () => _showPasswordSheet(context),
           ),
           const SizedBox(height: 20),
           Text(
@@ -1034,6 +1019,359 @@ class _SettingsSheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SettingsItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const _SettingsItem({required this.icon, required this.title, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.borderGrey),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textDark, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textMid),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Profil Düzenleme Sheet ───────────────────────────────────────────────────
+
+class _EditProfileSheet extends StatefulWidget {
+  final Map<String, dynamic> userData;
+  final User user;
+
+  const _EditProfileSheet({required this.userData, required this.user});
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameCtrl;
+  late TextEditingController _usernameCtrl;
+  late TextEditingController _cityCtrl;
+  late TextEditingController _uniCtrl;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.userData['name'] ?? widget.user.displayName ?? '');
+    _usernameCtrl = TextEditingController(text: widget.userData['username'] ?? '');
+    _cityCtrl = TextEditingController(text: (widget.userData['city'] == 'Şehir belirtilmedi') ? '' : widget.userData['city']);
+    _uniCtrl = TextEditingController(text: (widget.userData['university'] == 'Üniversite belirtilmedi') ? '' : widget.userData['university']);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _usernameCtrl.dispose();
+    _cityCtrl.dispose();
+    _uniCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+        'name': _nameCtrl.text.trim(),
+        'username': _usernameCtrl.text.trim(),
+        'city': _cityCtrl.text.trim(),
+        'university': _uniCtrl.text.trim(),
+      });
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Profili Düzenle',
+              style: GoogleFonts.nunito(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildField(_nameCtrl, 'Ad Soyad', isRequired: true),
+            const SizedBox(height: 12),
+            _buildField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
+            const SizedBox(height: 12),
+            _buildField(_cityCtrl, 'Şehir (Opsiyonel)'),
+            const SizedBox(height: 12),
+            _buildField(_uniCtrl, 'Üniversite (Opsiyonel)'),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal,
+                bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey,
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _save,
+                child: Text(
+                  'KAYDET',
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String label, {bool isRequired = false}) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+        ),
+      ),
+      validator: isRequired
+          ? (v) => (v == null || v.trim().isEmpty) ? 'Bu alan zorunludur' : null
+          : null,
+    );
+  }
+}
+
+// ─── Şifre İşlemleri Sheet ────────────────────────────────────────────────────
+
+class _PasswordSheet extends StatefulWidget {
+  final User user;
+  const _PasswordSheet({required this.user});
+
+  @override
+  State<_PasswordSheet> createState() => _PasswordSheetState();
+}
+
+class _PasswordSheetState extends State<_PasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _oldPassCtrl = TextEditingController();
+  final _newPassCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
+  
+  bool _isLoading = false;
+  late bool _hasPassword;
+
+  @override
+  void initState() {
+    super.initState();
+    _hasPassword = widget.user.providerData.any((p) => p.providerId == 'password');
+  }
+
+  @override
+  void dispose() {
+    _oldPassCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      if (_hasPassword) {
+        // Eski şifre ile doğrula ve güncelle
+        final cred = EmailAuthProvider.credential(
+          email: widget.user.email!,
+          password: _oldPassCtrl.text.trim(),
+        );
+        await widget.user.reauthenticateWithCredential(cred);
+        await widget.user.updatePassword(_newPassCtrl.text.trim());
+      } else {
+        // Şifre yoksa (örn: sadece google) doğrudan ekle (link) veya update
+        await widget.user.updatePassword(_newPassCtrl.text.trim());
+      }
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Şifre başarıyla güncellendi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              _hasPassword ? 'Şifre Değiştir' : 'Şifre Belirle',
+              style: GoogleFonts.nunito(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (!_hasPassword)
+              Text(
+                'Google ile giriş yaptığınız için henüz bir şifreniz yok. Şifre belirleyerek e-posta ve şifre ile de giriş yapabilirsiniz.',
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              ),
+            const SizedBox(height: 16),
+            if (_hasPassword) ...[
+              _buildField(_oldPassCtrl, 'Mevcut Şifre'),
+              const SizedBox(height: 12),
+            ],
+            _buildField(_newPassCtrl, 'Yeni Şifre'),
+            const SizedBox(height: 12),
+            _buildField(_confirmPassCtrl, 'Yeni Şifreyi Onayla', isConfirm: true),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal,
+                bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey,
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _submit,
+                child: Text(
+                  _hasPassword ? 'ŞİFREYİ DEĞİŞTİR' : 'ŞİFRE BELİRLE',
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String label, {bool isConfirm = false}) {
+    return TextFormField(
+      controller: controller,
+      obscureText: true,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+        ),
+      ),
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'Bu alan zorunludur';
+        if (v.trim().length < 6) return 'En az 6 karakter olmalıdır';
+        if (isConfirm && v.trim() != _newPassCtrl.text.trim()) {
+          return 'Şifreler eşleşmiyor';
+        }
+        return null;
+      },
     );
   }
 }

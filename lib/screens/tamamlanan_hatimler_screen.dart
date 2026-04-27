@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../models/hatim_model.dart';
 import '../widgets/hatim_heat_map_sheet.dart';
+import '../utils/hatim_remover.dart';
 
 class TamamlananHatimlerScreen extends StatefulWidget {
   const TamamlananHatimlerScreen({super.key});
@@ -20,12 +21,11 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
   Future<void> _deleteHatim(Hatim hatim) async {
     if (user == null) return;
     setState(() => _deletingIds.add(hatim.id));
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user!.uid)
-        .collection('hatims')
-        .doc(hatim.id)
-        .delete();
+    try {
+      await HatimRemover.deleteHatim(user!.uid, hatim);
+    } catch (_) {
+      if (mounted) setState(() => _deletingIds.remove(hatim.id));
+    }
   }
 
   String _formatDate(DateTime? dt) {
@@ -128,7 +128,7 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
                         title: Text('Hatimi sil',
                             style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
                         content: Text(
-                          '"${hatim.displayName}" silinsin mi?\nBu işlem geri alınamaz.',
+                          '"${hatim.displayName}" ve tüm okuma kayıtları silinecek.\nHasanat puanı ve okunan sayfalar geri alınır.',
                           style: GoogleFonts.nunito(color: AppColors.textMid),
                         ),
                         actions: [

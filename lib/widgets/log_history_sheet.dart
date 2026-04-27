@@ -4,8 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
 import '../models/reading_log_model.dart';
+import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
+import 'log_edit_sheet.dart';
+import '../utils/hatim_calculator.dart';
 
 class LogHistorySheet {
   static Future<void> show(BuildContext context) {
@@ -20,8 +23,98 @@ class LogHistorySheet {
 
 // ── Ana içerik ────────────────────────────────────────────────────────────────
 
-class _LogHistoryContent extends StatelessWidget {
+class _LogHistoryContent extends StatefulWidget {
   const _LogHistoryContent();
+
+  @override
+  State<_LogHistoryContent> createState() => _LogHistoryContentState();
+}
+
+class _LogHistoryContentState extends State<_LogHistoryContent> {
+  bool _deleting = false;
+
+  Future<void> _deleteAllLogs(String uid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Tüm kayıtları sil',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
+          style: TextStyle(color: AppColors.textMid),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal',
+                style: TextStyle(color: AppColors.textMid)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tümünü Sil',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ) ?? false;
+    if (!confirmed || !mounted) return;
+
+    setState(() => _deleting = true);
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final logsSnap = await db
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .get();
+
+      // Toplam sayfa sayısını hesapla
+      int totalPages = 0;
+      final Set<String> affectedHatimIds = {};
+      for (var doc in logsSnap.docs) {
+        final data = doc.data();
+        totalPages += (data['pagesRead'] as int?) ?? 0;
+        final hatimId = data['hatimId'] as String?;
+        if (hatimId != null) affectedHatimIds.add(hatimId);
+      }
+
+      // Logları 400'lük batch'ler halinde sil
+      final docs = logsSnap.docs;
+      for (int i = 0; i < docs.length; i += 400) {
+        final chunk = docs.sublist(i, (i + 400).clamp(0, docs.length));
+        final batch = db.batch();
+        for (var doc in chunk) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      // Kullanıcı istatistiklerini sıfırla
+      if (totalPages > 0) {
+        await db.collection('users').doc(uid).update({
+          'hasanat': FieldValue.increment(-(totalPages * 10)),
+          'totalPages': FieldValue.increment(-totalPages),
+        });
+      }
+
+      // Etkilenen hatimleri yeniden hesapla
+      for (final hatimId in affectedHatimIds) {
+        await HatimCalculator.recalculate(uid, hatimId);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +195,37 @@ class _LogHistoryContent extends StatelessWidget {
                   },
                 ),
               ),
+              // Tüm kayıtları sil butonu
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: TextButton.icon(
+                  onPressed: _deleting ? null : () => _deleteAllLogs(uid),
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.errorRed))
+                      : const Icon(Icons.delete_sweep_outlined,
+                          color: AppColors.errorRed, size: 20),
+                  label: Text(
+                    _deleting ? 'Siliniyor...' : 'Tüm Kayıtları Sil',
+                    style: const TextStyle(
+                      color: AppColors.errorRed,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                          color: AppColors.errorRed.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -145,11 +269,11 @@ class _LogTile extends StatelessWidget {
   IconData get _icon {
     switch (log.method) {
       case LogMethod.hatim:
-        return Icons.bookmark;
+        return Icons.bookmark_border;
       case LogMethod.pages:
-        return Icons.description_outlined;
+        return Icons.article_outlined;
       case LogMethod.cuz:
-        return Icons.layers_outlined;
+        return Icons.pie_chart_outline;
       case LogMethod.surah:
         return Icons.menu_book_outlined;
     }
@@ -219,6 +343,10 @@ class _LogTile extends StatelessWidget {
       },
     );
     await batch.commit();
+
+    if (log.hatimId != null) {
+      await HatimCalculator.recalculate(uid, log.hatimId!);
+    }
   }
 
   @override
@@ -279,7 +407,7 @@ class _LogTile extends StatelessWidget {
               builder: (_) => Padding(
                 padding: EdgeInsets.only(
                     bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: _LogEditSheet(log: log, uid: uid),
+                child: LogEditSheet(log: log, uid: uid),
               ),
             ),
             tooltip: 'Düzenle',
@@ -318,373 +446,5 @@ class _TypeBadge extends StatelessWidget {
             color: AppColors.teal),
       ),
     );
-  }
-}
-
-// ── Düzenleme sheet ───────────────────────────────────────────────────────────
-
-class _LogEditSheet extends StatefulWidget {
-  final ReadingLog log;
-  final String uid;
-
-  const _LogEditSheet({required this.log, required this.uid});
-
-  @override
-  State<_LogEditSheet> createState() => _LogEditSheetState();
-}
-
-class _LogEditSheetState extends State<_LogEditSheet> {
-  // hatim
-  late final TextEditingController _pagesCtrl;
-
-  // pages
-  late final TextEditingController _startCtrl;
-  late final TextEditingController _endCtrl;
-
-  // cuz
-  CuzInfo? _selectedCuz;
-
-  // surah
-  SurahInfo? _selectedSurah;
-
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final log = widget.log;
-
-    _pagesCtrl = TextEditingController(text: '${log.pagesRead}');
-    _startCtrl = TextEditingController(text: '${log.startPage ?? ''}');
-    _endCtrl = TextEditingController(text: '${log.endPage ?? ''}');
-
-    if (log.method == LogMethod.cuz && log.startPage != null) {
-      _selectedCuz = QuranData.cuzler
-          .where((c) => c.startPage == log.startPage)
-          .firstOrNull;
-    }
-    if (log.method == LogMethod.surah && log.surahId != null) {
-      _selectedSurah = QuranData.surahlar
-          .where((s) => s.id == log.surahId)
-          .firstOrNull;
-    }
-  }
-
-  @override
-  void dispose() {
-    _pagesCtrl.dispose();
-    _startCtrl.dispose();
-    _endCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final log = widget.log;
-    int newPagesRead;
-    final Map<String, dynamic> updateData = {};
-
-    switch (log.method) {
-      case LogMethod.hatim:
-        newPagesRead = int.tryParse(_pagesCtrl.text) ?? log.pagesRead;
-        if (newPagesRead <= 0) return;
-        updateData['pagesRead'] = newPagesRead;
-
-      case LogMethod.pages:
-        final s = int.tryParse(_startCtrl.text) ?? 0;
-        final e = int.tryParse(_endCtrl.text) ?? 0;
-        if (s <= 0 || e <= 0 || s > e || e > 604) return;
-        newPagesRead = e - s + 1;
-        updateData['startPage'] = s;
-        updateData['endPage'] = e;
-        updateData['pagesRead'] = newPagesRead;
-
-      case LogMethod.cuz:
-        if (_selectedCuz == null) return;
-        newPagesRead = _selectedCuz!.pageCount;
-        updateData['startPage'] = _selectedCuz!.startPage;
-        updateData['endPage'] = _selectedCuz!.endPage;
-        updateData['pagesRead'] = newPagesRead;
-
-      case LogMethod.surah:
-        if (_selectedSurah == null) return;
-        newPagesRead = _selectedSurah!.startPage == 0
-            ? 1
-            : (_selectedSurah!.endPage - _selectedSurah!.startPage + 1);
-        updateData['surahId'] = _selectedSurah!.id;
-        updateData['startPage'] = _selectedSurah!.startPage;
-        updateData['endPage'] = _selectedSurah!.endPage;
-        updateData['pagesRead'] = newPagesRead;
-    }
-
-    setState(() => _loading = true);
-
-    final diff = newPagesRead - log.pagesRead;
-    final batch = FirebaseFirestore.instance.batch();
-
-    batch.update(
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.uid)
-          .collection('logs')
-          .doc(log.id),
-      updateData,
-    );
-
-    if (diff != 0) {
-      batch.update(
-        FirebaseFirestore.instance.collection('users').doc(widget.uid),
-        {
-          'hasanat': FieldValue.increment(diff * 10),
-          'totalPages': FieldValue.increment(diff),
-        },
-      );
-    }
-
-    await batch.commit();
-    if (mounted) Navigator.pop(context);
-  }
-
-  String get _methodLabel {
-    switch (widget.log.method) {
-      case LogMethod.hatim:
-        return 'Hatim devam';
-      case LogMethod.pages:
-        return 'Sayfa aralığı';
-      case LogMethod.cuz:
-        return 'Cüz';
-      case LogMethod.surah:
-        return 'Sure';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final log = widget.log;
-    final typeLabel = log.type == HatimType.arapca ? 'Arapça' : 'Meal';
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Kaydı Düzenle',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-
-          // Kayıt bilgisi (salt okunur)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline,
-                    size: 14, color: AppColors.textLight),
-                const SizedBox(width: 6),
-                Text(
-                  '$typeLabel · $_methodLabel',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textMid),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Düzenlenebilir alan
-          _buildEditField(log),
-
-          // Hatim notu
-          if (log.method == LogMethod.hatim) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Icon(Icons.warning_amber_outlined,
-                    size: 13, color: AppColors.textLight),
-                const SizedBox(width: 4),
-                const Expanded(
-                  child: Text(
-                    'Hatim ilerlemesi güncellenmez, yalnızca hasanat düzeltilir.',
-                    style: TextStyle(
-                        fontSize: 11, color: AppColors.textLight),
-                  ),
-                ),
-              ],
-            ),
-          ],
-
-          const SizedBox(height: 20),
-
-          // Kaydet
-          SizedBox(
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _loading ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.borderGrey,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999)),
-                elevation: 0,
-              ).copyWith(
-                side: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.disabled)) return null;
-                  return const BorderSide(
-                      color: AppColors.tealDark, width: 3);
-                }),
-              ),
-              child: _loading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Text('KAYDET',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEditField(ReadingLog log) {
-    switch (log.method) {
-      case LogMethod.hatim:
-        return TextField(
-          controller: _pagesCtrl,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Okunan sayfa sayısı',
-            prefixIcon: const Icon(Icons.add),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.teal),
-            ),
-          ),
-        );
-
-      case LogMethod.pages:
-        return Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _startCtrl,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Başlangıç',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.teal),
-                  ),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('–',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textMid)),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _endCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Bitiş',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.teal),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-
-      case LogMethod.cuz:
-        return DropdownSearch<CuzInfo>(
-          items: (filter, _) => QuranData.cuzler,
-          itemAsString: (c) =>
-              '${c.cuzNo}. Cüz  (${c.startPage}–${c.endPage}. sayfa)',
-          compareFn: (a, b) => a.cuzNo == b.cuzNo,
-          selectedItem: _selectedCuz,
-          onSelected: (c) => setState(() => _selectedCuz = c),
-          popupProps: const PopupProps.menu(showSearchBox: false),
-          decoratorProps: DropDownDecoratorProps(
-            decoration: InputDecoration(
-              labelText: 'Cüz seç',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.teal),
-              ),
-            ),
-          ),
-        );
-
-      case LogMethod.surah:
-        return DropdownSearch<SurahInfo>(
-          items: (filter, _) => QuranData.surahlar,
-          itemAsString: (s) => '${s.id}. ${s.name}',
-          compareFn: (a, b) => a.id == b.id,
-          selectedItem: _selectedSurah,
-          onSelected: (s) => setState(() => _selectedSurah = s),
-          popupProps: const PopupProps.menu(
-            showSearchBox: true,
-            searchFieldProps: TextFieldProps(
-              decoration: InputDecoration(
-                hintText: 'Sure ara...',
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-          ),
-          decoratorProps: DropDownDecoratorProps(
-            decoration: InputDecoration(
-              labelText: 'Sure seç',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.teal),
-              ),
-            ),
-          ),
-        );
-    }
   }
 }

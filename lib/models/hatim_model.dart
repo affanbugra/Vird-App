@@ -6,7 +6,8 @@ class Hatim {
   final String id;
   final HatimType type;
   final String? name;
-  final int currentPage;
+  final int currentPage;   // Okunan benzersiz sayfa sayısı (0-604)
+  final int lastReadPage;  // En son okunan sayfa numarası (Devam sekmesi için)
   final int totalPages;
   final bool isCompleted;
   final DateTime? completedAt;
@@ -18,6 +19,7 @@ class Hatim {
     required this.type,
     this.name,
     this.currentPage = 0,
+    this.lastReadPage = 0,
     this.totalPages = 604,
     this.isCompleted = false,
     this.completedAt,
@@ -37,6 +39,7 @@ class Hatim {
       type: data['type'] == 'arapca' ? HatimType.arapca : HatimType.meal,
       name: data['name'] as String?,
       currentPage: data['currentPage'] ?? 0,
+      lastReadPage: data['lastReadPage'] ?? data['currentPage'] ?? 0,
       totalPages: data['totalPages'] ?? 604,
       isCompleted: (data['isCompleted'] as bool?) ?? false,
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
@@ -50,6 +53,7 @@ class Hatim {
       'type': type == HatimType.arapca ? 'arapca' : 'meal',
       if (name != null && name!.isNotEmpty) 'name': name,
       'currentPage': currentPage,
+      'lastReadPage': lastReadPage,
       'totalPages': totalPages,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),

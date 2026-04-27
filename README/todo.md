@@ -19,7 +19,7 @@
 - [x] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç) ✅
 - [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅
 - [ ] 10 — Offline mode (cihaza kayıt, bağlantı gelince senkronizasyon)
-- [ ] 11 — Ekip sistemi (oluşturma, katılım, yönetim, ceza sistemi)
+- [ ] 11 — Ekip sistemi (Ekipler sekmesi UI iskeleti eklendi; yapılacaklar: oluşturma, katılım, yönetim, ceza)
 - [ ] 12 — Liderboard (haftalık sıralama, Cuma 13:00 sıfırlama, madalyalar)
 - [x] 13 — Profil veri bağlantısı (ısı haritası Firestore loglarına bağlandı) ✅
 - [ ] 14 — Bildirimler (tüm bildirim tipleri)
@@ -65,10 +65,10 @@
 - [ ] Profil unvan sistemi — hatim sayısına göre futbol yıldızı / LinkedIn etiketi tarzı rozet veya unvan (örn. "Hafız Adayı", "Hatim Ustası")
 
 ### Hesap & Ayarlar
-- [ ] Google ile giren kullanıcılar için şifre oluşturma (Ayarlar ekranından e-posta + yeni şifre belirleme)
+- [x] Google ile giren kullanıcılar için şifre oluşturma (Ayarlar ekranından e-posta + yeni şifre belirleme) ✅
 - [ ] Profil avatarı — fotoğraf yükleme veya avatar oluşturma/seçme
-- [ ] Ayarlar sekmesi — gizlilik ayarları (kim neyi görebilir: sadece ben / arkadaşlar / herkes)
-- [ ] Profil düzenleme ekranı — isim, kullanıcı adı, şehir, üniversite/meslek bilgisi güncelleme
+- [x] Ayarlar sekmesi — gizlilik ayarları (kim neyi görebilir: sadece ben / arkadaşlar / herkes) (Kısmen: Şifre ve Profil Ayarları eklendi) ✅
+- [x] Profil düzenleme ekranı — isim, kullanıcı adı, şehir, üniversite/meslek bilgisi güncelleme ✅
 - [ ] Üniversite okumayanlar için profil alanı — meslek bilgisi veya lise öğrencisi seçeneği
 
 ### Ayet & Hadis
@@ -86,7 +86,7 @@
 ### Yeni Özellikler
 - [ ] Namaz takibi
 - [ ] İslami oyun/quiz (Zip benzeri)
-- [ ] Kuran ve Meal uygulama içi okuma entegrasyonu
+- [ ] Kuran ve Meal uygulama içi okuma entegrasyonu (Vird sekmesinde "Yakında Geliyor" listesine eklendi)
 - [ ] Tefsir takibi
 - [ ] Kuran Arapçası öğrenme (Duolingo tarzı)
 - [ ] Ramazan güncellemesi (oruç, teravih takip)

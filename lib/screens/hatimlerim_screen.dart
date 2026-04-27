@@ -4,10 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../models/hatim_model.dart';
-import '../data/quran_cuz.dart';
 import '../widgets/log_entry_bottom_sheet.dart';
 import '../widgets/hatim_heat_map_sheet.dart';
+import '../widgets/duolingo_button.dart';
 import 'tamamlanan_hatimler_screen.dart';
+import '../utils/hatim_remover.dart';
 
 const int _arapcaLimit = 3;
 const int _mealLimit = 1;
@@ -59,12 +60,11 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
   Future<void> _deleteHatim(Hatim hatim) async {
     if (user == null) return;
     setState(() => _deletingIds.add(hatim.id));
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user!.uid)
-        .collection('hatims')
-        .doc(hatim.id)
-        .delete();
+    try {
+      await HatimRemover.deleteHatim(user!.uid, hatim);
+    } catch (_) {
+      if (mounted) setState(() => _deletingIds.remove(hatim.id));
+    }
   }
 
   @override
@@ -132,7 +132,24 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
                   const SizedBox(height: 16),
                   Expanded(
                     child: hatims.isEmpty
-                        ? _EmptyState(onAdd: () => _showNewHatimSheet(context, hatims))
+                        ? Column(
+                            children: [
+                              Expanded(child: _EmptyState(onAdd: () => _showNewHatimSheet(context, hatims))),
+                              if (completedCount > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4, bottom: 16),
+                                  child: _TamamlananButton(
+                                    count: completedCount,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const TamamlananHatimlerScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
                         : ListView.builder(
                             itemCount: hatims.length + (completedCount > 0 ? 1 : 0),
                             itemBuilder: (context, i) {
@@ -193,7 +210,7 @@ class _EmptyState extends StatelessWidget {
           const Text('Henüz aktif bir hatiminiz yok.',
               style: TextStyle(color: AppColors.textMid, fontSize: 15)),
           const SizedBox(height: 8),
-          const Text('İlk hatimini başlatmak için + butonuna dokun.',
+          const Text('Yeni bir hatim başlatmak için + butonuna dokun.',
               style: TextStyle(color: AppColors.textLight, fontSize: 13)),
         ],
       ),
@@ -310,7 +327,7 @@ class _DismissibleHatimCard extends StatelessWidget {
               title: const Text('Hatimi sil',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               content: Text(
-                '"${hatim.displayName}" silinsin mi?\nBu işlem geri alınamaz.',
+                '"${hatim.displayName}" ve tüm okuma kayıtları silinecek.\nHasanat puanı ve okunan sayfalar geri alınır.',
                 style: const TextStyle(color: AppColors.textMid),
               ),
               actions: [
@@ -349,21 +366,12 @@ class _HatimCardContent extends StatelessWidget {
 
   const _HatimCardContent({required this.hatim, required this.onHeatMap});
 
-  int _completedCuzCount(int currentPage) {
-    if (currentPage <= 0) return 0;
-    return QuranData.cuzler.where((c) => currentPage >= c.endPage).length;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isArapca = hatim.type == HatimType.arapca;
-    final completedCuz = _completedCuzCount(hatim.currentPage);
-    const totalCuz = 30;
-    final cuzProgress = completedCuz / totalCuz;
-    final currentCuzInfo = hatim.currentPage == 0
-        ? QuranData.cuzler.first
-        : QuranData.cuzForPage(hatim.currentPage);
-    final currentCuzNo = currentCuzInfo?.cuzNo ?? 1;
+    // currentPage artık gerçekten okunan benzersiz sayfa sayısını temsil ediyor
+    final readPages = hatim.currentPage;
+    final progress = readPages / 604;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -405,7 +413,7 @@ class _HatimCardContent extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${hatim.currentPage}/604 sayfa · $currentCuzNo. cüz',
+                        '$readPages/604 sayfa',
                         style: GoogleFonts.nunito(
                           color: AppColors.textMid,
                           fontSize: 12,
@@ -432,7 +440,7 @@ class _HatimCardContent extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
-                value: cuzProgress,
+                value: progress,
                 minHeight: 6,
                 backgroundColor: AppColors.borderGrey,
                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
@@ -575,32 +583,17 @@ class _NewHatimSheetState extends State<_NewHatimSheet> {
           // Başlat butonu
           SizedBox(
             height: 52,
-            child: ElevatedButton(
+            child: DuolingoButton(
+              color: AppColors.teal,
+              bottomColor: AppColors.tealDark,
+              disabledColor: AppColors.borderGrey,
               onPressed: (_selectedType == null || _loading) ? null : _confirm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.borderGrey,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999)),
-                elevation: 0,
-              ).copyWith(
-                side: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.disabled)) return null;
-                  return const BorderSide(color: AppColors.tealDark, width: 3);
-                }),
-              ),
-              child: _loading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Text('BAŞLAT',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
+              isLoading: _loading,
+              child: const Text('BAŞLAT',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16)),
             ),
           ),
         ],

@@ -35,6 +35,10 @@ updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
 ### Hot reload asset eklemez
 Yeni asset (`pubspec.yaml` + dosya) eklenince hot reload görmez. `flutter clean` + `flutter run` gerekli.
 
+### DraggableScrollableSheet ve setState çakışması (Beyaz Ekran / Flash)
+`DraggableScrollableSheet` içerisinde karmaşık bir widget ağacı ve `StreamBuilder` varken en üstte `setState` çağrıldığında tüm sheet sıfırdan hesaplanmaya çalışıp beyaz ekran / height jump sorunlarına sebep olur.
+**Çözüm:** `ValueNotifier<T>` ve `ValueListenableBuilder` kullanarak sadece güncellenmesi gereken widget'ı sarmala. Böylece bottom sheet layout'u bozulmaz.
+
 ---
 
 ## Firestore
@@ -51,6 +55,10 @@ final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
 final ratio = count / denom;
 ```
 → Az okuyan birinin haritası açık kalır; çok okuyan birinin haritası anlamlı şekilde koyulaşır.
+
+### Toplu Veri Silme (Batch Limit)
+Firestore batch işlemlerinde en fazla 500 işlem yapılabilir. Çok sayıda logu silerken hata almamak için:
+**Çözüm:** Silinecek listeyi `.sublist` ile chunk'lara ayırıp (`(i, i+400)`) loop içerisinde `batch.commit()` atılmalı.
 
 ---
 
@@ -78,6 +86,10 @@ onChanged: (t) => setState(() {
 // chip listesi:
 hatims: _hatims.where((h) => h.type == _globalType).toList(),
 ```
+
+### Hatim İlerleme Hesabı (Set Yaklaşımı)
+Kullanıcının `pagesRead` (okuduğu sayfa) verilerini toplamak 604'ü geçmesine ve hatimin yanlışlıkla bitmesine sebep olabilir.
+**Çözüm:** Her logdaki `startPage` ve `endPage` aralığını bir `Set<int>` içine at (benzersiz hale gelir). `Set.length` okunan sayfa sayısını, `Set.contains()` kontrolü ise spesifik bir sayfanın okunup okunmadığını kesin olarak verir.
 
 ---
 

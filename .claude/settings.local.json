@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(cp \"C:\\\\Users\\\\HUAWEI\\\\.claude\\\\projects\\\\D--Coding-vird-app\\\\2deb49a9-eec1-4b9b-8c76-5f6212cd5eb7\\\\tool-results\\\\webfetch-1777111535182-i8t11z.bin\" /tmp/design.gz)",
+      "Bash(gunzip -f /tmp/design.gz)",
+      "Read(//tmp/**)",
+      "Bash(tar xf *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell([System.Environment]::GetFolderPath\\('MyDocuments'\\); $env:USERPROFILE; ls D:\\\\)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(dart pub *)",
+      "Bash(firebase *)",
+      "Bash(git rm *)",
+      "Bash(flutter clean *)",
+      "Bash(git commit *)",
+      "WebSearch",
+      "Bash(gh api *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(flutter run *)",
+      "Bash(flutter build *)"
+    ]
+  }
+}

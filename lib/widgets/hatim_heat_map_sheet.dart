@@ -3,7 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
 import '../models/hatim_model.dart';
+import 'duolingo_button.dart';
 import '../data/quran_cuz.dart';
+import '../models/reading_log_model.dart';
+import 'log_edit_sheet.dart';
+import '../utils/hatim_calculator.dart';
 
 String _fmtDate(DateTime dt) =>
     '${dt.day}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
@@ -49,7 +53,13 @@ class HatimHeatMapSheet extends StatefulWidget {
 }
 
 class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
-  int? _selectedPage;
+  final ValueNotifier<int?> _selectedPage = ValueNotifier<int?>(null);
+
+  @override
+  void dispose() {
+    _selectedPage.dispose();
+    super.dispose();
+  }
 
   Set<int> _buildReadPages(List<QueryDocumentSnapshot> logs) {
     final Set<int> pages = {};
@@ -177,34 +187,24 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                     children: [
                       // DEVAM ET butonu (sadece aktif hatimler için)
                       if (widget.onDevamEt != null) ...[
-                        SizedBox(
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                widget.onDevamEt!();
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.teal,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999)),
-                              elevation: 0,
-                            ).copyWith(
-                              side: WidgetStateProperty.all(
-                                  const BorderSide(color: AppColors.tealDark, width: 3)),
-                            ),
-                            child: Text(
-                              'DEVAM ET',
-                              style: GoogleFonts.nunito(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                              ),
+                        DuolingoButton(
+                          child: Text(
+                            'DEVAM ET',
+                            style: GoogleFonts.nunito(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              letterSpacing: 0.5,
                             ),
                           ),
+                          color: AppColors.teal,
+                          bottomColor: AppColors.tealDark,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              widget.onDevamEt!();
+                            });
+                          },
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -230,34 +230,43 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      // Isı haritası
-                      _BinaryHeatGrid(
-                        readPages: readPages,
-                        selectedPage: _selectedPage,
-                        onPageTap: (p) => setState(() =>
-                            _selectedPage = _selectedPage == p ? null : p),
+                      // Isı haritası + Lejant + Detay paneli
+                      ValueListenableBuilder<int?>(
+                        valueListenable: _selectedPage,
+                        builder: (context, selectedPage, _) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _BinaryHeatGrid(
+                                readPages: readPages,
+                                selectedPage: selectedPage,
+                                onPageTap: (p) => _selectedPage.value =
+                                    _selectedPage.value == p ? null : p,
+                              ),
+                              const SizedBox(height: 10),
+                              // Lejant
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  _LegendDot(color: AppColors.borderGrey),
+                                  const SizedBox(width: 4),
+                                  Text('Okunmadı',
+                                      style: GoogleFonts.nunito(
+                                          fontSize: 10, color: AppColors.textMid)),
+                                  const SizedBox(width: 12),
+                                  _LegendDot(color: _kReadColor),
+                                  const SizedBox(width: 4),
+                                  Text('Okundu',
+                                      style: GoogleFonts.nunito(
+                                          fontSize: 10, color: AppColors.textMid)),
+                                ],
+                              ),
+                              // Detay paneli
+                              _DetailPanel(page: selectedPage, readPages: readPages),
+                            ],
+                          );
+                        },
                       ),
-                      const SizedBox(height: 10),
-                      // Lejant
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _LegendDot(color: AppColors.borderGrey),
-                          const SizedBox(width: 4),
-                          Text('Okunmadı',
-                              style: GoogleFonts.nunito(
-                                  fontSize: 10, color: AppColors.textMid)),
-                          const SizedBox(width: 12),
-                          _LegendDot(color: _kReadColor),
-                          const SizedBox(width: 4),
-                          Text('Okundu',
-                              style: GoogleFonts.nunito(
-                                  fontSize: 10, color: AppColors.textMid)),
-                        ],
-                      ),
-                      // Detay paneli
-                      if (_selectedPage != null)
-                        _DetailPanel(page: _selectedPage!, readPages: readPages),
                       const SizedBox(height: 12),
                       // Tarih bilgileri
                       _HatimDatesRow(hatim: widget.hatim),
@@ -376,16 +385,33 @@ class _LegendDot extends StatelessWidget {
 // ─── Detay paneli ─────────────────────────────────────────────────────────────
 
 class _DetailPanel extends StatelessWidget {
-  final int page;
+  final int? page;
   final Set<int> readPages;
   const _DetailPanel({required this.page, required this.readPages});
 
   @override
   Widget build(BuildContext context) {
-    final surahText = page == 0
-        ? 'Fâtiha'
-        : QuranData.surahsOnPage(page);
-    final isRead = readPages.contains(page);
+    if (page == null) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderGrey),
+        ),
+        child: Text(
+          'Detay için bir sayfaya dokun',
+          style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+        ),
+      );
+    }
+
+    final p = page!;
+    final surahText = p == 0 ? 'Fâtiha' : QuranData.surahsOnPage(p);
+    final cuz = QuranData.cuzForPage(p);
+    final pageLabel = p == 0 ? 'Fâtiha · Cüz 1' : 'Sayfa $p · Cüz ${cuz?.cuzNo ?? '?'}';
+    final isRead = readPages.contains(p);
 
     return Container(
       margin: const EdgeInsets.only(top: 8),
@@ -402,18 +428,20 @@ class _DetailPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  page == 0 ? 'Fâtiha' : '$page. sayfa',
+                  pageLabel,
                   style: GoogleFonts.nunito(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textDark,
                   ),
                 ),
-                Text(
-                  surahText,
-                  style: GoogleFonts.nunito(
-                      fontSize: 11, color: AppColors.textMid),
-                ),
+                if (surahText.isNotEmpty)
+                  Text(
+                    surahText,
+                    style: GoogleFonts.nunito(
+                        fontSize: 11, color: AppColors.textMid),
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             ),
           ),
@@ -643,10 +671,12 @@ class _LogRow extends StatelessWidget {
     final dateText = createdAt != null ? _fmtDate(createdAt) : '';
 
     final icon = method == 'hatim'
-        ? Icons.arrow_forward
+        ? Icons.bookmark_border
         : method == 'cuz'
-            ? Icons.layers_outlined
-            : Icons.menu_book_outlined;
+            ? Icons.pie_chart_outline
+            : method == 'surah'
+                ? Icons.menu_book_outlined
+                : Icons.article_outlined;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 5),
@@ -715,6 +745,11 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
       },
     );
     await batch.commit();
+
+    final hatimId = data['hatimId'] as String?;
+    if (hatimId != null) {
+      await HatimCalculator.recalculate(widget.uid, hatimId);
+    }
   }
 
   @override
@@ -848,7 +883,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                                 false;
                           },
                           onDismissed: (_) => _deleteLog(doc),
-                          child: _LogRowDetailed(doc: doc),
+                          child: _LogRowDetailed(doc: doc, uid: widget.uid),
                         ),
                       );
                     },
@@ -865,7 +900,8 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
 
 class _LogRowDetailed extends StatelessWidget {
   final QueryDocumentSnapshot doc;
-  const _LogRowDetailed({required this.doc});
+  final String uid;
+  const _LogRowDetailed({required this.doc, required this.uid});
 
   @override
   Widget build(BuildContext context) {
@@ -882,10 +918,12 @@ class _LogRowDetailed extends StatelessWidget {
     final dateText = createdAt != null ? _fmtDate(createdAt) : '';
 
     final icon = method == 'hatim'
-        ? Icons.arrow_forward
+        ? Icons.bookmark_border
         : method == 'cuz'
-            ? Icons.layers_outlined
-            : Icons.menu_book_outlined;
+            ? Icons.pie_chart_outline
+            : method == 'surah'
+                ? Icons.menu_book_outlined
+                : Icons.article_outlined;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -933,8 +971,24 @@ class _LogRowDetailed extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: AppColors.teal)),
           ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: AppColors.teal, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => Padding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: LogEditSheet(log: ReadingLog.fromFirestore(doc), uid: uid),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
+

@@ -26,8 +26,10 @@ IconData _iconFromName(String name) {
 const _allUpdates = [
   _Update(iconName: 'book',     title: 'Kuran Okuma & Hatim Takibi',  desc: 'Günlük okuma alışkanlığı, hatim takibi, Seri, Hasanat ve Kuran Haritası.',  eta: 'Yayında ✓', released: true),
   _Update(iconName: 'people',   title: 'Arkadaşlarınla Takipleş',     desc: 'Arkadaşlarını ekle, okuma aktivitelerini takip et, birlikte ilerle.',          eta: 'Yakında'),
+  _Update(iconName: 'trophy',   title: 'Ekipler & Yarışmalar',        desc: 'Kendi ekibini oluştur, arkadaşlarınla yarışarak hayra öncülük et.',            eta: 'Yakında'),
   _Update(iconName: 'quote',    title: 'Ayet & Hadisler',              desc: 'Günlük bildirimler, favori ayet ve hadisleri seç ve kategorize et.',           eta: 'Yakında'),
   _Update(iconName: 'bookmark', title: 'Tefsir Takibi',                desc: 'Tefsir okumak isteyenler için ayrı takip ve ilerleme sistemi.',                eta: 'Yakında'),
+  _Update(iconName: 'book',     title: 'Uygulama İçi Okuma',           desc: 'Kur\'an-ı Kerim, meal ve tefsirleri doğrudan uygulama içinden rahatça oku.',   eta: 'Yakında'),
   _Update(iconName: 'prayer',   title: 'Namaz Takibi',                 desc: 'Beş vakit namaz için günlük takip ve hatırlatmalar.',                          eta: 'Yakında'),
   _Update(iconName: 'school',   title: 'İslami Kulüpler',              desc: 'Üniversite İslami kulüplerini takip et, etkinliklerden haberdar ol.',          eta: 'Yakında'),
   _Update(iconName: 'moon',     title: 'Ramazan Güncellemesi',         desc: 'Oruç takibi, teravih cami hedefleri, üniversite iftarları ve daha fazlası.',   eta: 'Ramazan 2027'),

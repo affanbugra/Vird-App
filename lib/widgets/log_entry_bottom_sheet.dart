@@ -1,12 +1,13 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../models/hatim_model.dart';
+import 'duolingo_button.dart';
 import '../models/reading_log_model.dart';
 import '../data/quran_cuz.dart';
+import '../utils/hatim_calculator.dart';
 import 'log_history_sheet.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
@@ -130,8 +131,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         method = LogMethod.hatim;
         type = _devamHatim!.type;
         pagesRead = pages;
-        startPage = (_devamHatim!.currentPage + 1).clamp(1, 604);
-        endPage = (_devamHatim!.currentPage + pages).clamp(1, 604);
+        startPage = (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+        endPage = (_devamHatim!.lastReadPage + pages).clamp(1, 604);
         hatimId = _devamHatim!.id;
         linkedHatim = _devamHatim;
 
@@ -176,9 +177,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     // Devam sekmesinde hatim kapasitesini aşan sayfa uyarısı
     if (_tabController.index == 0 && linkedHatim != null && !linkedHatim.isCompleted) {
       final h = linkedHatim;
-      final projected = h.currentPage + pagesRead;
+      final projected = h.lastReadPage + pagesRead;
       if (projected > 604) {
-        final remaining = 604 - h.currentPage;
+        final remaining = 604 - h.lastReadPage;
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -247,28 +248,20 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             .collection('hatims')
             .doc(hatimId);
 
-        final int newCurrentPage;
-        if (_tabController.index == 0) {
-          newCurrentPage = (linkedHatim.currentPage + pagesRead).clamp(0, 604);
-        } else {
-          newCurrentPage = math.max(linkedHatim.currentPage, endPage);
-        }
-
-        final bool justCompleted = newCurrentPage >= 604 && !linkedHatim.isCompleted;
-
+        // Sadece updatedAt güncelle — tamamlanma kontrolü recalculate'e bırakılıyor
         batch.update(hatimRef, {
-          'currentPage': newCurrentPage,
           'updatedAt': FieldValue.serverTimestamp(),
-          if (justCompleted) 'isCompleted': true,
-          if (justCompleted) 'completedAt': FieldValue.serverTimestamp(),
         });
-
-        if (justCompleted) {
-          batch.update(userRef, {'hatimCount': FieldValue.increment(1)});
-        }
       }
 
       await batch.commit();
+
+      // Hatim tamamlanma kontrolünü dinamik olarak yap
+      // Tüm logları okuyup gerçekten tüm sayfalar okunmuş mu kontrol eder
+      if (hatimId != null) {
+        await HatimCalculator.recalculate(user.uid, hatimId);
+      }
+
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
@@ -279,15 +272,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
   String _hatimPositionText(Hatim hatim) {
     if (hatim.currentPage == 0) return 'Henüz başlanmadı';
-    final cuz = QuranData.cuzForPage(hatim.currentPage);
-    if (cuz == null) return '${hatim.currentPage}. sayfa';
-    final pagesInCuz = hatim.currentPage - cuz.startPage + 1;
-    return '${cuz.cuzNo}. cüzden $pagesInCuz sayfa okundu';
+    return '${hatim.currentPage}/604 sayfa okundu';
   }
 
   String _hatimSurahText(Hatim hatim) {
-    if (hatim.currentPage == 0) return 'Fâtiha';
-    return QuranData.surahsOnPage(hatim.currentPage);
+    if (hatim.lastReadPage == 0) return 'Fâtiha';
+    return QuranData.surahsOnPage(hatim.lastReadPage);
   }
 
   // ── Tab: Devam ──────────────────────────────────────────────────────
@@ -299,6 +289,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     // Eğer initialHatim ile gelindiyse hatim zaten seçili — direk input göster
     if (_devamHatim != null) {
+      final nextPage = (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+      final isFinished = _devamHatim!.lastReadPage >= 604;
+      final nextCuz = QuranData.cuzForPage(nextPage);
+      final nextSurah = QuranData.surahsOnPage(nextPage);
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -359,7 +354,62 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          // Devam bilgisi
+          if (isFinished)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.emoji_events, size: 16, color: AppColors.gold),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Tüm sayfalar sıralı olarak okundu! 🎉',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gold),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMid),
+                        children: [
+                          const TextSpan(text: 'Devam: '),
+                          TextSpan(
+                            text: 'Sayfa $nextPage',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
+                          ),
+                          if (nextCuz != null)
+                            TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
+                          if (nextSurah.isNotEmpty)
+                            TextSpan(text: ' · $nextSurah'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 12),
           TextField(
             controller: _devamPagesCtrl,
             keyboardType: TextInputType.number,
@@ -910,31 +960,21 @@ class _SaveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.teal,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: AppColors.borderGrey,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          elevation: 0,
-          padding: EdgeInsets.zero,
-        ).copyWith(
-          side: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.disabled)) return null;
-            return const BorderSide(color: AppColors.tealDark, width: 3);
-          }),
+    return DuolingoButton(
+      height: 48, // Toplam 52px (48 + 4 depth)
+      color: AppColors.teal,
+      bottomColor: AppColors.tealDark,
+      disabledColor: AppColors.borderGrey,
+      onPressed: isLoading ? null : onPressed,
+      isLoading: isLoading,
+      child: const Text(
+        'KAYDET',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          letterSpacing: 0.5,
         ),
-        child: isLoading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text('KAYDET',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
       ),
     );
   }
