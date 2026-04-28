@@ -10,6 +10,8 @@ import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
 import '../widgets/duolingo_button.dart';
 import '../widgets/log_history_sheet.dart';
+import '../widgets/seri_calendar_sheet.dart';
+import '../services/notification_service.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -163,6 +165,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
                               hasanat: hasanat,
                               hatimCount: completedCount,
                               totalPages: totalPages,
+                              onSeriTap: () => SeriCalendarSheet.show(
+                                context,
+                                uid: user.uid,
+                                seri: seri,
+                              ),
                             );
                           },
                         ),
@@ -370,12 +377,14 @@ class _StatGrid extends StatelessWidget {
   final int hasanat;
   final int hatimCount;
   final int totalPages;
+  final VoidCallback? onSeriTap;
 
   const _StatGrid({
     required this.seri,
     required this.hasanat,
     required this.hatimCount,
     required this.totalPages,
+    this.onSeriTap,
   });
 
   @override
@@ -384,7 +393,10 @@ class _StatGrid extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange)),
+          Expanded(child: GestureDetector(
+            onTap: onSeriTap,
+            child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange),
+          )),
           const SizedBox(width: 8),
           Expanded(child: _StatCard(icon: '✨', value: _fmt(hasanat), label: 'HASANAT', color: AppColors.gold)),
           const SizedBox(width: 8),
@@ -905,7 +917,7 @@ class _PageDetail extends StatelessWidget {
 
 // ─── Ayarlar Bottom Sheet ─────────────────────────────────────────────────────
 
-class _SettingsSheet extends StatelessWidget {
+class _SettingsSheet extends StatefulWidget {
   final Map<String, dynamic> userData;
   final User user;
   final VoidCallback onSignOut;
@@ -916,6 +928,21 @@ class _SettingsSheet extends StatelessWidget {
     required this.onSignOut,
   });
 
+  @override
+  State<_SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends State<_SettingsSheet> {
+  TimeOfDay? _notifTime;
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationService.getSavedTime().then((t) {
+      if (mounted) setState(() => _notifTime = t);
+    });
+  }
+
   void _showEditProfile(BuildContext context) {
     Navigator.pop(context);
     showModalBottomSheet(
@@ -924,7 +951,7 @@ class _SettingsSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _EditProfileSheet(userData: userData, user: user),
+      builder: (_) => _EditProfileSheet(userData: widget.userData, user: widget.user),
     );
   }
 
@@ -936,8 +963,31 @@ class _SettingsSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _PasswordSheet(user: user),
+      builder: (_) => _PasswordSheet(user: widget.user),
     );
+  }
+
+  Future<void> _handleNotifTap(BuildContext context) async {
+    if (_notifTime != null) {
+      await NotificationService.cancel();
+      if (mounted) setState(() => _notifTime = null);
+      return;
+    }
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 20, minute: 0),
+      helpText: 'Hatırlatıcı saati',
+    );
+    if (picked != null) {
+      await NotificationService.scheduleDaily(picked.hour, picked.minute);
+      if (mounted) {
+        setState(() => _notifTime = picked);
+        final formatted = picked.format(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hatırlatıcı her gün $formatted için kuruldu')),
+        );
+      }
+    }
   }
 
   @override
@@ -993,6 +1043,15 @@ class _SettingsSheet extends StatelessWidget {
               LogHistorySheet.show(context);
             },
           ),
+          const SizedBox(height: 12),
+          _SettingsItem(
+            icon: Icons.notifications_outlined,
+            title: _notifTime == null
+                ? 'Günlük Hatırlatıcı'
+                : 'Hatırlatıcı: ${_notifTime!.format(context)}',
+            subtitle: _notifTime == null ? 'Kapalı — ayarlamak için dokun' : 'Kapatmak için dokun',
+            onTap: () => _handleNotifTap(context),
+          ),
           const SizedBox(height: 20),
           Text(
             'Gizlilik',
@@ -1023,7 +1082,7 @@ class _SettingsSheet extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: onSignOut,
+              onPressed: widget.onSignOut,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.errorRed),
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1048,9 +1107,10 @@ class _SettingsSheet extends StatelessWidget {
 class _SettingsItem extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
 
-  const _SettingsItem({required this.icon, required this.title, required this.onTap});
+  const _SettingsItem({required this.icon, required this.title, required this.onTap, this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1068,13 +1128,26 @@ class _SettingsItem extends StatelessWidget {
             Icon(icon, color: AppColors.textDark, size: 22),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.nunito(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                ],
               ),
             ),
             const Icon(Icons.chevron_right, color: AppColors.textMid),
