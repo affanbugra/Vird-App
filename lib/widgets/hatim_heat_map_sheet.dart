@@ -8,6 +8,7 @@ import '../data/quran_cuz.dart';
 import '../models/reading_log_model.dart';
 import 'log_edit_sheet.dart';
 import '../utils/hatim_calculator.dart';
+import '../utils/seri_calculator.dart';
 
 String _fmtDate(DateTime dt) =>
     '${dt.day}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
@@ -750,6 +751,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
     if (hatimId != null) {
       await HatimCalculator.recalculate(widget.uid, hatimId);
     }
+    await SeriCalculator.recalculate(widget.uid);
   }
 
   @override

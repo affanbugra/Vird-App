@@ -317,6 +317,62 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     }
   }
 
+  Future<void> _deleteTeam(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Grubu Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text(
+          'Bu grubu kalıcı olarak silmek istediğine emin misin? Tüm üyeler gruptan çıkarılacak.',
+          style: GoogleFonts.nunito(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('İptal', style: GoogleFonts.nunito()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Sil', style: GoogleFonts.nunito(color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final membersSnap = await db.collection('users')
+          .where('teamId', isEqualTo: widget.teamId)
+          .get();
+
+      final batch = db.batch();
+      for (final doc in membersSnap.docs) {
+        batch.update(doc.reference, {'teamId': FieldValue.delete()});
+      }
+
+      final requestsSnap = await db.collection('teams')
+          .doc(widget.teamId)
+          .collection('requests')
+          .get();
+      for (final doc in requestsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      batch.delete(db.collection('teams').doc(widget.teamId));
+      await batch.commit();
+
+      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    }
+  }
+
   void _showEditSheet(BuildContext context, TeamModel team, String field) {
     final current =
         field == 'description' ? team.description : team.penaltyNote;
@@ -479,8 +535,13 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                       if (isAdmin)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, color: Colors.white),
-                          onSelected: (v) =>
-                              _showEditSheet(context, team, v),
+                          onSelected: (v) {
+                            if (v == 'deleteTeam') {
+                              _deleteTeam(context);
+                            } else {
+                              _showEditSheet(context, team, v);
+                            }
+                          },
                           itemBuilder: (_) => [
                             PopupMenuItem(
                               value: 'description',
@@ -491,6 +552,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               value: 'penaltyNote',
                               child: Text('Ceza Notunu Düzenle',
                                   style: GoogleFonts.nunito()),
+                            ),
+                            const PopupMenuDivider(),
+                            PopupMenuItem(
+                              value: 'deleteTeam',
+                              child: Text('Grubu Sil',
+                                  style: GoogleFonts.nunito(
+                                      color: AppColors.errorRed,
+                                      fontWeight: FontWeight.w700)),
                             ),
                           ],
                         ),

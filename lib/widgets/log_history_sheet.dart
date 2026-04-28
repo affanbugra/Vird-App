@@ -7,6 +7,7 @@ import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
 import 'log_edit_sheet.dart';
 import '../utils/hatim_calculator.dart';
+import '../utils/seri_calculator.dart';
 
 class LogHistorySheet {
   static Future<void> show(BuildContext context) {
@@ -107,6 +108,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
       for (final hatimId in affectedHatimIds) {
         await HatimCalculator.recalculate(uid, hatimId);
       }
+      await SeriCalculator.recalculate(uid);
 
       if (mounted) Navigator.pop(context);
     } catch (_) {
@@ -345,6 +347,7 @@ class _LogTile extends StatelessWidget {
     if (log.hatimId != null) {
       await HatimCalculator.recalculate(uid, log.hatimId!);
     }
+    await SeriCalculator.recalculate(uid);
   }
 
   @override
