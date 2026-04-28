@@ -442,7 +442,7 @@ class _CreateTeamSheet extends StatefulWidget {
 class _CreateTeamSheetState extends State<_CreateTeamSheet> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  bool _isPrivate = false;
+  final bool _isPrivate = true;
   bool _isLoading = false;
 
   @override
@@ -580,34 +580,17 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             ),
             child: Row(
               children: [
+                const Icon(Icons.lock_outline, size: 18, color: AppColors.textMid),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Gizli Grup',
-                        style: GoogleFonts.nunito(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      Text(
-                        'Listede görünmez — sadece davet koduyla bulunabilir',
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          color: AppColors.textMid,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Tüm gruplar şimdilik gizlidir — sadece davet koduyla bulunabilir',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      color: AppColors.textMid,
+                      height: 1.3,
+                    ),
                   ),
-                ),
-                Switch(
-                  value: _isPrivate,
-                  onChanged: (v) => setState(() => _isPrivate = v),
-                  activeThumbColor: AppColors.teal,
-                  activeTrackColor: AppColors.teal.withValues(alpha: 0.4),
                 ),
               ],
             ),

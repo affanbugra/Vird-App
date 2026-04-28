@@ -318,6 +318,9 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   }
 
   Future<void> _deleteTeam(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -362,14 +365,12 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       batch.delete(db.collection('teams').doc(widget.teamId));
       await batch.commit();
 
-      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+      navigator.pop();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Hata: $e', style: GoogleFonts.nunito()),
-          backgroundColor: AppColors.errorRed,
-        ));
-      }
+      messenger.showSnackBar(SnackBar(
+        content: Text('Hata: $e', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.errorRed,
+      ));
     }
   }
 

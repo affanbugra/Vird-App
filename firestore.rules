@@ -14,8 +14,12 @@ service cloud.firestore {
     match /users/{userId} {
       // Herkes okuyabilir (liderboard, profil görüntüleme)
       allow read: if isAuth();
-      // Sadece kendi dokümanını yazabilir
-      allow create, update: if isOwner(userId);
+      // Sadece kendi dokümanını yazabilir; teamId alanını herhangi bir
+      // giriş yapmış kullanıcı değiştirebilir (admin üye ekleme/silme için)
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId)
+                    || (isAuth() && request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['teamId']));
       allow delete: if false;
 
       // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir
@@ -40,6 +44,11 @@ service cloud.firestore {
       allow update: if isAuth();
       // Silme: sadece admin
       allow delete: if isAuth() && request.auth.uid == resource.data.adminUid;
+
+      // Katılma istekleri alt koleksiyonu
+      match /requests/{requestId} {
+        allow read, write: if isAuth();
+      }
     }
 
     // ── Özellik önerileri ──────────────────────────────────────────────
