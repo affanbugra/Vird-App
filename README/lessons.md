@@ -100,3 +100,66 @@ Collaborator JSON+Provider sistemi getirirse reddet — proje `QuranData` static
 
 ### `QuranData.surahsOnPage()` kullan, hard-code yazma
 Sure isimlerini ve sayfa aralıklarını Dart const'tan çek. Aynı veri iki yerde tutulursa biri güncellenince diğeri tutarsız kalır.
+
+---
+
+## Navigator & Async
+
+### Async öncesi Navigator/Messenger yakala
+`Navigator.of(context)` ve `ScaffoldMessenger.of(context)` async işlemden (await) önce değişkene atanmalı. Await sonrasında widget unmount olmuş olabilir; `context` stale olur ve hata verir ya da yanlış route'a atlar.
+
+```dart
+final navigator = Navigator.of(context);   // await'ten ÖNCE
+final messenger = ScaffoldMessenger.of(context);
+await someAsyncOperation();
+navigator.pop();   // güvenli
+```
+
+### Same-frame pop + push yapmaktan kaçın
+`Navigator.pop(context)` hemen ardından aynı frame içinde `Navigator.push(...)` çağrısı navigator'ı tutarsız duruma sokar (beyaz ekran, assertion hatası). Push'u bir sonraki frame'e ertele:
+```dart
+Navigator.pop(context);
+WidgetsBinding.instance.addPostFrameCallback((_) => Navigator.push(...));
+```
+
+---
+
+## Bildirim Sistemi
+
+### Akıllı "o gün okumadıysa git" bildirimi
+`matchDateTimeComponents: DateTimeComponents.time` ile kurulan günlük tekrarlayan bildirim, kullanıcı log kaydedince iptal edilip **yarından** itibaren yeniden kurulur. Böylece o gün okuyan biri bildirim almaz, okumayanlar alır.
+
+```dart
+// Log kaydedilince (fire-and-forget):
+NotificationService.cancelForToday();
+
+// cancelForToday içinde:
+var scheduled = TZDateTime(local, now.year, now.month, now.day + 1, hour, minute);
+// Her zaman yarından başlar — bugünkü bildirimi atlar
+```
+
+`init()`'te auto-reschedule tutma — uygulama yeniden açılınca "kullanıcı bugün okudu mu?" bilinmez, yanlışlıkla bugünkü bildirimi geri getirir.
+
+---
+
+## Firestore Güvenlik Kuralları
+
+### Alan bazlı güncelleme istisnası
+Bir kullanıcının belgesini yalnızca belirli bir alanı değiştirmek için başka bir kullanıcının güncellemesine izin vermek gerekiyorsa (ör. admin üye ekleme/çıkarma — `teamId` alanı), `affectedKeys().hasOnly([...])` ile kısıtla:
+
+```javascript
+allow update: if isOwner(userId)
+              || (isAuth() && request.resource.data.diff(resource.data)
+                  .affectedKeys().hasOnly(['teamId']));
+```
+
+Bu sayede diğer kullanıcılar yalnızca `teamId` alanını değiştirebilir, diğer alanlara dokunamaz.
+
+### `logs` subcollection okuma kuralı ve liderboard
+`users/{uid}/logs` subcollection'ını yalnızca `isOwner()` ile kısıtlarsan liderboard için başka kullanıcıların loglarını okumak `Permission Denied` hatası verir ve kullanıcı 0 puan görünür. Liderboard gibi cross-user okuma gerektiren senaryolarda `isAuth()` yeterli:
+```javascript
+match /logs/{logId} {
+  allow read: if isAuth();
+  allow write: if isOwner(userId);
+}
+```

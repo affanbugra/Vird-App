@@ -4,13 +4,14 @@
 
 ---
 
-## Genel Durum (2026-04-28 — son güncelleme: Beta test hazırlığı tamamlandı)
+## Genel Durum (2026-04-28 — son güncelleme: Faz 3 tamamlandı, MVP 1 haftalık beta testine hazır)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
 - **Test ortamı:** Her zaman `flutter run -d chrome` — emülatör RAM sorunu nedeniyle kullanılmıyor
 - **Git:** Ortak repo, herkes push yapıyor
-- **Firestore kuralları:** `firestore.rules` güncellendi. Deploy için: `firebase login` → `firebase deploy --only firestore:rules --project vird-fc834`
+- **Firestore kuralları:** Deploy edildi — `firebase deploy --only firestore:rules --project vird-fc834`
+- **MVP öncesi kalan tek iş:** Liderboard dönemini günlük → haftalık çevirmek + son hata testleri
 
 ---
 
@@ -23,21 +24,44 @@
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
 | 4 | Hatimlerim + Tamamlanan Hatimler + Isı Haritası | ✅ Tamamlandı |
 | 5 | Log girişi (kilitleme modu + fazla sayfa uyarısı) | ✅ Tamamlandı |
-| 6 | Seri sistemi | ⚠️ Kısmi (temel seri sayacı aktif; freeze/repair/Cuma bonusu yok) |
+| 6 | Seri sistemi | ⚠️ Kısmi (seri sayacı + takvim + dinamik yeniden hesap; freeze/repair/Cuma bonusu yok) |
 | 7 | Sure serii | ⬜ |
 | 8 | Hasanat sistemi | ✅ Tamamlandı |
 | 9 | Kuran Haritası (UI ✅, veri bağlantısı ✅) | ✅ Tamamlandı |
-| 10 | Offline mode | ⬜ |
-| 11 | Ekip sistemi (liste + profil + günlük liderboard) | ✅ Tamamlandı |
-| 12 | Liderboard | ✅ Ekip içi günlük liderboard ✅ |
+| 10 | Offline mode | ✅ Tamamlandı (Firestore persistence) |
+| 11 | Ekip sistemi (liste + profil + liderboard + admin silme + gizli gruplar) | ✅ Tamamlandı |
+| 12 | Liderboard | ✅ Ekip içi günlük liderboard ✅ (haftalığa çevrilecek — MVP öncesi) |
 | 13 | Profil (UI ✅, ısı haritası veri bağlantısı ✅) | ✅ Tamamlandı |
-| 14 | Bildirimler | ⬜ |
+| 14 | Bildirimler | ⚠️ Kısmi (günlük akıllı bildirim ✅; seri tehlike / Cuma / ekip bildirimleri yok) |
 | 15 | Rozetler | ⬜ |
 | 16 | Vird sekmesi (UI + Firestore form) | ✅ Tamamlandı |
 
 ---
 
 ## Tamamlanan Modüller
+
+### Faz 3 — Offline, Bildirim, Seri Takvimi, Ekip Yönetimi (2026-04-28)
+
+#### Seri Sistemi İyileştirmeleri
+- **Seri Takvimi (`seri_calendar_sheet.dart`):** Seriye tıklayınca aylık takvim açılır. Log girilen günler turuncu dolu daire, bugün turuncu çerçeveli daire, gelecek günler gri. Ay navigasyonu (← →) ile geriye gidilebilir; ileriye gidilemez.
+- **Dinamik Seri Yeniden Hesabı (`utils/seri_calculator.dart`):** Log silinince `SeriCalculator.recalculate(uid)` çağrılır. Son 90 günün loglarını okur, bugünden geriye sayarak ardışık günleri hesaplar, `seri` ve `lastLogDate` alanlarını günceller. `log_history_sheet.dart` ve `hatim_heat_map_sheet.dart`'ta her silme işleminden sonra çağrılır.
+- **Migration fix:** `lastLogDate == null` olan eski kullanıcılarda seri sıfırlanıyordu. Düzeltme: `lastLogDate == null` ise dünkü logları sorgulanarak mevcut seri korunur.
+
+#### Offline Mode
+- **Firestore Persistence:** `main.dart`'ta `FirebaseFirestore.instance.settings = Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED)`. İnternet kesilince Firestore local cache'den okuma yapar, yazma işlemleri senkronize queue'ya alınır.
+
+#### Akıllı Günlük Bildirim (`services/notification_service.dart`)
+- `scheduleDaily(hour, minute)`: Kullanıcının seçtiği saatte her gün tekrar eden bildirim kurar.
+- `cancelForToday()`: Log kaydedilince bugünkü bildirimi iptal eder ve yarından itibaren yeniden programlar — o gün okumuşsa bildirim gitmez. `log_entry_bottom_sheet.dart`'ta her başarılı kayıttan sonra çağrılır.
+- `init()`'teki auto-reschedule kaldırıldı — uygulama yeniden açılınca okunan günün bildirimi tekrar programlanmasın diye.
+- Profil → Ayarlar'dan saat seçimi + iptal. Aktif bildirim saati gösterilir.
+
+#### Ekip Sistemi Tamamlanması
+- **Admin Grup Silme:** Admin PopupMenu'ye "Grubu Sil" eklendi. Batch ile tüm üyelerin `teamId` alanı temizlenir, bekleyen istekler silinir, ekip dokümanı kaldırılır. Silme sonrası `Navigator.pop()` — Ekipler sekmesine döner.
+- **Zorla Gizli Gruplar:** `_CreateTeamSheet`'te `_isPrivate = true` sabitlendi, toggle kaldırıldı. Tüm açılan gruplar şimdilik gizlidir; bilgi kutusu gösterilir.
+- **Firestore Kuralları Deploy Edildi:** `logs` subcollection'ı `isAuth()` ile herkese okunabilir yapıldı (liderboard için). `users/{uid}` güncelleme kuralına `teamId` alanı için alan-bazlı istisna eklendi. `teams/{teamId}/requests` subcollection'ı için kural eklendi. Deploy: `firebase deploy --only firestore:rules --project vird-fc834`.
+
+---
 
 ### Faz 1 & 2 — Beta Test Hazırlığı (2026-04-28)
 

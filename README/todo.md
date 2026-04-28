@@ -4,9 +4,10 @@
 
 ---
 
-## Aktif
+## Aktif — MVP Öncesi (tek kalan)
 
-- [ ] **Firestore güvenlik kurallarını deploy et** — `firebase login` sonra `firebase deploy --only firestore:rules --project vird-fc834`. `firestore.rules` hazır, sadece deploy eksik.
+- [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
+- [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
 ---
 
@@ -14,18 +15,17 @@
 
 - [x] 4 — Hatimlerim ekranı (aktif hatimler, yeni hatim ekleme, üstte özet) ✅
 - [x] 5 — Log girişi (sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi) ✅
-- [ ] 6 — Seri sistemi — temel sayaç eklendi (lastLogDate + seri field, Faz 1); eksikler: gece yarısı sıfırlama garantisi, freeze/repair, perfect seri, Cuma bonusu
+- [x] 6 — Seri sistemi — sayaç + seri takvimi + dinamik yeniden hesap ✅; eksikler MVP sonrasına: freeze/repair, perfect seri, Cuma bonusu, seri animasyonu
 - [ ] 7 — Sure serii (sure seçme, günlük log, sure bazlı sayaç)
 - [x] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç) ✅
 - [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅
-- [ ] 10 — Offline mode (cihaza kayıt, bağlantı gelince senkronizasyon)
-- [x] 11 — Ekip sistemi (liste, gizlilik, davet kodu, istek/onay sistemi, admin paneli, günlük liderboard) ✅
-- [x] 12 — Günlük liderboard (ekip içi, 0 puanlı üyeler dahil, ilk 3 yeşil/son 3 kırmızı) ✅
+- [x] 10 — Offline mode (Firestore persistence — cihaz cache, bağlantı gelince sync) ✅
+- [x] 11 — Ekip sistemi (liste, gizlilik, davet kodu, istek/onay, admin paneli, liderboard, admin grup silme) ✅
+- [x] 12 — Günlük liderboard (ekip içi, 0 puanlı üyeler dahil, ilk 3 yeşil/son 3 kırmızı) ✅ → haftalığa çevrilecek
 - [x] 13 — Profil veri bağlantısı (ısı haritası Firestore loglarına bağlandı) ✅
-- [ ] 14 — Bildirimler (tüm bildirim tipleri)
-- [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri)
+- [x] 14 — Bildirimler — günlük akıllı bildirim ✅ (log kaydedilince o gün iptal); diğer tipler MVP sonrası
+- [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri) — MVP sonrası
 - [x] 16 — Vird sekmesi (öneri formu, yol haritası, hakkında) ✅
-- [ ] QA & Yayın öncesi test — tüm modüller bitince her akış için bug testi; `/systematic-debugging` ve `/tdd` skill'leri kullanılacak
 
 ---
 
@@ -38,6 +38,26 @@
 ---
 
 ## MVP Sonrası
+
+### Seri Sistemi (Tamamlama)
+- [ ] **Seri Animasyonu** — seri sayısı artınca alev animasyonu; tehlikedeyse titreme/renk değişimi
+- [ ] Seri freeze — önceden kazanılır, kaçırılan günü korur, max 2 adet
+- [ ] Seri repair — kaçırdıktan sonra kısa süre içinde ekstra okuyarak geri kazanma
+- [ ] Perfect Seri — freeze kullanmadan devam edince seri altın olur
+- [ ] Cuma bonusu — Cuma günü tamamlayınca ekstra hasanat
+
+### Oyunlaştırma & UX
+- [ ] **Günlük Görevler** — günlük mini hedef sistemi (ör. "Bugün 10 sayfa oku", "Bir cüz tamamla"); tamamlanınca rozetlenir
+- [ ] **Motivasyonel Yazılar** — ironik ve samimi "hadi aslanım" tarzı yazılar; boş durum ekranlarında, yükleme anında, seri kırılınca, uzun süredir giriş yapılmayınca gösterilir
+- [ ] **Rozetler & Başarılar** — seri rozetleri (7/30/100/365 gün), hatim rozetleri (1./3./10. hatim), okuma rozetleri (100/500/1000 sayfa), liderboard madalyaları
+- [ ] **Hatim Tamamlanma UX** — tamamlanan hatimi geri alma yok uyarısı ("Hatim bitiyor, geri alınamaz, devam et?"); tamamlanan hatimlerde log ekleme/düzenleme kilitleme
+
+### İslami İçerik
+- [ ] **Zikir Entegrasyonu** — zikir çekme takip ekranı (başlangıcı yapıldı); tesbih sayacı, günlük zikir hedefi
+- [ ] **Nafile Namaz Bilgisi** — vakit ekranlarında veya ayrı sekmede: vakitlere göre hangi nafile namazların tavsiye edildiği bilgisi (kuşluk, teheccüd, evvabin vb.)
+- [ ] **Oruç Tavsiye Günleri** — Pazartesi-Perşembe, Eyam-ı Biyz (ayın 13-14-15'i), 3 Aylar yaklaşınca bildirim; Ramazan öncesi sayaç
+- [ ] **Vakitlerde Tavsiye Edilen Sure & Dualar** — sabah/akşam duaları, Kehf (Cuma), Mülk (gece), vb.; ilgili vakitte bildirim veya ana ekran kartı
+- [ ] **Ezan Vakitleri + Ezan Duası** — konum/şehir ile namaz vakitleri; ezan vaktinde isteğe bağlı ezan duası bildirimi
 
 ### Admin Paneli (Uygulama İçi İçerik Yönetimi)
 - [ ] Firestore'da `isAdmin: true` ile admin yetkisi sistemi
