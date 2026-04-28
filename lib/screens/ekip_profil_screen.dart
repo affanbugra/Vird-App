@@ -29,7 +29,7 @@ class _MemberEntry {
 
 // ─── Ana ekran ─────────────────────────────────────────────────────────────────
 
-enum _LeaderboardPeriod { daily, weekly }
+enum _LeaderboardPeriod { daily }
 
 class EkipProfilScreen extends StatefulWidget {
   final String teamId;
@@ -46,7 +46,6 @@ class EkipProfilScreen extends StatefulWidget {
 }
 
 class _EkipProfilScreenState extends State<EkipProfilScreen> {
-  // Şimdilik günlük mod. Haftalığa geçmek için sadece bunu .weekly yap.
   final _periodMode = _LeaderboardPeriod.daily;
 
   List<_MemberEntry> _leaderboard = [];
@@ -638,7 +637,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                         _LeaderboardSection(
                           leaderboard: _leaderboard,
                           loading: _leaderboardLoading,
-                          untilMidnight: _untilMidnight,
+                          untilMidnight: _untilEnd,
                           currentUid: widget.currentUid,
                           onRefresh: _loadLeaderboard,
                           onMemberTap: (uid) => Navigator.push(
@@ -1223,11 +1222,11 @@ class _LeaderboardRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                fmtHasanat(entry.todayHasanat),
+                fmtHasanat(entry.periodHasanat),
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: entry.todayHasanat > 0
+                  color: entry.periodHasanat > 0
                       ? AppColors.gold
                       : AppColors.textLight,
                 ),

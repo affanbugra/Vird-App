@@ -6,7 +6,7 @@
 
 ## Aktif
 
-*(Şu an aktif görev yok — MVP backlog'dan sıradaki modüle geçilecek)*
+- [ ] **Firestore güvenlik kurallarını deploy et** — `firebase login` sonra `firebase deploy --only firestore:rules --project vird-fc834`. `firestore.rules` hazır, sadece deploy eksik.
 
 ---
 
@@ -14,7 +14,7 @@
 
 - [x] 4 — Hatimlerim ekranı (aktif hatimler, yeni hatim ekleme, üstte özet) ✅
 - [x] 5 — Log girişi (sure seçimi, sayfa aralığı, hatim devam, Arapça/Meal sekmesi) ✅
-- [ ] 6 — Seri sistemi (sayaç, freeze, repair, perfect seri, Cuma bonusu)
+- [ ] 6 — Seri sistemi — temel sayaç eklendi (lastLogDate + seri field, Faz 1); eksikler: gece yarısı sıfırlama garantisi, freeze/repair, perfect seri, Cuma bonusu
 - [ ] 7 — Sure serii (sure seçme, günlük log, sure bazlı sayaç)
 - [x] 8 — Hasanat sistemi (sayfa bazlı hesaplama, görsel sayaç) ✅
 - [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅

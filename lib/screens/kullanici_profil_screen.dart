@@ -100,7 +100,7 @@ class _KullaniciProfilScreenState extends State<KullaniciProfilScreen> {
               ? null
               : uniRaw;
           final avatarSeed = data?['avatarSeed'] as String?;
-          final isPro = (data?['isPro'] as bool?) ?? false;
+          final isPro = data?['isPro'] == true;
           final isHafiz = (data?['isHafiz'] as bool?) ?? false;
           final seri = (data?['seri'] as int?) ?? 0;
           final hasanat = (data?['hasanat'] as int?) ?? 0;
@@ -299,16 +299,27 @@ class _UserHeader extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.tealLight,
+                          color: AppColors.gold.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'PRO',
-                          style: GoogleFonts.nunito(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.teal,
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.35),
+                            width: 1,
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.star_rounded, size: 9, color: AppColors.gold),
+                            const SizedBox(width: 2),
+                            Text(
+                              'PRO',
+                              style: GoogleFonts.nunito(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.gold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

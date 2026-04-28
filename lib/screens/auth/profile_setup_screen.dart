@@ -191,7 +191,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       'city': '',
                       'university': '',
                       'createdAt': FieldValue.serverTimestamp(),
-                    });
+                    }, SetOptions(merge: true));
                   }
                   if (context.mounted) {
                     Navigator.popUntil(context, (route) => route.isFirst);

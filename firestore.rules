@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // ── Kullanıcı profilleri ───────────────────────────────────────────
+    match /users/{userId} {
+      // Herkes okuyabilir (liderboard, profil görüntüleme)
+      allow read: if isAuth();
+      // Sadece kendi dokümanını yazabilir
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+
+      // Okuma logları — sadece sahibi
+      match /logs/{logId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Hatimler — sadece sahibi
+      match /hatims/{hatimId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ── Ekipler ────────────────────────────────────────────────────────
+    match /teams/{teamId} {
+      // Herkes okuyabilir
+      allow read: if isAuth();
+      // Ekip kurma: adminUid kendi uid'i olmalı
+      allow create: if isAuth() && request.auth.uid == request.resource.data.adminUid;
+      // Güncelleme: herhangi bir giriş yapmış kullanıcı (katılma/ayrılma için)
+      allow update: if isAuth();
+      // Silme: sadece admin
+      allow delete: if isAuth() && request.auth.uid == resource.data.adminUid;
+    }
+
+    // ── Özellik önerileri ──────────────────────────────────────────────
+    match /feature_requests/{requestId} {
+      allow create: if isAuth();
+      allow read, update, delete: if false;
+    }
+
+    // ── Ekip katılma istekleri ─────────────────────────────────────────
+    match /pending_requests/{requestId} {
+      allow read, write: if isAuth();
+    }
+  }
+}

@@ -263,6 +263,30 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     setState(() => _isLoading = true);
 
     try {
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+      // ── Seri hesabı ──────────────────────────────────────────────────
+      final userDocSnap = await userRef.get();
+      final userData = userDocSnap.data();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final lastLogDate = (userData?['lastLogDate'] as Timestamp?)?.toDate();
+      final currentSeri = (userData?['seri'] as int?) ?? 0;
+
+      final Map<String, dynamic> seriUpdate;
+      if (lastLogDate == null || lastLogDate.isBefore(yesterday)) {
+        // İlk log veya gün atlandı — seriyi 1'den başlat
+        seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      } else if (lastLogDate.isBefore(today)) {
+        // Dün okundu — seri uzuyor
+        seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      } else {
+        // Bugün zaten okundu — seri değişmez
+        seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       final batch = FirebaseFirestore.instance.batch();
 
       final logRef = FirebaseFirestore.instance
@@ -283,10 +307,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         createdAt: DateTime.now(),
       ).toMap());
 
-      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       batch.set(userRef, {
         'hasanat': FieldValue.increment(pagesRead * 10),
         'totalPages': FieldValue.increment(pagesRead),
+        ...seriUpdate,
       }, SetOptions(merge: true));
 
       if (linkedHatim != null && hatimId != null) {

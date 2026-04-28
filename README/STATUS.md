@@ -4,12 +4,13 @@
 
 ---
 
-## Genel Durum (2026-04-27 — son güncelleme: Ekip Sistemi MVP tamamlandı)
+## Genel Durum (2026-04-28 — son güncelleme: Beta test hazırlığı tamamlandı)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
-- **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi)
+- **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
 - **Test ortamı:** Her zaman `flutter run -d chrome` — emülatör RAM sorunu nedeniyle kullanılmıyor
 - **Git:** Ortak repo, herkes push yapıyor
+- **Firestore kuralları:** `firestore.rules` güncellendi. Deploy için: `firebase login` → `firebase deploy --only firestore:rules --project vird-fc834`
 
 ---
 
@@ -22,7 +23,7 @@
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
 | 4 | Hatimlerim + Tamamlanan Hatimler + Isı Haritası | ✅ Tamamlandı |
 | 5 | Log girişi (kilitleme modu + fazla sayfa uyarısı) | ✅ Tamamlandı |
-| 6 | Seri sistemi | ⬜ |
+| 6 | Seri sistemi | ⚠️ Kısmi (temel seri sayacı aktif; freeze/repair/Cuma bonusu yok) |
 | 7 | Sure serii | ⬜ |
 | 8 | Hasanat sistemi | ✅ Tamamlandı |
 | 9 | Kuran Haritası (UI ✅, veri bağlantısı ✅) | ✅ Tamamlandı |
@@ -37,6 +38,29 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Faz 1 & 2 — Beta Test Hazırlığı (2026-04-28)
+
+Yaklaşık 40 kişilik YTÜ Fark Kulübü beta testine hazırlık kapsamında yapılan kritik düzeltmeler ve iyileştirmeler.
+
+#### Faz 1 — Kritik Düzeltmeler
+
+- **Seri sayacı** (`log_entry_bottom_sheet.dart`): Log kaydedilirken `lastLogDate` ve `seri` alanları artık doğru güncelleniyor. Dün okunduysa +1, bugün zaten okunduysa değişmez, daha önce veya hiç okunmadıysa 1'e sıfırlanır. Yeni alan: `users/{uid}.lastLogDate` (Timestamp).
+- **Ekip liderboard crash düzeltmesi** (`ekip_profil_screen.dart`): Remote commit'in gözden kaçırdığı `_untilMidnight → _untilEnd` ve `entry.todayHasanat → entry.periodHasanat` rename'leri düzeltildi.
+- **Google logo offline fallback** (`login_screen.dart`, `register_screen.dart`): `Image.network` artık internetsizken mavi "G" harfi gösteriyor.
+- **Widget test compile hatası** (`test/widget_test.dart`): `MyApp` → `VirdApp(showHome: false)` düzeltildi.
+
+#### Faz 2 — Önemli İyileştirmeler
+
+- **Kayıt akışı tutarlılığı** (`register_screen.dart`): Kullanıcı Firestore dokümanı artık tüm alanlarla oluşturuluyor (`hasanat`, `seri`, `totalPages`, `hatimCount`, `isPro`). E-posta format ve şifre uzunluğu client-side validasyonu eklendi.
+- **Google kayıt** (`auth_service.dart`): Yeni Google kullanıcısı için oluşturulan Firestore dokümanına eksik alanlar eklendi (`hasanat`, `seri`, `totalPages`, `hatimCount`, `isPro`, `proExpiresAt`).
+- **"Bu adımı atla" veri kaybı giderildi** (`profile_setup_screen.dart`): `set()` çağrısına `SetOptions(merge: true)` eklendi — atla butonuna basınca `hasanat` gibi alanlar artık sıfırlanmıyor.
+- **Türkçe hata mesajları** (`login_screen.dart`, `register_screen.dart`): `FirebaseAuthException` kodları `_parseAuthError()` ile Türkçe kullanıcı mesajlarına dönüştürülüyor.
+- **Firestore güvenlik kuralları** (`firestore.rules`): Test modu yerine gerçek kurallar. Kullanıcılar sadece kendi `logs` ve `hatims` sub-collection'larına yazabiliyor. **Deploy edilmesi gerekiyor:** `firebase deploy --only firestore:rules --project vird-fc834`
+- **firebase.json + firestore.indexes.json** güncellendi — Firestore rules deploy desteği eklendi.
+- **Import temizliği**: `log_history_sheet.dart`, `hatim_remover.dart`, `onboarding_screen.dart` içindeki kullanılmayan importlar kaldırıldı. `ekip_profil_screen.dart`'taki kullanılmayan `weekly` enum değeri silindi.
+
+---
 
 ### Modül 1 — Kurulum (2026-04-21)
 

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/hatim_model.dart';
-import '../models/reading_log_model.dart';
 
 class HatimRemover {
   /// Bir hatimi ve ona ait tüm okuma kayıtlarını (logları) temizler.

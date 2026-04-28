@@ -1,9 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../app_colors.dart';
 import '../../app_assets.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
+
+String _parseAuthError(dynamic e) {
+  if (e is FirebaseAuthException) {
+    switch (e.code) {
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'E-posta veya şifre hatalı.';
+      case 'invalid-email':
+        return 'Geçersiz e-posta adresi.';
+      case 'user-disabled':
+        return 'Bu hesap devre dışı bırakıldı.';
+      case 'too-many-requests':
+        return 'Çok fazla deneme. Lütfen birkaç dakika sonra tekrar deneyin.';
+      case 'network-request-failed':
+        return 'İnternet bağlantısı yok. Bağlantını kontrol et.';
+      case 'popup-closed-by-user':
+      case 'cancelled-by-user':
+        return 'Google girişi iptal edildi.';
+      default:
+        return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+    }
+  }
+  return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Giriş başarısız: ${e.toString()}')),
+          SnackBar(content: Text(_parseAuthError(e))),
         );
       }
     } finally {
@@ -114,14 +140,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Google Girişi başarısız: $e')),
+                              SnackBar(content: Text(_parseAuthError(e))),
                             );
                           }
                         } finally {
                           if (mounted) setState(() => _isLoading = false);
                         }
                       },
-                icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png', height: 24),
+                icon: Image.network(
+                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
+                  height: 24,
+                  errorBuilder: (_, _, _) => const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
+                ),
                 label: const Text('Google ile Giriş Yap', style: TextStyle(color: AppColors.textDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),

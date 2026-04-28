@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
-import '../models/reading_log_model.dart';
 import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';

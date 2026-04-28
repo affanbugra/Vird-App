@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
@@ -32,11 +33,31 @@ class AuthService {
   Future<UserCredential?> signInWithGoogle() async {
     try {
       final provider = GoogleAuthProvider();
+      final UserCredential cred;
       if (kIsWeb) {
-        return await _auth.signInWithPopup(provider);
+        cred = await _auth.signInWithPopup(provider);
       } else {
-        return await _auth.signInWithProvider(provider);
+        cred = await _auth.signInWithProvider(provider);
       }
+      if (cred.additionalUserInfo?.isNewUser == true) {
+        final user = cred.user;
+        if (user != null) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'name': user.displayName ?? '',
+            'email': user.email ?? '',
+            'city': '',
+            'university': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'isPro': false,
+            'proExpiresAt': null,
+            'hasanat': 0,
+            'seri': 0,
+            'totalPages': 0,
+            'hatimCount': 0,
+          });
+        }
+      }
+      return cred;
     } catch (e) {
       rethrow;
     }

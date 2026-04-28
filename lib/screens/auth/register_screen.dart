@@ -6,6 +6,29 @@ import '../../app_colors.dart';
 import '../../providers/auth_provider.dart';
 import 'profile_setup_screen.dart';
 
+String _parseAuthError(dynamic e) {
+  if (e is FirebaseAuthException) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return 'Bu e-posta adresi zaten kullanımda.';
+      case 'invalid-email':
+        return 'Geçersiz e-posta adresi.';
+      case 'weak-password':
+        return 'Şifre en az 6 karakter olmalıdır.';
+      case 'too-many-requests':
+        return 'Çok fazla deneme. Lütfen birkaç dakika sonra tekrar deneyin.';
+      case 'network-request-failed':
+        return 'İnternet bağlantısı yok. Bağlantını kontrol et.';
+      case 'popup-closed-by-user':
+      case 'cancelled-by-user':
+        return 'Google girişi iptal edildi.';
+      default:
+        return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+    }
+  }
+  return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+}
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -20,19 +43,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
 
   Future<void> _handleRegister() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _nameController.text.isEmpty) return;
-    
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) return;
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Şifre en az 6 karakter olmalıdır.')),
+      );
+      return;
+    }
+    if (!email.contains('@') || !email.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Geçersiz e-posta adresi.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      await context.read<AuthProvider>().registerWithEmail(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
-          );
+      await context.read<AuthProvider>().registerWithEmail(email, password);
 
-      // Auth state değişmeden önce hemen Firestore'da user doc oluştur
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final name = _nameController.text.trim();
         await user.updateDisplayName(name);
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': name,
@@ -40,6 +75,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'city': '',
           'university': '',
           'createdAt': FieldValue.serverTimestamp(),
+          'isPro': false,
+          'hasanat': 0,
+          'seri': 0,
+          'totalPages': 0,
+          'hatimCount': 0,
         });
       }
 
@@ -47,14 +87,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => ProfileSetupScreen(name: _nameController.text.trim()),
+            builder: (context) => ProfileSetupScreen(name: name),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kayıt başarısız: ${e.toString()}')),
+          SnackBar(content: Text(_parseAuthError(e))),
         );
       }
     } finally {
@@ -150,14 +190,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Google Girişi başarısız: $e')),
+                              SnackBar(content: Text(_parseAuthError(e))),
                             );
                           }
                         } finally {
                           if (mounted) setState(() => _isLoading = false);
                         }
                       },
-                icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png', height: 24),
+                icon: Image.network(
+                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
+                  height: 24,
+                  errorBuilder: (_, _, _) => const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
+                ),
                 label: const Text('Google ile Kayıt Ol', style: TextStyle(color: AppColors.textDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
