@@ -275,15 +275,27 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       final currentSeri = (userData?['seri'] as int?) ?? 0;
 
       final Map<String, dynamic> seriUpdate;
-      if (lastLogDate == null || lastLogDate.isBefore(yesterday)) {
-        // İlk log veya gün atlandı — seriyi 1'den başlat
-        seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
-      } else if (lastLogDate.isBefore(today)) {
-        // Dün okundu — seri uzuyor
-        seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
-      } else {
+      if (lastLogDate != null && !lastLogDate.isBefore(today)) {
         // Bugün zaten okundu — seri değişmez
         seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+      } else if (lastLogDate != null && !lastLogDate.isBefore(yesterday)) {
+        // lastLogDate dün — seri uzuyor
+        seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      } else {
+        // lastLogDate null veya çok eski — dünkü loglara bak (migration için)
+        final hadLogYesterday = lastLogDate == null
+            ? await userRef.collection('logs')
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
+                .where('createdAt', isLessThan: Timestamp.fromDate(today))
+                .limit(1)
+                .get()
+                .then((s) => s.docs.isNotEmpty)
+            : false;
+        if (hadLogYesterday) {
+          seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+        } else {
+          seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+        }
       }
       // ─────────────────────────────────────────────────────────────────
 

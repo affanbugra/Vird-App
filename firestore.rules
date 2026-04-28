@@ -18,9 +18,10 @@ service cloud.firestore {
       allow create, update: if isOwner(userId);
       allow delete: if false;
 
-      // Okuma logları — sadece sahibi
+      // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir
       match /logs/{logId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isAuth();
+        allow write: if isOwner(userId);
       }
 
       // Hatimler — sadece sahibi
