@@ -9,6 +9,7 @@ import '../models/reading_log_model.dart';
 import '../data/quran_cuz.dart';
 import '../utils/hatim_calculator.dart';
 import 'log_history_sheet.dart';
+import '../services/notification_service.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
   final Hatim? initialHatim;
@@ -339,6 +340,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       }
 
       await batch.commit();
+      NotificationService.cancelForToday();
 
       bool justCompleted = false;
       if (hatimId != null) {

@@ -29,15 +29,6 @@ class NotificationService {
       const InitializationSettings(android: android, iOS: ios),
     );
     _initialized = true;
-
-    // Uygulama başlarken kaydedilmiş hatırlatıcı varsa yeniden kur
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool(_keyEnabled) ?? false;
-    final hour = prefs.getInt(_keyHour);
-    if (enabled && hour != null) {
-      final minute = prefs.getInt(_keyMinute) ?? 0;
-      await _schedule(hour, minute);
-    }
   }
 
   static Future<TimeOfDay?> getSavedTime() async {
@@ -71,12 +62,25 @@ class NotificationService {
     await _plugin.cancel(_notifId);
   }
 
-  static Future<void> _schedule(int hour, int minute) async {
+  /// Bugün log kaydedildiğinde çağrılır — bugünkü bildirimi iptal eder,
+  /// yarından itibaren tekrar başlatır (o gün okumadı ise gitsin mantığı).
+  static Future<void> cancelForToday() async {
+    if (kIsWeb) return;
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_keyEnabled) ?? false;
+    if (!enabled) return;
+    final hour = prefs.getInt(_keyHour);
+    if (hour == null) return;
+    final minute = prefs.getInt(_keyMinute) ?? 0;
+    await _schedule(hour, minute, fromTomorrow: true);
+  }
+
+  static Future<void> _schedule(int hour, int minute, {bool fromTomorrow = false}) async {
     await _plugin.cancel(_notifId);
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-    if (scheduled.isBefore(now)) {
+    if (fromTomorrow || scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
