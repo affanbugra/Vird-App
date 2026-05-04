@@ -12,6 +12,8 @@ import '../widgets/duolingo_button.dart';
 import '../widgets/log_history_sheet.dart';
 import '../widgets/seri_calendar_sheet.dart';
 import '../services/notification_service.dart';
+import '../widgets/seri_fire_effect.dart';
+import '../widgets/hasanat_star_effect.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -393,12 +395,20 @@ class _StatGrid extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: GestureDetector(
-            onTap: onSeriTap,
-            child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange),
+          Expanded(child: SeriFireEffect(
+            seriValue: seri,
+            borderRadius: BorderRadius.circular(12),
+            child: GestureDetector(
+              onTap: onSeriTap,
+              child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange),
+            ),
           )),
           const SizedBox(width: 8),
-          Expanded(child: _StatCard(icon: '✨', value: _fmt(hasanat), label: 'HASANAT', color: AppColors.gold)),
+          Expanded(child: HasanatStarEffect(
+            hasanatValue: hasanat,
+            borderRadius: BorderRadius.circular(12),
+            child: _StatCard(icon: '✨', value: _fmt(hasanat), label: 'HASANAT', color: AppColors.gold),
+          )),
           const SizedBox(width: 8),
           Expanded(child: _StatCard(icon: '📖', value: _fmt(hatimCount), label: 'HATİM', color: AppColors.teal)),
           const SizedBox(width: 8),
@@ -980,6 +990,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     );
     if (picked != null) {
       await NotificationService.scheduleDaily(picked.hour, picked.minute);
+      if (!context.mounted) return;
       if (mounted) {
         setState(() => _notifTime = picked);
         final formatted = picked.format(context);

@@ -6,6 +6,7 @@ import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
 import '../utils/hatim_calculator.dart';
+import '../utils/seri_calculator.dart';
 import 'duolingo_button.dart';
 
 class LogEditSheet extends StatefulWidget {
@@ -73,6 +74,12 @@ class _LogEditSheetState extends State<LogEditSheet> {
         newPagesRead = int.tryParse(_pagesCtrl.text) ?? log.pagesRead;
         if (newPagesRead <= 0) return;
         updateData['pagesRead'] = newPagesRead;
+        // startPage/endPage'i de güncelle — ısı haritası ve diğer bileşenler bunlara bağlı
+        if (log.startPage != null) {
+          final newEnd = (log.startPage! + newPagesRead - 1).clamp(1, 604);
+          updateData['startPage'] = log.startPage;
+          updateData['endPage'] = newEnd;
+        }
         break;
 
       case LogMethod.pages:
@@ -135,6 +142,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
       if (log.hatimId != null) {
         await HatimCalculator.recalculate(widget.uid, log.hatimId!);
       }
+      await SeriCalculator.recalculate(widget.uid);
 
       if (mounted) Navigator.pop(context);
     } catch (e) {

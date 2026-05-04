@@ -49,6 +49,11 @@ service cloud.firestore {
       match /requests/{requestId} {
         allow read, write: if isAuth();
       }
+
+      // Geçmiş sıralamalar alt koleksiyonu
+      match /history/{historyId} {
+        allow read, write: if isAuth();
+      }
     }
 
     // ── Özellik önerileri ──────────────────────────────────────────────

@@ -189,6 +189,14 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                       // DEVAM ET butonu (sadece aktif hatimler için)
                       if (widget.onDevamEt != null) ...[
                         DuolingoButton(
+                          color: AppColors.teal,
+                          bottomColor: AppColors.tealDark,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              widget.onDevamEt!();
+                            });
+                          },
                           child: Text(
                             'DEVAM ET',
                             style: GoogleFonts.nunito(
@@ -198,14 +206,6 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                               letterSpacing: 0.5,
                             ),
                           ),
-                          color: AppColors.teal,
-                          bottomColor: AppColors.tealDark,
-                          onPressed: () {
-                            Navigator.pop(context);
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              widget.onDevamEt!();
-                            });
-                          },
                         ),
                         const SizedBox(height: 12),
                       ],
