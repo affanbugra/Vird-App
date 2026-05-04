@@ -9,6 +9,8 @@ import '../widgets/hatim_heat_map_sheet.dart';
 import '../widgets/duolingo_button.dart';
 import 'tamamlanan_hatimler_screen.dart';
 import '../utils/hatim_remover.dart';
+import '../widgets/seri_fire_effect.dart';
+import '../widgets/hasanat_star_effect.dart';
 
 const int _arapcaLimit = 3;
 const int _mealLimit = 1;
@@ -220,34 +222,55 @@ class _EmptyState extends StatelessWidget {
 
 // ── Özet kartlar ────────────────────────────────────────────────────────────
 
-class _SummaryCards extends StatelessWidget {
+class _SummaryCards extends StatefulWidget {
   final String uid;
   const _SummaryCards({required this.uid});
 
   @override
+  State<_SummaryCards> createState() => _SummaryCardsState();
+}
+
+class _SummaryCardsState extends State<_SummaryCards> {
+  int _prevSeri = -1;
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').doc(widget.uid).snapshots(),
       builder: (context, snap) {
         final data = snap.data?.data() as Map<String, dynamic>?;
-        final seri = data?['seri'] ?? 0;
+        final seri = (data?['seri'] as int?) ?? 0;
         final hasanat = data?['hasanat'] ?? 0;
-        return Row(
-          children: [
-            Expanded(child: _StatCard(
-              icon: Icons.local_fire_department,
-              color: AppColors.orange,
-              value: '$seri Gün',
-              label: 'Mevcut Seri',
-            )),
-            const SizedBox(width: 16),
-            Expanded(child: _StatCard(
-              icon: Icons.stars,
-              color: AppColors.gold,
-              value: '$hasanat',
-              label: 'Toplam Hasanat',
-            )),
-          ],
+
+        // İlk yüklemede animasyon olmasın
+        if (_prevSeri == -1) _prevSeri = seri;
+        if (seri != _prevSeri) _prevSeri = seri;
+
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: SeriFireEffect(
+                seriValue: seri,
+                child: _StatCard(
+                  icon: Icons.local_fire_department,
+                  color: AppColors.orange,
+                  value: '$seri Gün',
+                  label: 'Mevcut Seri',
+                ),
+              )),
+              const SizedBox(width: 16),
+              Expanded(child: HasanatStarEffect(
+                hasanatValue: hasanat,
+                child: _StatCard(
+                  icon: Icons.stars,
+                  color: AppColors.gold,
+                  value: '$hasanat',
+                  label: 'Toplam Hasanat',
+                ),
+              )),
+            ],
+          ),
         );
       },
     );

@@ -138,6 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         try {
                           await context.read<AuthProvider>().signInWithGoogle();
                         } catch (e) {
+                          if (!context.mounted) return;
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(_parseAuthError(e))),

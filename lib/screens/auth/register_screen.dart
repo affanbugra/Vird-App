@@ -188,6 +188,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           await context.read<AuthProvider>().signInWithGoogle();
                           // Yönlendirme main.dart tarafından otomatik yapılacak
                         } catch (e) {
+                          if (!context.mounted) return;
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(_parseAuthError(e))),

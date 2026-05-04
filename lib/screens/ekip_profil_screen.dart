@@ -8,6 +8,7 @@ import '../app_assets.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
+import 'ekip_gecmis_screen.dart';
 
 // ─── Veri modeli ───────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ class _MemberEntry {
 
 // ─── Ana ekran ─────────────────────────────────────────────────────────────────
 
-enum _LeaderboardPeriod { daily }
+enum _LeaderboardPeriod { daily, weekly }
 
 class EkipProfilScreen extends StatefulWidget {
   final String teamId;
@@ -46,7 +47,7 @@ class EkipProfilScreen extends StatefulWidget {
 }
 
 class _EkipProfilScreenState extends State<EkipProfilScreen> {
-  final _periodMode = _LeaderboardPeriod.daily;
+  final _periodMode = _LeaderboardPeriod.weekly;
 
   List<_MemberEntry> _leaderboard = [];
   bool _leaderboardLoading = true;
@@ -61,6 +62,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     _loadLeaderboard();
     _startCountdown();
     _checkPendingStatus();
+    _archivePastPeriodsIfNeeded();
   }
 
   @override
@@ -113,6 +115,108 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           .get();
       if (mounted) setState(() => _isPending = doc.exists);
     } catch (_) {}
+  }
+
+  Future<void> _archivePastPeriodsIfNeeded() async {
+    if (!mounted) return;
+    if (_periodMode != _LeaderboardPeriod.weekly) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      
+      // Takımın kurulma tarihini al
+      final teamDoc = await db.collection('teams').doc(widget.teamId).get();
+      final teamData = teamDoc.data();
+      if (teamData == null) return;
+      final createdAtTs = teamData['createdAt'] as Timestamp?;
+      if (createdAtTs == null) return;
+      final createdDate = createdAtTs.toDate();
+      final teamCreatedAtDay = DateTime(createdDate.year, createdDate.month, createdDate.day);
+
+      final historyRef = db.collection('teams').doc(widget.teamId).collection('history');
+      
+      // Önce hatalı oluşmuş eski arşivleri temizle (Kuruluş tarihinden önce biten haftaları VEYA eski günlük arşivleri)
+      final oldDocs = await historyRef.get();
+      for (final doc in oldDocs.docs) {
+        final parts = doc.id.split('-');
+        if (parts.length == 3) {
+          final docDate = DateTime(int.tryParse(parts[0]) ?? 1970, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[2]) ?? 1);
+          final docEndDate = docDate.add(const Duration(days: 6));
+          // Eğer arşiv Pazartesi gününe ait değilse, bu eski bir 'günlük' arşivdir, silinmelidir.
+          // Veya haftanın bitiş tarihi takımın kurulduğu günden sonra değilse (Örn Pazar günü kurulduysa o hafta silinmelidir)
+          if (docDate.weekday != DateTime.monday || !docEndDate.isAfter(teamCreatedAtDay)) {
+            await doc.reference.delete();
+          }
+        }
+      }
+
+      final membersSnap = await db.collection('users').where('teamId', isEqualTo: widget.teamId).get();
+
+      final now = DateTime.now();
+      final currentDaysSinceMonday = now.weekday - DateTime.monday;
+      final currentWeekStart = DateTime(now.year, now.month, now.day - currentDaysSinceMonday);
+
+      // Son 3 haftayı geriye dönük kontrol et
+      for (int i = 1; i <= 3; i++) {
+        final targetWeekStart = currentWeekStart.subtract(Duration(days: 7 * i));
+        final targetWeekEnd = targetWeekStart.add(const Duration(days: 6));
+        
+        // Eğer kontrol edilen haftanın bitiş günü, takımın kurulduğu günden sonra değilse arşive alma
+        if (!targetWeekEnd.isAfter(teamCreatedAtDay)) continue;
+
+        final targetDayStr = "${targetWeekStart.year}-${targetWeekStart.month.toString().padLeft(2, '0')}-${targetWeekStart.day.toString().padLeft(2, '0')}";
+
+        final docSnap = await historyRef.doc(targetDayStr).get();
+        if (docSnap.exists) continue; // Arşivlenmişse atla
+
+        // Arşivlenmemişse o haftanın loglarını hesapla
+        // Liderin veya diğerlerinin takım kurulmadan önceki puanlarını almamak için:
+        // Eğer targetWeekStart (Örn Pazartesi), takımın kurulduğu günden (Örn Çarşamba) önceyse, sorguyu Çarşamba'dan başlat!
+        final periodStart = targetWeekStart.isBefore(teamCreatedAtDay) ? teamCreatedAtDay : targetWeekStart;
+        final periodEnd = targetWeekStart.add(const Duration(days: 7));
+
+        final entries = <_MemberEntry>[];
+
+        for (final memberDoc in membersSnap.docs) {
+          final uid = memberDoc.id;
+          final data = memberDoc.data();
+
+          final logsSnap = await db.collection('users').doc(uid).collection('logs')
+              .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+              .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
+              .get();
+
+          int periodHasanat = 0;
+          for (final log in logsSnap.docs) {
+            periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
+          }
+
+          // Puanı 0 olsa bile listeye ekle ki yöneticiler kimin okumadığını görebilsin
+          entries.add(_MemberEntry(
+            uid: uid,
+            name: data['name'] as String? ?? 'İsimsiz',
+            username: data['username'] as String? ?? '',
+            avatarSeed: data['avatarSeed'] as String?,
+            periodHasanat: periodHasanat,
+          ));
+        }
+
+        entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
+
+        await historyRef.doc(targetDayStr).set({
+          'date': Timestamp.fromDate(targetWeekStart),
+          'rankings': entries.map((e) => {
+            'uid': e.uid,
+            'name': e.name,
+            'username': e.username,
+            'avatarSeed': e.avatarSeed,
+            'periodHasanat': e.periodHasanat,
+          }).toList(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Arşivleme hatası: $e');
+    }
   }
 
   Future<void> _loadLeaderboard() async {
@@ -533,35 +637,52 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                     backgroundColor: AppColors.teal,
                     foregroundColor: Colors.white,
                     actions: [
-                      if (isAdmin)
+                      if (isAdmin || isMember)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, color: Colors.white),
                           onSelected: (v) {
                             if (v == 'deleteTeam') {
                               _deleteTeam(context);
+                            } else if (v == 'history') {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => EkipGecmisScreen(teamId: widget.teamId, teamName: team.name, isProAdmin: isAdmin)));
                             } else {
                               _showEditSheet(context, team, v);
                             }
                           },
                           itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: 'description',
-                              child: Text('Açıklamayı Düzenle',
-                                  style: GoogleFonts.nunito()),
-                            ),
-                            PopupMenuItem(
-                              value: 'penaltyNote',
-                              child: Text('Ceza Notunu Düzenle',
-                                  style: GoogleFonts.nunito()),
-                            ),
-                            const PopupMenuDivider(),
-                            PopupMenuItem(
-                              value: 'deleteTeam',
-                              child: Text('Grubu Sil',
-                                  style: GoogleFonts.nunito(
-                                      color: AppColors.errorRed,
-                                      fontWeight: FontWeight.w700)),
-                            ),
+                            if (isAdmin || !isAdmin) ...[
+                              PopupMenuItem(
+                                value: 'history',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.history, color: AppColors.teal, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('Geçmiş Sıralamalar', style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.teal)),
+                                  ],
+                                ),
+                              ),
+                              if (isAdmin) const PopupMenuDivider(),
+                            ],
+                            if (isAdmin) ...[
+                              PopupMenuItem(
+                                value: 'description',
+                                child: Text('Açıklamayı Düzenle',
+                                    style: GoogleFonts.nunito()),
+                              ),
+                              PopupMenuItem(
+                                value: 'penaltyNote',
+                                child: Text('Ceza Notunu Düzenle',
+                                    style: GoogleFonts.nunito()),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'deleteTeam',
+                                child: Text('Grubu Sil',
+                                    style: GoogleFonts.nunito(
+                                        color: AppColors.errorRed,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                            ],
                           ],
                         ),
                     ],
@@ -1022,6 +1143,12 @@ class _LeaderboardSection extends StatelessWidget {
   });
 
   String _fmtDuration(Duration d) {
+    if (d.inDays > 0) {
+      final days = d.inDays;
+      final h = (d.inHours % 24).toString().padLeft(2, '0');
+      final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+      return '$days gün $h:$m';
+    }
     final h = d.inHours.toString().padLeft(2, '0');
     final m = (d.inMinutes % 60).toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
