@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-04-28 — son güncelleme: Faz 3 tamamlandı, MVP 1 haftalık beta testine hazır)
+## Genel Durum (2026-05-07 — son güncelleme: Web versiyonu canlıya alındı)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -12,6 +12,8 @@
 - **Git:** Ortak repo, herkes push yapıyor
 - **Firestore kuralları:** Deploy edildi — `firebase deploy --only firestore:rules --project vird-fc834`
 - **MVP öncesi kalan tek iş:** Liderboard dönemini günlük → haftalık çevirmek + son hata testleri
+- **Web versiyonu:** https://vird-fc834.web.app — iOS dahil tüm cihazlardan erişilebilir
+- **Özel alan adı:** Henüz bağlanmadı — Firebase Console > Hosting > Add custom domain
 
 ---
 
@@ -35,10 +37,24 @@
 | 14 | Bildirimler | ⚠️ Kısmi (günlük akıllı bildirim ✅; seri tehlike / Cuma / ekip bildirimleri yok) |
 | 15 | Rozetler | ⬜ |
 | 16 | Vird sekmesi (UI + Firestore form) | ✅ Tamamlandı |
+| 17 | Web versiyonu (Firebase Hosting) | ✅ Tamamlandı — https://vird-fc834.web.app |
 
 ---
 
 ## Tamamlanan Modüller
+
+### Web Versiyonu — Firebase Hosting (2026-05-07)
+
+- **URL:** https://vird-fc834.web.app
+- **Build:** `flutter build web --release` → `build/web/` klasörüne çıkıyor
+- **Deploy:** `npx firebase deploy --only hosting --token "$TOKEN"` — CI token ile çalışır
+- **Config:** `firebase.json`'a `hosting` bloğu eklendi (`site: vird-fc834`, `public: build/web`, SPA rewrites)
+- **`.firebaserc`:** proje ID `vird-fc834` olarak tanımlı
+- **Auth:** Email/şifre + Google Sign-In web'de çalışıyor (`signInWithPopup` zaten vardı)
+- **Özel alan adı:** Henüz eklenmedi — Firebase Console > Hosting > Add custom domain
+- **Güncelleme:** Otomatik değil — her güncelleme için `flutter build web --release` + deploy çalıştırılmalı
+
+---
 
 ### Faz 3 — Offline, Bildirim, Seri Takvimi, Ekip Yönetimi (2026-04-28)
 
