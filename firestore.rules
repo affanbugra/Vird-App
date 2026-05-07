@@ -32,6 +32,11 @@ service cloud.firestore {
       match /hatims/{hatimId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Günlük Namaz Takipleri — sadece sahibi
+      match /daily_prayers/{dateStr} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // ── Ekipler ────────────────────────────────────────────────────────

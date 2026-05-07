@@ -5,6 +5,7 @@ import '../app_colors.dart';
 import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../data/quran_cuz.dart';
+import '../data/tilavet_secde.dart';
 import '../models/reading_log_model.dart';
 import 'log_edit_sheet.dart';
 import '../utils/hatim_calculator.dart';
@@ -55,6 +56,142 @@ class HatimHeatMapSheet extends StatefulWidget {
 
 class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
   final ValueNotifier<int?> _selectedPage = ValueNotifier<int?>(null);
+
+  /// page -> 'done' | 'pending' | null (not yet asked)
+  Map<int, String> _secdeStatus = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSecdeStatus();
+  }
+
+  Future<void> _loadSecdeStatus() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .collection('logs')
+          .doc('tilavet_secde_${widget.hatim.id}')
+          .get();
+      if (doc.exists && mounted) {
+        final data = doc.data()!;
+        final Map<int, String> status = {};
+        (data['pages'] as Map<String, dynamic>? ?? {}).forEach((k, v) {
+          status[int.parse(k)] = v as String;
+        });
+        setState(() => _secdeStatus = status);
+      }
+    } catch (e) {
+      debugPrint('Secde load error: \$e');
+    }
+  }
+
+  Future<void> _saveSecdeStatus(int page, String status) async {
+    setState(() => _secdeStatus[page] = status);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .collection('logs')
+          .doc('tilavet_secde_${widget.hatim.id}')
+          .set({
+        'hatimId': widget.hatim.id,
+        'type': 'tilavet_secde',
+        'pages': _secdeStatus.map((k, v) => MapEntry(k.toString(), v)),
+      });
+    } catch (e) {
+      debugPrint('Secde save error: \$e');
+    }
+  }
+
+  void _showSecdeDialog(int page) {
+    final label = TilavetSecdeData.secdeLabel(page) ?? 'Tilavet Secdesi';
+    final currentStatus = _secdeStatus[page];
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🕌', style: TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
+            Text(
+              'Tilavet Secdesi',
+              style: GoogleFonts.nunito(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$label  (Sayfa $page)',
+              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                label: Text(
+                  'Yaptım',
+                  style: GoogleFonts.nunito(
+                      color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _saveSecdeStatus(page, 'done');
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: Icon(Icons.access_time,
+                    color: currentStatus == 'pending'
+                        ? AppColors.errorRed
+                        : AppColors.textMid,
+                    size: 18),
+                label: Text(
+                  'Henüz Yapmadım',
+                  style: GoogleFonts.nunito(
+                    color: currentStatus == 'pending'
+                        ? AppColors.errorRed
+                        : AppColors.textMid,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(
+                    color: currentStatus == 'pending'
+                        ? AppColors.errorRed
+                        : AppColors.borderGrey,
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _saveSecdeStatus(page, 'pending');
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -241,8 +378,10 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                               _BinaryHeatGrid(
                                 readPages: readPages,
                                 selectedPage: selectedPage,
+                                secdeStatus: _secdeStatus,
                                 onPageTap: (p) => _selectedPage.value =
                                     _selectedPage.value == p ? null : p,
+                                onSecdeTap: _showSecdeDialog,
                               ),
                               const SizedBox(height: 10),
                               // Lejant
@@ -474,12 +613,16 @@ class _DetailPanel extends StatelessWidget {
 class _BinaryHeatGrid extends StatelessWidget {
   final Set<int> readPages;
   final int? selectedPage;
+  final Map<int, String> secdeStatus;
   final ValueChanged<int> onPageTap;
+  final ValueChanged<int> onSecdeTap;
 
   const _BinaryHeatGrid({
     required this.readPages,
     required this.selectedPage,
+    required this.secdeStatus,
     required this.onPageTap,
+    required this.onSecdeTap,
   });
 
   static const double _labelW = 14;
@@ -493,19 +636,59 @@ class _BinaryHeatGrid extends StatelessWidget {
   }
 
   Widget _square(int page, double sq, double radius, {bool usePage1Color = false}) {
-    final isRead = readPages.contains(usePage1Color ? 1 : page);
+    final actualPage = usePage1Color ? 1 : page;
+    final isRead = readPages.contains(actualPage);
     final isSelected = selectedPage == page;
+    final hasSecde = TilavetSecdeData.hasSecde(page);
+    final sStatus = hasSecde ? secdeStatus[page] : null;
+
+    // Köşe rozet rengi
+    Color? badgeColor;
+    if (hasSecde) {
+      if (sStatus == 'done') {
+        badgeColor = AppColors.gold;
+      } else if (sStatus == 'pending') {
+        badgeColor = AppColors.errorRed;
+      } else {
+        badgeColor = AppColors.textLight;
+      }
+    }
+
+    final badgeSize = (sq * 0.32).clamp(3.5, 6.0);
+
     return GestureDetector(
-      onTap: () => onPageTap(page),
-      child: Container(
-        width: sq,
-        height: sq,
-        margin: const EdgeInsets.only(right: _squareGap),
-        decoration: BoxDecoration(
-          color: isRead ? _kReadColor : AppColors.borderGrey,
-          borderRadius: BorderRadius.circular(radius),
-          border: isSelected ? Border.all(color: AppColors.textDark, width: 1.5) : null,
-        ),
+      onTap: hasSecde ? () => onSecdeTap(page) : null,
+      onLongPress: () => onPageTap(page),
+      child: Stack(
+        children: [
+          Container(
+            width: sq,
+            height: sq,
+            margin: const EdgeInsets.only(right: _squareGap),
+            decoration: BoxDecoration(
+              color: isRead ? _kReadColor : AppColors.borderGrey,
+              borderRadius: BorderRadius.circular(radius),
+              border: isSelected ? Border.all(color: AppColors.textDark, width: 1.5) : null,
+            ),
+          ),
+          if (hasSecde)
+            Positioned(
+              top: 1,
+              right: _squareGap + 1,
+              child: Container(
+                width: badgeSize,
+                height: badgeSize,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    width: 0.8,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -525,7 +708,10 @@ class _BinaryHeatGrid extends StatelessWidget {
 
         final rows = <Widget>[];
 
-        // Fatiha — rengi page 1 ile aynı
+        // Bekleyen tilavet secdesi sayısı (sadece 'pending' olanlar)
+        final pendingCount =
+            secdeStatus.values.where((v) => v == 'pending').length;
+
         rows.add(Padding(
           padding: const EdgeInsets.only(bottom: _squareGap),
           child: Row(
@@ -535,6 +721,41 @@ class _BinaryHeatGrid extends StatelessWidget {
               _square(0, sq, radius, usePage1Color: true),
               const SizedBox(width: 5),
               Text('Fâtiha', style: labelStyle),
+              const Spacer(),
+              if (pendingCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorRed.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.errorRed.withValues(alpha: 0.5),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                          color: AppColors.errorRed,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$pendingCount tamamlanmayan secde',
+                        style: GoogleFonts.nunito(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.errorRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ));

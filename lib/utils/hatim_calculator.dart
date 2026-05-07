@@ -25,6 +25,10 @@ class HatimCalculator {
     int lastReadPage = 0;
 
     for (var doc in logsSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      // tilavet_secde gibi log olmayan dokumanlari atla
+      if (data['createdAt'] == null) continue;
+      if (data['method'] == null) continue;
       final log = ReadingLog.fromFirestore(doc);
       final start = log.startPage;
       final end = log.endPage;

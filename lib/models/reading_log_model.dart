@@ -50,7 +50,7 @@ class ReadingLog {
       startPage: data['startPage'],
       endPage: data['endPage'],
       hatimId: data['hatimId'],
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }
