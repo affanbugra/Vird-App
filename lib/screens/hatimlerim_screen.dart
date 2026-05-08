@@ -11,6 +11,8 @@ import 'tamamlanan_hatimler_screen.dart';
 import '../utils/hatim_remover.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
+import '../widgets/seri_calendar_sheet.dart';
+import '../utils/seri_calculator.dart';
 
 const int _arapcaLimit = 3;
 const int _mealLimit = 1;
@@ -239,8 +241,14 @@ class _SummaryCardsState extends State<_SummaryCards> {
       stream: FirebaseFirestore.instance.collection('users').doc(widget.uid).snapshots(),
       builder: (context, snap) {
         final data = snap.data?.data() as Map<String, dynamic>?;
-        final seri = (data?['seri'] as int?) ?? 0;
+        final seriRaw = (data?['seri'] as int?) ?? 0;
+        final lastLogTs = data?['lastLogDate'] as Timestamp?;
+        final seriState = seriDisplayState(seriRaw, lastLogTs);
+        final seri = seriState.value;
+        final seriAtRisk = seriState.atRisk;
         final hasanat = data?['hasanat'] ?? 0;
+        final seriColor = seriAtRisk ? AppColors.errorRed : AppColors.orange;
+        final seriLabel = seriAtRisk ? 'Tehlikede!' : 'Mevcut Seri';
 
         // İlk yüklemede animasyon olmasın
         if (_prevSeri == -1) _prevSeri = seri;
@@ -252,11 +260,14 @@ class _SummaryCardsState extends State<_SummaryCards> {
             children: [
               Expanded(child: SeriFireEffect(
                 seriValue: seri,
-                child: _StatCard(
-                  icon: Icons.local_fire_department,
-                  color: AppColors.orange,
-                  value: '$seri Gün',
-                  label: 'Mevcut Seri',
+                child: GestureDetector(
+                  onTap: () => SeriCalendarSheet.show(context, uid: widget.uid, seri: seri),
+                  child: _StatCard(
+                    icon: Icons.local_fire_department,
+                    color: seriColor,
+                    value: '$seri Gün',
+                    label: seriLabel,
+                  ),
                 ),
               )),
               const SizedBox(width: 16),

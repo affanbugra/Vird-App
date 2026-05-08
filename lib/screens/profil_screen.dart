@@ -14,7 +14,8 @@ import '../widgets/seri_calendar_sheet.dart';
 import '../services/notification_service.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
-import 'gunluk_takipler_screen.dart';
+import 'vird_screen.dart';
+import '../utils/seri_calculator.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -123,7 +124,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final avatarSeed = data?['avatarSeed'] as String?;
         final isPro = (data?['isPro'] as bool?) ?? false;
         final isHafiz = (data?['isHafiz'] as bool?) ?? false;
-        final seri = (data?['seri'] as int?) ?? 0;
+        final seriRaw = (data?['seri'] as int?) ?? 0;
+        final lastLogTs = data?['lastLogDate'] as Timestamp?;
+        final seriState = seriDisplayState(seriRaw, lastLogTs);
+        final seri = seriState.value;
+        final seriAtRisk = seriState.atRisk;
         final hasanat = (data?['hasanat'] as int?) ?? 0;
         final totalPages = (data?['totalPages'] as int?) ?? 0;
 
@@ -147,6 +152,22 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     isPro: isPro,
                     isHafiz: isHafiz,
                     onSettingsTap: () => _showSettings(context, data ?? {}, user),
+                    onVirdTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => SizedBox(
+                        height: MediaQuery.of(ctx).size.height * 0.93,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                          child: MediaQuery.removePadding(
+                            context: ctx,
+                            removeTop: true,
+                            child: const VirdScreen(),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -165,6 +186,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             final completedCount = hatimSnap.data?.size ?? 0;
                             return _StatGrid(
                               seri: seri,
+                              seriAtRisk: seriAtRisk,
                               hasanat: hasanat,
                               hatimCount: completedCount,
                               totalPages: totalPages,
@@ -217,6 +239,7 @@ class _ProfileHeader extends StatelessWidget {
   final bool isPro;
   final bool isHafiz;
   final VoidCallback onSettingsTap;
+  final VoidCallback onVirdTap;
 
   const _ProfileHeader({
     required this.name,
@@ -227,6 +250,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.isPro,
     required this.isHafiz,
     required this.onSettingsTap,
+    required this.onVirdTap,
   });
 
   @override
@@ -375,42 +399,13 @@ class _ProfileHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Builder(
-                builder: (context) {
-                  return InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const GunlukTakiplerScreen()),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.tealLight,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.check_circle_outline, size: 16, color: AppColors.teal),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Günlük Takiplerim',
-                            style: GoogleFonts.nunito(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.teal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
+              GestureDetector(
+                onTap: onVirdTap,
+                child: Image.asset(
+                  'assets/images/vird_logo_seffaf.png',
+                  height: 38,
+                  width: 38,
+                ),
               ),
             ],
           ),
@@ -424,6 +419,7 @@ class _ProfileHeader extends StatelessWidget {
 
 class _StatGrid extends StatelessWidget {
   final int seri;
+  final bool seriAtRisk;
   final int hasanat;
   final int hatimCount;
   final int totalPages;
@@ -431,6 +427,7 @@ class _StatGrid extends StatelessWidget {
 
   const _StatGrid({
     required this.seri,
+    this.seriAtRisk = false,
     required this.hasanat,
     required this.hatimCount,
     required this.totalPages,
@@ -439,6 +436,8 @@ class _StatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final seriColor = seriAtRisk ? AppColors.errorRed : AppColors.orange;
+    final seriLabel = seriAtRisk ? 'TEHLİKEDE' : 'SERİ';
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,7 +447,7 @@ class _StatGrid extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: GestureDetector(
               onTap: onSeriTap,
-              child: _StatCard(icon: '🔥', value: _fmt(seri), label: 'SERİ', color: AppColors.orange),
+              child: _StatCard(icon: '🔥', value: _fmt(seri), label: seriLabel, color: seriColor),
             ),
           )),
           const SizedBox(width: 8),

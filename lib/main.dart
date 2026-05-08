@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
-import 'app_assets.dart';
 import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/auth/splash_screen.dart';
@@ -15,7 +14,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
-import 'screens/vird_screen.dart';
+import 'screens/gunluk_takipler_screen.dart';
 import 'widgets/log_entry_bottom_sheet.dart';
 
 void main() async {
@@ -112,7 +111,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = const [
     HatimlerimScreen(),
     EkiplerScreen(),
-    VirdScreen(),
+    GunlukTakiplerScreen(),
     ProfilScreen(),
   ];
 
@@ -228,8 +227,9 @@ class _MainBottomNav extends StatelessWidget {
             ),
           ),
           _NavItem(
-            isVird: true,
-            label: 'VİRD',
+            icon: Icons.water_drop_outlined,
+            activeIcon: Icons.water_drop,
+            label: 'Alışkanlıklar',
             active: currentIndex == 2,
             onTap: () => onTap(2),
           ),
@@ -252,15 +252,12 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
-  final bool isVird;
-
   const _NavItem({
     this.icon,
     this.activeIcon,
     required this.label,
     required this.active,
     required this.onTap,
-    this.isVird = false,
   });
 
   @override
@@ -285,28 +282,20 @@ class _NavItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            // İkon
-            if (isVird)
-              Opacity(
-                opacity: active ? 1.0 : 0.4,
-                child: Image.asset(AppAssets.logo, height: 38),
-              )
-            else ...[
-              Icon(
-                active ? (activeIcon ?? icon) : icon,
+            Icon(
+              active ? (activeIcon ?? icon) : icon,
+              color: color,
+              size: 24,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                 color: color,
-                size: 24,
               ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: GoogleFonts.nunito(
-                  fontSize: 11,
-                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),

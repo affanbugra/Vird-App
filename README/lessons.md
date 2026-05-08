@@ -180,6 +180,17 @@ allow update: if isOwner(userId)
 
 Bu sayede diğer kullanıcılar yalnızca `teamId` alanını değiştirebilir, diğer alanlara dokunamaz.
 
+### Firebase Console'dan string değer girerken tırnak sorunu
+Firebase Console'da bir string field'a değer yazarken tırnakla yazılırsa (`"rical_i_fark_logo"`) tırnaklar değerin parçası olur. `team.logoAsset == 'rical_i_fark_logo'` koşulu başarısız olur.
+
+**Teşhis:** `debugPrint('field: "${value}"')` çıktısında çift tırnak görünüyorsa (`field: ""value""`) değer tırnak içeriyor demektir.
+
+**Çözüm:** Kod tarafında sanitize et — hard-coded string eşitliği yerine:
+```dart
+final key = (field ?? '').replaceAll('"', '').trim();
+if (key.startsWith('rical_i_fark')) { ... }
+```
+
 ### `logs` subcollection okuma kuralı ve liderboard
 `users/{uid}/logs` subcollection'ını yalnızca `isOwner()` ile kısıtlarsan liderboard için başka kullanıcıların loglarını okumak `Permission Denied` hatası verir ve kullanıcı 0 puan görünür. Liderboard gibi cross-user okuma gerektiren senaryolarda `isAuth()` yeterli:
 ```javascript

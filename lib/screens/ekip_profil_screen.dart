@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
-import '../app_assets.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
@@ -18,6 +17,7 @@ class _MemberEntry {
   final String username;
   final String? avatarSeed;
   final int periodHasanat;
+  final int seri;
 
   const _MemberEntry({
     required this.uid,
@@ -25,6 +25,7 @@ class _MemberEntry {
     required this.username,
     required this.avatarSeed,
     required this.periodHasanat,
+    required this.seri,
   });
 }
 
@@ -181,6 +182,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           final uid = memberDoc.id;
           final data = memberDoc.data();
 
+          // Bu haftadan sonra katıldıysa o haftanın arşivine dahil etme
+          final joinedAt = (data['teamJoinedAt'] as Timestamp?)?.toDate();
+          if (joinedAt != null && joinedAt.isAfter(targetWeekEnd)) continue;
+
           final logsSnap = await db.collection('users').doc(uid).collection('logs')
               .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
               .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
@@ -198,6 +203,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             username: data['username'] as String? ?? '',
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
+            seri: (data['seri'] as int?) ?? 0,
           ));
         }
 
@@ -256,6 +262,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           username: data['username'] as String? ?? '',
           avatarSeed: data['avatarSeed'] as String?,
           periodHasanat: periodHasanat,
+          seri: (data['seri'] as int?) ?? 0,
         ));
       }
 
@@ -285,7 +292,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       if (userData['teamId'] != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
+            content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
             backgroundColor: AppColors.teal,
           ));
         }
@@ -387,6 +394,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           .doc(requesterUid));
       batch.update(db.collection('users').doc(requesterUid), {
         'teamId': widget.teamId,
+        'teamJoinedAt': FieldValue.serverTimestamp(),
       });
       batch.update(db.collection('teams').doc(widget.teamId), {
         'memberCount': FieldValue.increment(1),
@@ -644,7 +652,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                             if (v == 'deleteTeam') {
                               _deleteTeam(context);
                             } else if (v == 'history') {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => EkipGecmisScreen(teamId: widget.teamId, teamName: team.name, isProAdmin: isAdmin)));
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => EkipGecmisScreen(teamId: widget.teamId, teamName: team.name, isAdmin: isAdmin)));
                             } else {
                               _showEditSheet(context, team, v);
                             }
@@ -707,21 +715,11 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                           ),
                         ),
                         child: Center(
-                          child: team.logoAsset == 'rical_i_fark'
-                              ? Opacity(
-                                  opacity: 0.25,
-                                  child: Image.asset(
-                                    AppAssets.ricalIFarkLogo,
-                                    height: 90,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.shield,
-                                  size: 56,
-                                  color:
-                                      Colors.white.withValues(alpha: 0.15),
-                                ),
+                          child: Icon(
+                            Icons.shield,
+                            size: 56,
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
                         ),
                       ),
                     ),
@@ -1125,7 +1123,9 @@ class _PenaltyCard extends StatelessWidget {
 
 // ─── Liderboard Bölümü ─────────────────────────────────────────────────────────
 
-class _LeaderboardSection extends StatelessWidget {
+enum _SortMode { puan, seri }
+
+class _LeaderboardSection extends StatefulWidget {
   final List<_MemberEntry> leaderboard;
   final bool loading;
   final Duration untilMidnight;
@@ -1141,6 +1141,13 @@ class _LeaderboardSection extends StatelessWidget {
     required this.onRefresh,
     required this.onMemberTap,
   });
+
+  @override
+  State<_LeaderboardSection> createState() => _LeaderboardSectionState();
+}
+
+class _LeaderboardSectionState extends State<_LeaderboardSection> {
+  _SortMode _sortMode = _SortMode.puan;
 
   String _fmtDuration(Duration d) {
     if (d.inDays > 0) {
@@ -1167,16 +1174,32 @@ class _LeaderboardSection extends StatelessWidget {
     return buf.toString();
   }
 
+  List<_MemberEntry> get _sorted {
+    final list = List<_MemberEntry>.from(widget.leaderboard);
+    if (_sortMode == _SortMode.seri) {
+      list.sort((a, b) {
+        final cmp = b.seri.compareTo(a.seri);
+        return cmp != 0 ? cmp : b.periodHasanat.compareTo(a.periodHasanat);
+      });
+    } else {
+      list.sort((a, b) {
+        final cmp = b.periodHasanat.compareTo(a.periodHasanat);
+        return cmp != 0 ? cmp : b.seri.compareTo(a.seri);
+      });
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final memberCount = loading ? '' : ' · ${leaderboard.length} üye';
+    final memberCount = widget.loading ? '' : ' · ${widget.leaderboard.length} üye';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
-              'Günlük Liderboard$memberCount',
+              'Haftalık Ekip Sıralaması$memberCount',
               style: GoogleFonts.nunito(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -1185,7 +1208,7 @@ class _LeaderboardSection extends StatelessWidget {
             ),
             const Spacer(),
             GestureDetector(
-              onTap: onRefresh,
+              onTap: widget.onRefresh,
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -1204,21 +1227,39 @@ class _LeaderboardSection extends StatelessWidget {
             const Icon(Icons.access_time, size: 13, color: AppColors.textLight),
             const SizedBox(width: 4),
             Text(
-              'Sıfırlanmaya ${_fmtDuration(untilMidnight)} kaldı',
+              'Sıfırlanmaya ${_fmtDuration(widget.untilMidnight)} kaldı',
               style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Sıralama filtresi
+        Row(
+          children: [
+            _SortChip(
+              label: 'Puan',
+              selected: _sortMode == _SortMode.puan,
+              onTap: () => setState(() => _sortMode = _SortMode.puan),
+            ),
+            const SizedBox(width: 8),
+            _SortChip(
+              label: '🔥 Seri',
+              selected: _sortMode == _SortMode.seri,
+              onTap: () => setState(() => _sortMode = _SortMode.seri),
             ),
           ],
         ),
         const SizedBox(height: 12),
 
-        if (loading)
+        if (widget.loading)
           const Center(
             child: Padding(
               padding: EdgeInsets.all(32),
               child: CircularProgressIndicator(),
             ),
           )
-        else if (leaderboard.isEmpty)
+        else if (widget.leaderboard.isEmpty)
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -1235,28 +1276,55 @@ class _LeaderboardSection extends StatelessWidget {
           )
         else
           _buildList(),
+
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
+            children: [
+              Text(
+                '"Onlar, Allah\'a ve ahiret gününe inanırlar. İyiliği emrederler, kötülükten men ederler, hayır işlerinde birbirleriyle yarışırlar. İşte onlar salihlerdendir."',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 12.5,
+                  color: AppColors.textMid,
+                  height: 1.6,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Âl-i İmrân, 114',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 11,
+                  color: AppColors.textLight,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildList() {
-    final count = leaderboard.length;
-    // İlk 3 madalyalı, son kişiler kırmızı (top 3 ile çakışmaz)
-    // 4 kişi → son 1, 5 kişi → son 2, 6+ kişi → son 3
+    final sorted = _sorted;
+    final count = sorted.length;
     final showRedZone = count > 3;
     final redStartIdx = count - 3;
 
     return Column(
       children: List.generate(count, (i) {
-        final entry = leaderboard[i];
+        final entry = sorted[i];
         final isTop = i < 3;
-        // 0 hasanatı olan herkes (ilk 3 dahil) kırmızıdır.
-        // Değilse, sadece kırmızı bölgedekiler (ilk 3 hariç sonrakiler) kırmızıdır.
         final isRed = entry.periodHasanat == 0 || (!isTop && showRedZone && i >= redStartIdx);
-        final isMe = entry.uid == currentUid;
+        final isMe = entry.uid == widget.currentUid;
 
         return GestureDetector(
-          onTap: () => onMemberTap(entry.uid),
+          onTap: () => widget.onMemberTap(entry.uid),
           child: _LeaderboardRow(
             rank: i + 1,
             entry: entry,
@@ -1267,6 +1335,44 @@ class _LeaderboardSection extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SortChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teal : AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.teal : AppColors.borderGrey,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.nunito(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.textMid,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1405,12 +1511,30 @@ class _LeaderboardRow extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (entry.username.isNotEmpty)
-                  Text(
-                    '@${entry.username}',
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textLight),
-                  ),
+                Row(
+                  children: [
+                    if (entry.username.isNotEmpty)
+                      Text(
+                        '@${entry.username}',
+                        style: GoogleFonts.nunito(
+                            fontSize: 11, color: AppColors.textLight),
+                      ),
+                    if (entry.username.isNotEmpty && entry.seri > 0)
+                      const SizedBox(width: 6),
+                    if (entry.seri > 0) ...[
+                      const Text('🔥', style: TextStyle(fontSize: 11)),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${entry.seri} gün',
+                        style: GoogleFonts.nunito(
+                          fontSize: 11,
+                          color: AppColors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

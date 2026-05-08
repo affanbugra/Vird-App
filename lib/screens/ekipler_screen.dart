@@ -76,7 +76,7 @@ class _EkiplerBody extends StatelessWidget {
     }
     if (currentTeamId != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
+        content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
         backgroundColor: AppColors.teal,
       ));
       return;
@@ -102,7 +102,7 @@ class _EkiplerBody extends StatelessWidget {
     if (currentTeamId != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-          'Zaten bir ekipteysin. Önce mevcut ekibinden ayrılmalısın.',
+          'Zaten bir ekiptesin. Önce mevcut ekibinden ayrılmalısın.',
           style: GoogleFonts.nunito(),
         ),
         backgroundColor: AppColors.teal,
@@ -302,7 +302,8 @@ class _TeamCard extends StatelessWidget {
   });
 
   Widget _buildLogo() {
-    if (team.logoAsset == 'rical_i_fark') {
+    final logoKey = (team.logoAsset ?? '').replaceAll('"', '').trim();
+    if (logoKey.startsWith('rical_i_fark')) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image.asset(
@@ -470,7 +471,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
       if ((userDoc.data() ?? {})['teamId'] != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
+            content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
             backgroundColor: AppColors.errorRed,
           ));
         }
@@ -493,6 +494,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
       });
       batch.update(db.collection('users').doc(widget.uid), {
         'teamId': teamRef.id,
+        'teamJoinedAt': FieldValue.serverTimestamp(),
       });
       await batch.commit();
 
@@ -663,7 +665,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
       final userData = userDoc.data() ?? {};
       if (userData['teamId'] != null) {
         if (mounted) {
-          setState(() { _error = 'Zaten bir ekipteysin. Önce mevcut ekibinden ayrıl.'; _isLoading = false; });
+          setState(() { _error = 'Zaten bir ekiptesin. Önce mevcut ekibinden ayrıl.'; _isLoading = false; });
         }
         return;
       }
@@ -688,6 +690,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
       final batch = db.batch();
       batch.update(db.collection('users').doc(widget.uid), {
         'teamId': teamId,
+        'teamJoinedAt': FieldValue.serverTimestamp(),
       });
       batch.update(db.collection('teams').doc(teamId), {
         'memberCount': FieldValue.increment(1),

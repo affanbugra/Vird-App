@@ -657,8 +657,10 @@ class _BinaryHeatGrid extends StatelessWidget {
     final badgeSize = (sq * 0.32).clamp(3.5, 6.0);
 
     return GestureDetector(
-      onTap: hasSecde ? () => onSecdeTap(page) : null,
-      onLongPress: () => onPageTap(page),
+      onTap: () {
+        onPageTap(page);
+        if (hasSecde && isRead) onSecdeTap(page);
+      },
       child: Stack(
         children: [
           Container(

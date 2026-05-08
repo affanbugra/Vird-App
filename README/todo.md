@@ -9,6 +9,15 @@
 - [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
+### Tamamlanan (2026-05-08)
+- [x] Nav yeniden yapılandırma: Alışkanlıklar tab eklendi, VİRD Ayarlar'a taşındı ✅
+- [x] Hatim ısı haritası secde tap düzeltmesi ✅
+- [x] Seri "tehlikede" göstergesi (Profil + Hatimlerim) ✅
+- [x] Liderboard geçmiş görünürlük: herkes son hafta, admin tümü ✅
+- [x] `teamJoinedAt` — retroaktif liderboard katılım önlendi ✅
+- [x] Liderboard Puan/Seri filtre chips + satırda seri gösterimi ✅
+- [x] Ricâl-i FARK ekip logosu ✅
+
 ---
 
 ## MVP Backlog (sırayla)
@@ -21,7 +30,7 @@
 - [x] 9 — Kuran Haritası veri bağlantısı (Firestore loglarından gerçek zamanlı ısı haritası) ✅
 - [x] 10 — Offline mode (Firestore persistence — cihaz cache, bağlantı gelince sync) ✅
 - [x] 11 — Ekip sistemi (liste, gizlilik, davet kodu, istek/onay, admin paneli, liderboard, admin grup silme) ✅
-- [x] 12 — Günlük liderboard (ekip içi, 0 puanlı üyeler dahil, ilk 3 yeşil/son 3 kırmızı) ✅ → haftalığa çevrilecek
+- [x] 12 — Haftalık ekip sıralaması (ekip içi, 0 puanlı üyeler dahil, ilk 3 yeşil/son 3 kırmızı, Puan/Seri filtresi) ✅
 - [x] 13 — Profil veri bağlantısı (ısı haritası Firestore loglarına bağlandı) ✅
 - [x] 14 — Bildirimler — günlük akıllı bildirim ✅ (log kaydedilince o gün iptal); diğer tipler MVP sonrası
 - [ ] 15 — Rozetler (seri, hatim, okuma, ekip rozetleri) — MVP sonrası

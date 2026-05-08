@@ -7,13 +7,13 @@ import 'kullanici_profil_screen.dart';
 class EkipGecmisScreen extends StatelessWidget {
   final String teamId;
   final String teamName;
-  final bool isProAdmin;
+  final bool isAdmin;
 
   const EkipGecmisScreen({
     super.key,
     required this.teamId,
     required this.teamName,
-    this.isProAdmin = false,
+    this.isAdmin = false,
   });
 
   String _formatDate(String yyyyMmDd, [DateTime? teamCreatedAtDay]) {
@@ -114,7 +114,7 @@ class EkipGecmisScreen extends StatelessWidget {
               }).toList();
 
               // Pro Yönetici değilse sadece en sonuncu 1 kaydı göster
-              if (!isProAdmin && docs.isNotEmpty) {
+              if (!isAdmin && docs.isNotEmpty) {
                 docs = [docs.first];
               }
 

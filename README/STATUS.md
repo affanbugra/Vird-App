@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-08 — son güncelleme: Günlük Takipler modülü eklendi)
+## Genel Durum (2026-05-08 — son güncelleme: Liderboard iyileştirmeleri + nav yeniden yapılandırma)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -12,7 +12,6 @@
 - **Git:** Ortak repo, herkes push yapıyor
 - **Firestore kuralları:** Deploy edildi — `firebase deploy --only firestore:rules --project vird-fc834`
 - **MVP öncesi kalan tek iş:** Liderboard dönemini günlük → haftalık çevirmek + son hata testleri
-- **Yeni modül:** Günlük Takipler (namaz takibi + özel alışkanlık takibi) eklendi
 - **Web versiyonu:** https://vird-fc834.web.app — iOS dahil tüm cihazlardan erişilebilir
 - **Özel alan adı:** Henüz bağlanmadı — Firebase Console > Hosting > Add custom domain
 
@@ -44,6 +43,65 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — VirdScreen + Liderboard Son Güncellemeler (2026-05-08)
+
+#### VirdScreen Konumu (`profil_screen.dart`)
+- **VirdScreen** Ayarlar sheet'inden çıkarıldı
+- Profil header'ında isim hizasında **sağ tarafa Vird logosu** (`vird_logo_seffaf.png`, 38dp) eklendi
+- Tıklayınca aynı `showModalBottomSheet` açılışı devam ediyor
+- `_ProfileHeader`'a `onVirdTap: VoidCallback` parametresi eklendi
+
+#### VirdScreen Yol Haritası (`vird_screen.dart`)
+- **4 yeni "Yayında ✓" kart:** Tilavet Secdesi Takibi, Namaz ve Alışkanlık Takibi (su damlası ikonu), Seri ve Ekip Güncellemeleri (kupa ikonu)
+- **"Namaz Takibi"** eski ayrı kartı kaldırıldı (Namaz ve Alışkanlık Takibi kartına dahil edildi)
+- **Başlık:** "Yakında geliyor" → "Neler geldi, neler geliyor"
+- **Ana önizleme:** 4 kart full opacity (hepsi yayında)
+- **Tam listede opacity:** Son 5 kart giderek solar; Ramazan kartı ~0.08 (neredeyse beyaz)
+- `_iconFromName`'e `water_drop` → `Icons.water_drop` eklendi
+
+#### Haftalık Ekip Sıralaması (`ekip_profil_screen.dart`)
+- Başlık "Günlük Liderboard" → "Haftalık Ekip Sıralaması" olarak güncellendi
+- Sıralamanın altına Âl-i İmrân 114. ayet meali eklendi (italik, ortalı)
+
+---
+
+### Oturum — Nav Yeniden Yapılandırma + Liderboard + Seri Düzeltmeleri (2026-05-08)
+
+#### Navigasyon Değişiklikleri (`main.dart`, `profil_screen.dart`)
+- **VirdScreen** nav tab'dan çıkarıldı → Ayarlar sheet'ine `showModalBottomSheet` olarak taşındı (diğer ayar maddeleriyle aynı yapıda)
+- **GunlukTakiplerScreen** nav tab 2'ye "Alışkanlıklar" adıyla eklendi
+- **İkon:** `Icons.water_drop_outlined` (pasif) / `Icons.water_drop` (aktif) — Vird logosundaki su damlasına referans
+- `_NavItem`'dan `isVird` field'ı tamamen kaldırıldı
+
+#### Hatim Isı Haritası Secde Düzeltmesi (`hatim_heat_map_sheet.dart`)
+- Secde olmayan sayfalarda tap handler yoktu — düzeltildi: tüm sayfalar `onTap` alır
+- Secde dialogu sadece **okunmuş** sayfalarda açılır (`hasSecde && isRead` kontrolü)
+
+#### Seri Görüntüleme Düzeltmesi
+- **`seriDisplayState()` fonksiyonu** (`utils/seri_calculator.dart`): Firestore'daki donmuş seri değerini `lastLogDate`'e göre gerçek duruma çevirir. Dün okunmuş bugün okunmamışsa `atRisk: true`, eski tarihte kalmışsa `value: 0` döner.
+- **Profil ekranı:** `lastLogDate` okunur, `seriDisplayState()` hesaplanır; tehlikedeyse seri kırmızı + "TEHLİKEDE" etiketi
+- **Hatimlerim ekranı:** Aynı mantık; seri kartına tap → `SeriCalendarSheet.show()` açılır
+
+#### Liderboard Geçmiş Görünürlüğü (`ekip_gecmis_screen.dart`, `ekip_profil_screen.dart`)
+- **Herkes** geçmiş haftanın sıralamasını görebilir (1 kayıt)
+- **Ekip admini** tüm geçmiş haftaları görebilir (tüm kayıtlar)
+- `isProAdmin` → `isAdmin` olarak yeniden adlandırıldı (tüm dosyalarda)
+- **`teamJoinedAt`** Timestamp alanı eklendi — ekibe sonradan katılanlar eski haftalara dahil edilmez. 3 yerde yazılır: ekip kurma, davet koduyla katılma, admin onayı
+
+#### Liderboard Puan/Seri Filtresi (`ekip_profil_screen.dart`)
+- `_MemberEntry` modeline `seri: int` alanı eklendi; `_loadLeaderboard`'da `data['seri']` okunur
+- `_LeaderboardSection` `StatefulWidget`'a dönüştürüldü; `_SortMode` enum (`puan` / `seri`)
+- **Filtre chips:** "Puan" ve "🔥 Seri" — teal zemin seçili, animasyonlu geçiş
+- **Sıralama:** Puan → hasanat desc + seri tiebreak; Seri → seri desc + hasanat tiebreak
+- **Satırda seri gösterimi:** `🔥 X gün` seri > 0 olan üyelerin username satırında turuncu renkte
+
+#### Ricâl-i FARK Ekip Logosu (`ekipler_screen.dart`, `app_assets.dart`)
+- `_TeamCard._buildLogo()`: `logoAsset` değeri `'rical_i_fark'` ile başlıyorsa `AppAssets.ricalIFarkLogo` gösterilir
+- Firebase Console'dan `teams/{teamId}` dokümanına `logoAsset: "rical_i_fark_logo"` yazılarak aktifleştirilir
+- **Eşleşme robustluğu:** `.replaceAll('"', '').trim().startsWith('rical_i_fark')` — Console'dan tırnaklı yazılsa bile çalışır
+
+---
 
 ### Modül 18 — Günlük Takipler (2026-05-08)
 
@@ -333,7 +391,7 @@ QuranData.cuzler                                    // List<CuzInfo> — 30 cüz
 
 ---
 
-### Modül 11 & 12 — Ekip Sistemi + Günlük Liderboard (2026-04-27, güncellendi 2026-04-27)
+### Modül 11 & 12 — Ekip Sistemi + Haftalık Ekip Sıralaması (2026-04-27, güncellendi 2026-05-08)
 
 #### Dosyalar
 - `lib/models/team_model.dart` — Team veri modeli (yeni)

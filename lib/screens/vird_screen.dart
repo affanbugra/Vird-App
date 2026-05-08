@@ -19,20 +19,22 @@ IconData _iconFromName(String name) {
     case 'quote':         return Icons.format_quote;
     case 'bookmark':      return Icons.bookmark_border;
     case 'school':        return Icons.school;
+    case 'water_drop':    return Icons.water_drop;
     default:              return Icons.star_outline;
   }
 }
 
 const _allUpdates = [
-  _Update(iconName: 'book',     title: 'Kuran Okuma & Hatim Takibi',  desc: 'Günlük okuma alışkanlığı, hatim takibi, Seri, Hasanat ve Kuran Haritası.',  eta: 'Yayında ✓', released: true),
-  _Update(iconName: 'people',   title: 'Arkadaşlarınla Takipleş',     desc: 'Arkadaşlarını ekle, okuma aktivitelerini takip et, birlikte ilerle.',          eta: 'Yakında'),
-  _Update(iconName: 'trophy',   title: 'Ekipler & Yarışmalar',        desc: 'Kendi ekibini oluştur, arkadaşlarınla yarışarak hayra öncülük et.',            eta: 'Yakında'),
-  _Update(iconName: 'quote',    title: 'Ayet & Hadisler',              desc: 'Günlük bildirimler, favori ayet ve hadisleri seç ve kategorize et.',           eta: 'Yakında'),
-  _Update(iconName: 'bookmark', title: 'Tefsir Takibi',                desc: 'Tefsir okumak isteyenler için ayrı takip ve ilerleme sistemi.',                eta: 'Yakında'),
-  _Update(iconName: 'book',     title: 'Uygulama İçi Okuma',           desc: 'Kur\'an-ı Kerim, meal ve tefsirleri doğrudan uygulama içinden rahatça oku.',   eta: 'Yakında'),
-  _Update(iconName: 'prayer',   title: 'Namaz Takibi',                 desc: 'Beş vakit namaz için günlük takip ve hatırlatmalar.',                          eta: 'Yakında'),
-  _Update(iconName: 'school',   title: 'İslami Kulüpler',              desc: 'Üniversite İslami kulüplerini takip et, etkinliklerden haberdar ol.',          eta: 'Yakında'),
-  _Update(iconName: 'moon',     title: 'Ramazan Güncellemesi',         desc: 'Oruç takibi, teravih cami hedefleri, üniversite iftarları ve daha fazlası.',   eta: 'Ramazan 2027'),
+  _Update(iconName: 'book',       title: 'Kuran Okuma & Hatim Takibi',      desc: 'Günlük okuma alışkanlığı, hatim takibi, Seri, Hasanat ve Kuran Haritası.',                                                                                                                                    eta: 'Yayında ✓',  released: true),
+  _Update(iconName: 'bookmark',   title: 'Tilavet Secdesi Takibi',          desc: 'Hatimini okurken secdelerini daha kolay takip edebilmen ve aksatmaman için hazırlandı.',                                                                                                                        eta: 'Yayında ✓',  released: true),
+  _Update(iconName: 'water_drop', title: 'Namaz ve Alışkanlık Takibi',      desc: '5 Vakit namazını takip et. Alışkanlıklarını ekle ve düzenli olarak takip et.',                                                                                                                                  eta: 'Yayında ✓',  released: true),
+  _Update(iconName: 'trophy',     title: 'Seri ve Ekip Güncellemeleri',     desc: 'Seri hataları giderildi. Haftalık ekip sıralamasında herkesin serisi görünür hale geldi ve seriye göre filtreleme özelliği eklendi. Üyeler bir önceki haftanın sıralamasını, admin tüm geçmiş sıralamaları görebilir.', eta: 'Yayında ✓',  released: true),
+  _Update(iconName: 'people',     title: 'Arkadaşlarınla Takipleş',         desc: 'Arkadaşlarını ekle, okuma aktivitelerini takip et, birlikte ilerle.',                                                                                                                                           eta: 'Yakında'),
+  _Update(iconName: 'quote',      title: 'Ayet & Hadisler',                 desc: 'Günlük bildirimler, favori ayet ve hadisleri seç ve kategorize et.',                                                                                                                                            eta: 'Yakında'),
+  _Update(iconName: 'bookmark',   title: 'Tefsir Takibi',                   desc: 'Tefsir okumak isteyenler için ayrı takip ve ilerleme sistemi.',                                                                                                                                                 eta: 'Yakında'),
+  _Update(iconName: 'book',       title: 'Uygulama İçi Okuma',              desc: 'Kur\'an-ı Kerim, meal ve tefsirleri doğrudan uygulama içinden rahatça oku.',                                                                                                                                    eta: 'Yakında'),
+  _Update(iconName: 'school',     title: 'İslami Kulüpler',                 desc: 'Üniversite İslami kulüplerini takip et, etkinliklerden haberdar ol.',                                                                                                                                           eta: 'Yakında'),
+  _Update(iconName: 'moon',       title: 'Ramazan Güncellemesi',            desc: 'Oruç takibi, teravih cami hedefleri, üniversite iftarları ve daha fazlası.',                                                                                                                                    eta: 'Ramazan 2027'),
 ];
 
 class _Update {
@@ -147,15 +149,11 @@ class _VirdScreenState extends State<VirdScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHead(kicker: 'Yol Haritası', title: 'Yakında geliyor'),
+          const _SectionHead(kicker: 'Yol Haritası', title: 'Neler geldi, neler geliyor'),
           ...List.generate(mainCount, (i) {
-            final op = i < 2 ? 1.0 : (1.0 - (i - 1) * 0.35).clamp(0.2, 1.0);
-            return Opacity(
-              opacity: op,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _UpdateCard(update: _allUpdates[i]),
-              ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _UpdateCard(update: _allUpdates[i]),
             );
           }),
           const SizedBox(height: 4),
@@ -214,7 +212,8 @@ class _VirdScreenState extends State<VirdScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                       itemCount: _allUpdates.length,
                       itemBuilder: (_, i) {
-                        final op = (_allUpdates[i].released ? 1.0 : (1.0 - i * 0.12)).clamp(0.08, 1.0);
+                        // Son 5 kartta (index 5+) giderek şeffaflaşır; son kart (Ramazan) neredeyse beyaz
+                        final op = i < 5 ? 1.0 : (1.0 - (i - 4) * 0.22).clamp(0.08, 1.0);
                         return Opacity(
                           opacity: op,
                           child: Padding(
