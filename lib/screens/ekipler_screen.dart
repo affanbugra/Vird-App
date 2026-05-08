@@ -49,8 +49,8 @@ class _EkiplerBody extends StatelessWidget {
   final String uid;
   const _EkiplerBody({required this.uid});
 
-  void _openCreateSheet(BuildContext context, bool isPro, String? currentTeamId) {
-    if (!isPro) {
+  void _openCreateSheet(BuildContext context, bool isPro, bool isDeveloper, String? currentTeamId) {
+    if (!isPro && !isDeveloper) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -74,7 +74,7 @@ class _EkiplerBody extends StatelessWidget {
       );
       return;
     }
-    if (currentTeamId != null) {
+    if (!isDeveloper && currentTeamId != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
         backgroundColor: AppColors.teal,
@@ -89,6 +89,7 @@ class _EkiplerBody extends StatelessWidget {
       ),
       builder: (_) => _CreateTeamSheet(
         uid: uid,
+        isDeveloper: isDeveloper,
         onCreated: (teamId) => Navigator.push(
           context,
           MaterialPageRoute(
@@ -98,8 +99,8 @@ class _EkiplerBody extends StatelessWidget {
     );
   }
 
-  void _openInviteCodeSheet(BuildContext context, String? currentTeamId) {
-    if (currentTeamId != null) {
+  void _openInviteCodeSheet(BuildContext context, String? currentTeamId, bool isDeveloper) {
+    if (!isDeveloper && currentTeamId != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Zaten bir ekiptesin. Önce mevcut ekibinden ayrılmalısın.',
@@ -134,6 +135,11 @@ class _EkiplerBody extends StatelessWidget {
         final userData = userSnap.data?.data() as Map<String, dynamic>?;
         final currentTeamId = userData?['teamId'] as String?;
         final isPro = (userData?['isPro'] as bool?) ?? false;
+        final isDeveloper = (userData?['isDeveloper'] as bool?) ?? false;
+        final devTeamIds = ((userData?['developerTeamIds']) as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const <String>[];
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -147,7 +153,7 @@ class _EkiplerBody extends StatelessWidget {
                 [];
             // Gizli grupları filtrele: sadece kendi grubu görünsün
             final teams =
-                allTeams.where((t) => !t.isPrivate || t.id == currentTeamId).toList();
+                allTeams.where((t) => !t.isPrivate || t.id == currentTeamId || devTeamIds.contains(t.id)).toList();
 
             if (teamsSnap.connectionState == ConnectionState.waiting && teams.isEmpty) {
               return const Center(child: CircularProgressIndicator());
@@ -163,7 +169,8 @@ class _EkiplerBody extends StatelessWidget {
                           itemCount: teams.length,
                           itemBuilder: (ctx, i) {
                             final team = teams[i];
-                            final isMyTeam = team.id == currentTeamId;
+                            final isMyTeam = team.id == currentTeamId ||
+                                devTeamIds.contains(team.id);
                             return _TeamCard(
                               team: team,
                               isMyTeam: isMyTeam,
@@ -198,7 +205,7 @@ class _EkiplerBody extends StatelessWidget {
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: () =>
-                                  _openInviteCodeSheet(context, currentTeamId),
+                                  _openInviteCodeSheet(context, currentTeamId, isDeveloper),
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: AppColors.teal),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -223,7 +230,7 @@ class _EkiplerBody extends StatelessWidget {
                               color: AppColors.teal,
                               bottomColor: AppColors.tealDark,
                               onPressed: () =>
-                                  _openCreateSheet(context, isPro, currentTeamId),
+                                  _openCreateSheet(context, isPro, isDeveloper, currentTeamId),
                               child: Text(
                                 'Yeni Grup Kur',
                                 style: GoogleFonts.nunito(
@@ -432,9 +439,14 @@ class _TeamCard extends StatelessWidget {
 
 class _CreateTeamSheet extends StatefulWidget {
   final String uid;
+  final bool isDeveloper;
   final void Function(String teamId) onCreated;
 
-  const _CreateTeamSheet({required this.uid, required this.onCreated});
+  const _CreateTeamSheet({
+    required this.uid,
+    required this.isDeveloper,
+    required this.onCreated,
+  });
 
   @override
   State<_CreateTeamSheet> createState() => _CreateTeamSheetState();
@@ -467,15 +479,17 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
     try {
       final db = FirebaseFirestore.instance;
 
-      final userDoc = await db.collection('users').doc(widget.uid).get();
-      if ((userDoc.data() ?? {})['teamId'] != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
-            backgroundColor: AppColors.errorRed,
-          ));
+      if (!widget.isDeveloper) {
+        final userDoc = await db.collection('users').doc(widget.uid).get();
+        if ((userDoc.data() ?? {})['teamId'] != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
+              backgroundColor: AppColors.errorRed,
+            ));
+          }
+          return;
         }
-        return;
       }
 
       final inviteCode = _generateInviteCode();
@@ -492,10 +506,16 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
         'inviteCode': inviteCode,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      batch.update(db.collection('users').doc(widget.uid), {
-        'teamId': teamRef.id,
-        'teamJoinedAt': FieldValue.serverTimestamp(),
-      });
+      if (widget.isDeveloper) {
+        batch.update(db.collection('users').doc(widget.uid), {
+          'developerTeamIds': FieldValue.arrayUnion([teamRef.id]),
+        });
+      } else {
+        batch.update(db.collection('users').doc(widget.uid), {
+          'teamId': teamRef.id,
+          'teamJoinedAt': FieldValue.serverTimestamp(),
+        });
+      }
       await batch.commit();
 
       if (mounted) {

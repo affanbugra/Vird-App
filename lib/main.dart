@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
 import 'providers/auth_provider.dart';
+import 'providers/user_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
@@ -37,6 +38,13 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, UserProvider>(
+          create: (_) => UserProvider(),
+          update: (_, auth, user) {
+            user!.listenToUser(auth.user?.uid);
+            return user;
+          },
+        ),
       ],
       child: VirdApp(showHome: showHome),
     ),

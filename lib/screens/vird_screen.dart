@@ -143,19 +143,35 @@ class _VirdScreenState extends State<VirdScreen> {
 
   // ─── Yakında geliyor ─────────────────────────────────────────────────────
   Widget _buildComingSection() {
-    const mainCount = 4;
+    final released = _allUpdates.where((u) => u.released).toList();
+    final upcoming = _allUpdates.where((u) => !u.released).toList();
+    // En son 2 yayında olan
+    final shownReleased = released.length >= 2
+        ? released.sublist(released.length - 2)
+        : released;
+    // İlk 3 yakında gelen — giderek solar
+    final shownUpcoming = upcoming.take(3).toList();
+    const upcomingOpacities = [1.0, 0.55, 0.20];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHead(kicker: 'Yol Haritası', title: 'Neler geldi, neler geliyor'),
-          ...List.generate(mainCount, (i) {
-            return Padding(
+          for (final item in shownReleased)
+            Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _UpdateCard(update: _allUpdates[i]),
-            );
-          }),
+              child: _UpdateCard(update: item),
+            ),
+          for (int i = 0; i < shownUpcoming.length; i++)
+            Opacity(
+              opacity: upcomingOpacities[i],
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _UpdateCard(update: shownUpcoming[i]),
+              ),
+            ),
           const SizedBox(height: 4),
           Center(
             child: GestureDetector(

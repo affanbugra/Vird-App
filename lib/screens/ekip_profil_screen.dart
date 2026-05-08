@@ -231,19 +231,26 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
     try {
       final periodStart = _getPeriodStart();
+      final db = FirebaseFirestore.instance;
 
-      final membersSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .where('teamId', isEqualTo: widget.teamId)
-          .get();
+      // Regular members (teamId) + developer members (developerTeamIds)
+      final results = await Future.wait([
+        db.collection('users').where('teamId', isEqualTo: widget.teamId).get(),
+        db.collection('users').where('developerTeamIds', arrayContains: widget.teamId).get(),
+      ]);
+
+      // Deduplicate by UID — developer's record takes priority if in both
+      final memberMap = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+      for (final doc in results[0].docs) { memberMap[doc.id] = doc; }
+      for (final doc in results[1].docs) { memberMap[doc.id] = doc; }
 
       final entries = <_MemberEntry>[];
 
-      for (final memberDoc in membersSnap.docs) {
+      for (final memberDoc in memberMap.values) {
         final uid = memberDoc.id;
         final data = memberDoc.data();
 
-        final logsSnap = await FirebaseFirestore.instance
+        final logsSnap = await db
             .collection('users')
             .doc(uid)
             .collection('logs')
@@ -288,8 +295,9 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       final db = FirebaseFirestore.instance;
       final userDoc = await db.collection('users').doc(widget.currentUid).get();
       final userData = userDoc.data() ?? {};
+      final isDeveloper = (userData['isDeveloper'] as bool?) ?? false;
 
-      if (userData['teamId'] != null) {
+      if (!isDeveloper && userData['teamId'] != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
@@ -299,19 +307,31 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         return;
       }
 
-      await db
-          .collection('teams')
-          .doc(widget.teamId)
-          .collection('requests')
-          .doc(widget.currentUid)
-          .set({
-        'name': userData['name'] as String? ?? 'İsimsiz',
-        'username': userData['username'] as String? ?? '',
-        'avatarSeed': userData['avatarSeed'] as String?,
-        'requestedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) setState(() => _isPending = true);
+      if (isDeveloper) {
+        // Developer: direkt katıl, istek süreci yok
+        final batch = db.batch();
+        batch.update(db.collection('users').doc(widget.currentUid), {
+          'developerTeamIds': FieldValue.arrayUnion([widget.teamId]),
+        });
+        batch.update(db.collection('teams').doc(widget.teamId), {
+          'memberCount': FieldValue.increment(1),
+        });
+        await batch.commit();
+        _loadLeaderboard();
+      } else {
+        await db
+            .collection('teams')
+            .doc(widget.teamId)
+            .collection('requests')
+            .doc(widget.currentUid)
+            .set({
+          'name': userData['name'] as String? ?? 'İsimsiz',
+          'username': userData['username'] as String? ?? '',
+          'avatarSeed': userData['avatarSeed'] as String?,
+          'requestedAt': FieldValue.serverTimestamp(),
+        });
+        if (mounted) setState(() => _isPending = true);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -370,10 +390,19 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     if (confirmed != true) return;
 
     final db = FirebaseFirestore.instance;
+    final userDoc = await db.collection('users').doc(widget.currentUid).get();
+    final isDeveloper = (userDoc.data()?['isDeveloper'] as bool?) ?? false;
+
     final batch = db.batch();
-    batch.update(db.collection('users').doc(widget.currentUid), {
-      'teamId': FieldValue.delete(),
-    });
+    if (isDeveloper) {
+      batch.update(db.collection('users').doc(widget.currentUid), {
+        'developerTeamIds': FieldValue.arrayRemove([widget.teamId]),
+      });
+    } else {
+      batch.update(db.collection('users').doc(widget.currentUid), {
+        'teamId': FieldValue.delete(),
+      });
+    }
     batch.update(db.collection('teams').doc(widget.teamId), {
       'memberCount': FieldValue.increment(-1),
     });
@@ -633,8 +662,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
               }
               final userData =
                   userSnap.data?.data() as Map<String, dynamic>?;
+              final devTeamIds =
+                  ((userData?['developerTeamIds']) as List?)
+                      ?.map((e) => e.toString())
+                      .toList() ??
+                  const <String>[];
               final currentTeamId = userData?['teamId'] as String?;
-              final isMember = currentTeamId == widget.teamId;
+              final isMember = currentTeamId == widget.teamId ||
+                  devTeamIds.contains(widget.teamId);
 
               return CustomScrollView(
                 slivers: [

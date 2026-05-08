@@ -124,6 +124,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final avatarSeed = data?['avatarSeed'] as String?;
         final isPro = (data?['isPro'] as bool?) ?? false;
         final isHafiz = (data?['isHafiz'] as bool?) ?? false;
+        final isDeveloper = (data?['isDeveloper'] as bool?) ?? false;
         final seriRaw = (data?['seri'] as int?) ?? 0;
         final lastLogTs = data?['lastLogDate'] as Timestamp?;
         final seriState = seriDisplayState(seriRaw, lastLogTs);
@@ -151,6 +152,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     avatarSeed: avatarSeed,
                     isPro: isPro,
                     isHafiz: isHafiz,
+                    isDeveloper: isDeveloper,
                     onSettingsTap: () => _showSettings(context, data ?? {}, user),
                     onVirdTap: () => showModalBottomSheet(
                       context: context,
@@ -238,6 +240,7 @@ class _ProfileHeader extends StatelessWidget {
   final String? avatarSeed;
   final bool isPro;
   final bool isHafiz;
+  final bool isDeveloper;
   final VoidCallback onSettingsTap;
   final VoidCallback onVirdTap;
 
@@ -249,6 +252,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.avatarSeed,
     required this.isPro,
     required this.isHafiz,
+    required this.isDeveloper,
     required this.onSettingsTap,
     required this.onVirdTap,
   });
@@ -369,6 +373,24 @@ class _ProfileHeader extends StatelessWidget {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.teal,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (isDeveloper) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'DEV',
+                              style: GoogleFonts.nunito(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
                             ),
                           ),
