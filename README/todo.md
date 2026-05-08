@@ -53,7 +53,9 @@
 - [ ] **Hatim Tamamlanma UX** — tamamlanan hatimi geri alma yok uyarısı ("Hatim bitiyor, geri alınamaz, devam et?"); tamamlanan hatimlerde log ekleme/düzenleme kilitleme
 
 ### İslami İçerik
-- [ ] **Zikir Entegrasyonu** — zikir çekme takip ekranı (başlangıcı yapıldı); tesbih sayacı, günlük zikir hedefi
+- [x] **Namaz Takibi** — vakinde / kaza / cemaat durumlarıyla haftalık namaz takibi ✅ (`gunluk_takipler_screen.dart`)
+- [x] **Alışkanlık Takibi** — özel alışkanlık oluşturma, günlük işaretleme, seri ve ısı haritası ✅ (`habit_tracker_widget.dart`)
+- [ ] **Zikir Entegrasyonu** — zikir çekme takip ekranı; tesbih sayacı, günlük zikir hedefi
 - [ ] **Nafile Namaz Bilgisi** — vakit ekranlarında veya ayrı sekmede: vakitlere göre hangi nafile namazların tavsiye edildiği bilgisi (kuşluk, teheccüd, evvabin vb.)
 - [ ] **Oruç Tavsiye Günleri** — Pazartesi-Perşembe, Eyam-ı Biyz (ayın 13-14-15'i), 3 Aylar yaklaşınca bildirim; Ramazan öncesi sayaç
 - [ ] **Vakitlerde Tavsiye Edilen Sure & Dualar** — sabah/akşam duaları, Kehf (Cuma), Mülk (gece), vb.; ilgili vakitte bildirim veya ana ekran kartı
@@ -110,7 +112,7 @@
 - [ ] Üniversiteler ligi — üniversiteler arası haftalık okuma rekabeti ve sıralama
 
 ### Yeni Özellikler
-- [ ] Namaz takibi
+- [x] Namaz takibi ✅
 - [ ] İslami oyun/quiz (Zip benzeri)
 - [ ] Kuran ve Meal uygulama içi okuma entegrasyonu (Vird sekmesinde "Yakında Geliyor" listesine eklendi)
 - [ ] Tefsir takibi

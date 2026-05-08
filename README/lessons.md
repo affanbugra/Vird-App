@@ -142,6 +142,31 @@ var scheduled = TZDateTime(local, now.year, now.month, now.day + 1, hour, minute
 
 ---
 
+## Flutter Web Deploy
+
+### Beyaz Ekran: `FormatException: Unexpected token '<', "<!DOCTYPE "`
+**Belirti:** Deploy sonrası uygulama tamamen beyaz ekran, konsolda şu hata:
+```
+FormatException: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+```
+
+**Kök neden:** Flutter web başlangıçta `assets/FontManifest.json` ve `assets/AssetManifest.bin` dosyalarını HTTP ile çeker. Firebase Hosting'deki `"source": "**", "destination": "/index.html"` rewrite kuralı bu dosyalar yoksa HTML döndürür. Flutter HTML'i JSON olarak parse etmeye çalışır → crash.
+
+**Teşhis:** `build/web/assets/` içinde `FontManifest.json` veya `AssetManifest.bin` yoksa sorun budur.
+
+**Çözüm:** `flutter build web --release` komutu bu dosyaları her zaman üretir. Eksik görünüyorsa build tamamlanmamış veya bozuktur — temiz rebuild yap:
+```
+flutter build web --release
+npx firebase deploy --only hosting
+```
+
+### `flutter_service_worker.js` varlığını kontrol et
+`flutter build web --release` her zaman `flutter_service_worker.js` üretmeyebilir. `flutter_bootstrap.js`'in son satırı `serviceWorkerSettings` içeriyorsa ama `build/web/flutter_service_worker.js` yoksa uygulama açılmaz (Firebase HTML döndürür, Dart JSON parse eder → crash).
+
+**Kural:** Deploy öncesi `build/web/flutter_service_worker.js` var mı kontrol et. Varsa bootstrap'e dokunma. Yoksa `_flutter.loader.load({})` yap (serviceWorkerSettings'i kaldır).
+
+---
+
 ## Firestore Güvenlik Kuralları
 
 ### Alan bazlı güncelleme istisnası

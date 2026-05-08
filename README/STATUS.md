@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-07 — son güncelleme: Web versiyonu canlıya alındı)
+## Genel Durum (2026-05-08 — son güncelleme: Günlük Takipler modülü eklendi)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -12,6 +12,7 @@
 - **Git:** Ortak repo, herkes push yapıyor
 - **Firestore kuralları:** Deploy edildi — `firebase deploy --only firestore:rules --project vird-fc834`
 - **MVP öncesi kalan tek iş:** Liderboard dönemini günlük → haftalık çevirmek + son hata testleri
+- **Yeni modül:** Günlük Takipler (namaz takibi + özel alışkanlık takibi) eklendi
 - **Web versiyonu:** https://vird-fc834.web.app — iOS dahil tüm cihazlardan erişilebilir
 - **Özel alan adı:** Henüz bağlanmadı — Firebase Console > Hosting > Add custom domain
 
@@ -38,10 +39,75 @@
 | 15 | Rozetler | ⬜ |
 | 16 | Vird sekmesi (UI + Firestore form) | ✅ Tamamlandı |
 | 17 | Web versiyonu (Firebase Hosting) | ✅ Tamamlandı — https://vird-fc834.web.app |
+| 18 | Günlük Takipler (namaz takibi + alışkanlık takibi) | ✅ Tamamlandı |
 
 ---
 
 ## Tamamlanan Modüller
+
+### Modül 18 — Günlük Takipler (2026-05-08)
+
+#### Dosyalar
+- `lib/screens/gunluk_takipler_screen.dart` — Günlük Takipler ana ekranı (599 satır)
+- `lib/widgets/habit_tracker_widget.dart` — Özel alışkanlık takip widget'ı (863 satır)
+- `lib/widgets/habit_heat_map_sheet.dart` — Alışkanlık ısı haritası bottom sheet (353 satır)
+- `lib/data/tilavet_secde.dart` — 14 tilavet secdesi sayfa verisi
+
+#### Namaz Takibi (`GunlukTakiplerScreen`)
+- **Durumlar:** `PrayerStatus` — `none`, `onTime`, `kaza`, `cemaat`
+- **Vakitler:** `PrayerTime` — sabah, öğle, ikindi, akşam, yatsı
+- **Görünüm:** `PageView` ile haftalık gezinme; geçmiş haftalara geri gidilebilir
+- **Prefetch:** `initState`'te mevcut ve önceki haftanın verisi önceden yüklenir
+- **Firestore:** `users/{uid}/logs/prayer_YYYY-MM-DD` dokümanına `set(merge: true)` ile yazar
+- **Renk kodlaması:** `AppColors.successGreen` (vakinde), `AppColors.goldSoft` (kaza), `AppColors.tealSoft` (cemaat)
+
+#### Alışkanlık Takibi (`HabitTrackerWidget`)
+- **`HabitDef`:** id, title, color, createdAt — Firestore'da `users/{uid}/logs/habit_defs` dokümanına `items` array olarak yazılır
+- **Log formatı:** `users/{uid}/logs/{YYYY-MM-DD}_{habitId}` dokümanlarına `completed: bool` yazılır
+- **Son 30 günün logu** tek seferinde çekilir; date değişince lazily yüklenir
+- **Seri hesabı:** Seçilen günden geriye sayarak ardışık tamamlanan günler hesaplanır
+- **Isı haritası:** Her alışkanlığa tıklayınca `HabitHeatMapSheet.show()` açılır
+
+#### Alışkanlık Isı Haritası (`HabitHeatMapSheet`)
+- Yıllık görünüm (GitHub contribution graph tarzı)
+- Binary renk: tamamlandı = alışkanlığa ait renk, tamamlanmadı = `AppColors.borderGrey`
+- Metrikler: toplam tamamlama sayısı, mevcut seri, oluşturulma tarihi
+
+#### Tilavet Secde Verisi (`TilavetSecdeData`)
+- 14 tilavet secdesi sayfa numarası ve sure adı
+- API: `hasSecde(page)`, `secdeLabel(page)`, `secdesInRange(startPage, endPage)`
+- `hatim_calculator.dart`'ta secde dokümanlarını loglardan filtrelemeye yarar (`createdAt == null` kontrolüyle)
+
+#### AppColors Yeni Renkler
+- `tealSoft = Color(0xFF63A5AB)` — cemaat namazı rengi
+- `goldSoft = Color(0xFFFFD166)` — kaza namazı rengi
+
+#### Firestore Şeması (Günlük Takipler)
+```
+users/{uid}/logs/prayer_YYYY-MM-DD
+  type: 'prayer'
+  date: 'prayer_YYYY-MM-DD'
+  prayers: {
+    sabah: 'none' | 'onTime' | 'kaza' | 'cemaat'
+    ogle:  'none' | 'onTime' | 'kaza' | 'cemaat'
+    ikindi:'none' | 'onTime' | 'kaza' | 'cemaat'
+    aksam: 'none' | 'onTime' | 'kaza' | 'cemaat'
+    yatsi: 'none' | 'onTime' | 'kaza' | 'cemaat'
+  }
+
+users/{uid}/logs/habit_defs
+  items: [{ id, title, color, createdAt }]
+
+users/{uid}/logs/YYYY-MM-DD_{habitId}
+  completed: bool
+  date: 'YYYY-MM-DD'
+  habitId: string
+```
+
+#### Firestore Güvenlik Kuralı (yeni)
+- `daily_prayers/{dateStr}` koleksiyonu için `isOwner(userId)` kuralı eklendi
+
+---
 
 ### Web Versiyonu — Firebase Hosting (2026-05-07)
 
