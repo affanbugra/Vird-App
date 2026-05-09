@@ -13,6 +13,7 @@ import '../utils/hatim_calculator.dart';
 import '../utils/seri_calculator.dart';
 import 'log_history_sheet.dart';
 import '../services/notification_service.dart';
+import '../screens/streak_animation_screen.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
   final Hatim? initialHatim;
@@ -369,7 +370,35 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       }
       // ─────────────────────────────────────────────────────────────────
 
-      if (mounted) Navigator.pop(context, justCompleted);
+      // ── Seri animasyonu ──────────────────────────────────────────────
+      final streakIncreased = seriUpdate.containsKey('seri');
+      int newSeri = currentSeri;
+      if (streakIncreased) newSeri = (seriUpdate['seri'] as int);
+
+      List<bool>? weekFilled;
+      int todayIdx = 0;
+      if (streakIncreased && mounted) {
+        weekFilled = await _getWeekFilled(user.uid);
+        todayIdx = DateTime.now().weekday - 1; // 0=Pzt, 6=Paz
+      }
+      // ─────────────────────────────────────────────────────────────────
+
+      if (!mounted) return;
+
+      final overlayCtx = Navigator.of(context, rootNavigator: true).context;
+      Navigator.pop(context, justCompleted);
+
+      if (streakIncreased && weekFilled != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          StreakAnimationScreen.show(
+            overlayCtx,
+            count: newSeri,
+            prevCount: currentSeri,
+            filled: weekFilled!,
+            todayIndex: todayIdx,
+          );
+        });
+      }
     } catch (e, st) {
       debugPrint('LOG KAYDETME HATASI: $e\n$st');
       if (mounted) {
@@ -382,6 +411,37 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         );
       }
     }
+  }
+
+  // ── Haftalık doluluk dizisi (seri animasyonu için) ──────────────────
+
+  Future<List<bool>> _getWeekFilled(String uid) async {
+    final now   = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // Haftanın başı: Pazartesi
+    final monday     = today.subtract(Duration(days: today.weekday - 1));
+    final sevenAgo   = monday;
+
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('logs')
+        .where('createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(sevenAgo))
+        .get();
+
+    final loggedDays = <String>{};
+    for (final doc in snap.docs) {
+      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate();
+      if (d != null) {
+        loggedDays.add('${d.year}-${d.month}-${d.day}');
+      }
+    }
+
+    return List.generate(7, (i) {
+      final day = monday.add(Duration(days: i));
+      return loggedDays.contains('${day.year}-${day.month}-${day.day}');
+    });
   }
 
   // ── Tilavet Secdesi Prompt ──────────────────────────────────────────

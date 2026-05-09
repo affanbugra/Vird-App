@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-09 — son güncelleme: isDeveloper sistemi + Seri 5 bug düzeltmesi + Profil header yeniden tasarımı)
+## Genel Durum (2026-05-09 — son güncelleme: Seri animasyonu ekranı + DevPanel arşiv + web deploy)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -26,7 +26,7 @@
 | 3 | Kuran verisi entegrasyonu | ✅ Tamamlandı |
 | 4 | Hatimlerim + Tamamlanan Hatimler + Isı Haritası | ✅ Tamamlandı |
 | 5 | Log girişi (kilitleme modu + fazla sayfa uyarısı) | ✅ Tamamlandı |
-| 6 | Seri sistemi | ⚠️ Kısmi (seri sayacı + takvim + dinamik yeniden hesap; freeze/repair/Cuma bonusu yok) |
+| 6 | Seri sistemi | ⚠️ Kısmi (seri sayacı + takvim + animasyon ekranı ✅; freeze/repair/Cuma bonusu yok) |
 | 7 | Sure serii | ⬜ |
 | 8 | Hasanat sistemi | ✅ Tamamlandı |
 | 9 | Kuran Haritası (UI ✅, veri bağlantısı ✅) | ✅ Tamamlandı |
@@ -43,6 +43,58 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — Seri Animasyonu + DevPanel Arşiv + Web Deploy (2026-05-09)
+
+#### StreakAnimationScreen (`lib/screens/streak_animation_screen.dart`) — YENİ DOSYA
+
+Duolingo tarzı seri kutlama ekranı. Log kaydedilip seri artınca otomatik açılır.
+
+**Animasyon katmanları (7 AnimationController):**
+- `_intro` (2200ms): halo → gölge → alev gövdesi (TweenSequence elasticOut) → whip arkleri (4 adet, PathMetrics dash) → kıvılcımlar → motivasyon metni → CTA butonu
+- `_breathe`, `_bodyBreath`, `_midFlick`, `_coreFlick`, `_shadowCtrl`: 1700ms sonra başlayan idle döngüler
+- `_particles`: sürekli dönen parçacık sistemi
+
+**_FlamePainter (CustomPainter):**
+- Alev gövdesi: `cubicTo` ile el çizimi SVG path; canvas.translate + scale ile viewBox uyumu
+- Arc whip'ler: `PathMetrics.extractPath(start, end)` ile kayan çizgi animasyonu
+- Kıvılcımlar: polar koordinatlardan spiral dağılım
+- `transform-origin bottom` davranışı: `translate(0,80) → scale → translate(0,-80)` ile
+
+**_DayRow:**
+- Label row + 38px Stack (circle area) ayrımı → pill hizası sorunu çözüldü
+- Pill: `top:2, bottom:2` = 34px, daireler `top:4` = 30px (pill dairelerin 2px çevresini sarar)
+- Token: `tokenBase=7.0` (circle center = 4+15=19, token=24 → top=7)
+- Parabolic arc: `4t(1-t)*-20px` (token yayında yükselip iner)
+- Elastic spring pill: `Cubic(0.34, 1.2, 0.4, 1)` ile sadece bugünün katkısı animasyonlu genişler
+- Senkronize handoff: token t=0.75'te (525ms) söner, checkmark 520ms'de patlar
+- Gap senaryosu: prevFilled != todayIndex-1 → bağımsız yeni pill, token uzaktan kayar
+
+**Mesaj sistemi:**
+- `_kMessages` — Dart record türü `(min, max, msgs)` ile 5 aralık
+- `{X}` placeholder `replaceAll` ile streak sayısıyla değiştirilir
+- `_getMotivation(count)` dönem hesabı yapar
+
+**Entegrasyon (`log_entry_bottom_sheet.dart`):**
+- `_getWeekFilled(uid)` — Firestore'dan haftanın log günlerini çeker (Pzt başlangıçlı)
+- `_saveLog()` içinde `streakIncreased = seriUpdate.containsKey('seri')` kontrolü
+- rootNavigator ile sheet kapandıktan sonra `addPostFrameCallback` ile açılır
+
+**Layout:**
+- Motivasyon metni: iki `Spacer()` arasında — takvim ile buton tam ortasında
+
+#### DevPanel Arşiv Görünümü (`lib/screens/dev_panel_screen.dart`)
+
+- `_ArchiveView` StatefulWidget eklendi: BUGS/TO-DO sekmeleri, `archived == true` filtreli StreamBuilder
+- Sol swipe ile silme (`Dismissible`), unarchive butonu (teal, `Icons.unarchive_outlined`)
+- Yeni item oluşturulurken `'archived': false` alanı eklendi
+
+#### Web Deploy
+- `flutter build web --release` → `build/web/` (29.5s, 41 dosya)
+- `firebase deploy --only hosting` → https://vird-fc834.web.app
+- Node `npx-cli.js` ile çalıştırıldı (PS execution policy bypass)
+
+---
 
 ### Oturum — isDeveloper Sistemi + Seri Bug Düzeltmeleri + Profil Header (2026-05-09)
 
@@ -689,3 +741,8 @@ users/{uid} (root doc)
 - **`serverTimestamp()` + `orderBy` crash:** Firestore'a `FieldValue.serverTimestamp()` yazınca pending write aşamasında o field `null` döner. `orderBy('fieldWithServerTimestamp')` olan bir query bu null'ı sıralayamaz ve crash verir. Çözüm: `orderBy` kaldır, sıralama gerekiyorsa client-side yap.
 - **Same-frame pop+push navigator crash:** `Navigator.pop(context)` hemen ardından `Navigator.push(...)` çağrılırsa (aynı frame içinde) navigator tutarsız duruma girer — defalarca "Unexpected null value" + `mouse_tracker.dart:199` assertion hatası ve beyaz ekran. Çözüm: push'u `WidgetsBinding.instance.addPostFrameCallback((_) => Navigator.push(...))` ile bir sonraki frame'e ertele.
 - **`finally` blok + navigation:** Sheet pop edildikten sonra `finally` içinde `setState` çağrısı `mounted` false olduğu için crash atar. Başarılı path'in `finally` resetine ihtiyacı yok — sadece `catch` içinde loading state sıfırla.
+- **Stack pill hizası:** `StackFit.loose` ile Row kendi yüksekliğinde büyür ve Stack'e yapışır. Pill `top: N` sabit değeri Row'un gerçek boyutunu bilmez — hizalama kayar. Çözüm: label row ve circle alanını `Column` ile ayır, pill'i sadece 38px'lik circle Stack'ine sabitle (`top:2, bottom:2`).
+- **CustomPainter arc whip:** `PathMetrics.extractPath(startFrac*len, endFrac*len)` ile kayan görünür segment animasyonu. `t` ilerledikçe `startFrac` ve `endFrac` birlikte hareket eder — baştan sona kayan çizgi efekti.
+- **Flame `transform-origin bottom`:** CSS `transform-origin: center bottom` eşdeğeri için: `canvas.translate(0, anchorY); canvas.scale(s); canvas.translate(0, -anchorY)`. `save/restore` ile her frame temiz.
+- **Parabolic arc token:** `y = base + 4*t*(1-t)*-amplitude` formülü t=0.5'te tepe yapar, t=0 ve t=1'de base'de. `Curves.easeInOut.transform(t)` x eksenine uygulanınca doğal yavaşlama eklenir.
+- **Elastic pill yalnızca bugünkü katkı:** `AnimatedContainer` tüm bloğu animate eder, `pillBaseW + delta * curve.value` ise sadece yeni eklenen segmenti genişletir. Önceden var olan blok hemen görünür, sadece uzayan kısım spring ile açılır.

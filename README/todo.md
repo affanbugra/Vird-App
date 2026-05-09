@@ -10,6 +10,9 @@
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
 ### Tamamlanan (2026-05-09)
+- [x] **Seri animasyonu ekranı** — StreakAnimationScreen (CustomPainter alev, whip arkleri, haftalık takvim, motivasyon mesajları, elastic pill, parabolic arc token) ✅
+- [x] DevPanel arşiv görünümü — `_ArchiveView` StatefulWidget, BUGS/TO-DO sekmeleri, unarchive ✅
+- [x] Web deploy — `flutter build web --release` + `firebase deploy --only hosting` → https://vird-fc834.web.app ✅
 - [x] isDeveloper sistemi: UserProvider, DEV badge, developerTeamIds liderboard desteği ✅
 - [x] Seri 5 bug düzeltmesi: recalculate anchor-day, deleteAllLogs filtresi, seriDisplayState guard, migration path, liderboard seriDisplayState ✅
 - [x] Profil header: Vird logosu + ayarlar butonu banner sağ altına taşındı (v_logo.png) ✅
@@ -54,7 +57,7 @@
 ## MVP Sonrası
 
 ### Seri Sistemi (Tamamlama)
-- [ ] **Seri Animasyonu** — seri sayısı artınca alev animasyonu; tehlikedeyse titreme/renk değişimi
+- [x] **Seri Animasyonu** — seri sayısı artınca alev animasyonu; tehlikedeyse titreme/renk değişimi ✅
 - [ ] Seri freeze — önceden kazanılır, kaçırılan günü korur, max 2 adet
 - [ ] Seri repair — kaçırdıktan sonra kısa süre içinde ekstra okuyarak geri kazanma
 - [ ] Perfect Seri — freeze kullanmadan devam edince seri altın olur
