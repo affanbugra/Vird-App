@@ -10,6 +10,7 @@ import '../models/reading_log_model.dart';
 import '../data/quran_cuz.dart';
 import '../data/tilavet_secde.dart';
 import '../utils/hatim_calculator.dart';
+import '../utils/seri_calculator.dart';
 import 'log_history_sheet.dart';
 import '../services/notification_service.dart';
 
@@ -278,6 +279,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       final currentSeri = (userData?['seri'] as int?) ?? 0;
 
       final Map<String, dynamic> seriUpdate;
+      bool needsSeriRecalculate = false;
+
       if (lastLogDate != null && !lastLogDate.isBefore(today)) {
         // Bugün zaten okundu — seri değişmez
         seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
@@ -285,7 +288,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         // lastLogDate dün — seri uzuyor
         seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
       } else {
-        // lastLogDate null veya çok eski — dünkü loglara bak (migration için)
+        // lastLogDate null — dünkü loglara bak (migration / veri bozulması)
         final hadLogYesterday = lastLogDate == null
             ? await userRef.collection('logs')
                 .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
@@ -295,7 +298,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 .then((s) => s.docs.isNotEmpty)
             : false;
         if (hadLogYesterday) {
-          seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+          // Gerçek zincir uzunluğunu bilmiyoruz; commit sonrası recalculate hesaplar
+          needsSeriRecalculate = true;
+          seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
         } else {
           seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
         }
@@ -343,6 +348,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       await batch.commit();
       NotificationService.cancelForToday();
+
+      // lastLogDate null iken dünkü log bulunduysa — gerçek seri uzunluğunu hesapla
+      if (needsSeriRecalculate) {
+        await SeriCalculator.recalculate(user.uid);
+      }
 
       bool justCompleted = false;
       if (hatimId != null) {

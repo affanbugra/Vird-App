@@ -75,20 +75,23 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
           .collection('logs')
           .get();
 
-      // Toplam sayfa sayısını hesapla
+      // Sadece okuma loglarını işle (namaz/alışkanlık/secde logları dokunulmasın)
       int totalPages = 0;
       final Set<String> affectedHatimIds = {};
+      final List<DocumentSnapshot> readingLogDocs = [];
       for (var doc in logsSnap.docs) {
         final data = doc.data();
+        final type = data['type'] as String?;
+        if (type != 'arapca' && type != 'meal') continue;
+        readingLogDocs.add(doc);
         totalPages += (data['pagesRead'] as int?) ?? 0;
         final hatimId = data['hatimId'] as String?;
         if (hatimId != null) affectedHatimIds.add(hatimId);
       }
 
-      // Logları 400'lük batch'ler halinde sil
-      final docs = logsSnap.docs;
-      for (int i = 0; i < docs.length; i += 400) {
-        final chunk = docs.sublist(i, (i + 400).clamp(0, docs.length));
+      // Okuma loglarını 400'lük batch'ler halinde sil
+      for (int i = 0; i < readingLogDocs.length; i += 400) {
+        final chunk = readingLogDocs.sublist(i, (i + 400).clamp(0, readingLogDocs.length));
         final batch = db.batch();
         for (var doc in chunk) {
           batch.delete(doc.reference);

@@ -8,6 +8,7 @@ import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
 import 'ekip_gecmis_screen.dart';
+import '../utils/seri_calculator.dart';
 
 // ─── Veri modeli ───────────────────────────────────────────────────────────────
 
@@ -263,13 +264,17 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           periodHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
         }
 
+        final rawSeri = (data['seri'] as int?) ?? 0;
+        final lastLogTs = data['lastLogDate'] as Timestamp?;
+        final realSeri = seriDisplayState(rawSeri, lastLogTs).value;
+
         entries.add(_MemberEntry(
           uid: uid,
           name: data['name'] as String? ?? 'İsimsiz',
           username: data['username'] as String? ?? '',
           avatarSeed: data['avatarSeed'] as String?,
           periodHasanat: periodHasanat,
-          seri: (data['seri'] as int?) ?? 0,
+          seri: realSeri,
         ));
       }
 

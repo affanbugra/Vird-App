@@ -282,18 +282,40 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 10,
+              bottom: 8,
               right: 12,
-              child: GestureDetector(
-                onTap: onSettingsTap,
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: onVirdTap,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Image.asset(
+                        'assets/images/v_logo.png',
+                        height: 19,
+                        width: 19,
+                        color: Colors.white,
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.settings_outlined, color: Colors.white, size: 19),
-                ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: onSettingsTap,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.settings_outlined, color: Colors.white, size: 19),
+                    ),
+                  ),
+                ],
               ),
             ),
             Positioned(
@@ -419,14 +441,6 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                     ],
                   ],
-                ),
-              ),
-              GestureDetector(
-                onTap: onVirdTap,
-                child: Image.asset(
-                  'assets/images/vird_logo_seffaf.png',
-                  height: 38,
-                  width: 38,
                 ),
               ),
             ],
