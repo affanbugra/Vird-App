@@ -9,6 +9,11 @@
 - [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
+### Tamamlanan (2026-05-09)
+- [x] isDeveloper sistemi: UserProvider, DEV badge, developerTeamIds liderboard desteği ✅
+- [x] Seri 5 bug düzeltmesi: recalculate anchor-day, deleteAllLogs filtresi, seriDisplayState guard, migration path, liderboard seriDisplayState ✅
+- [x] Profil header: Vird logosu + ayarlar butonu banner sağ altına taşındı (v_logo.png) ✅
+
 ### Tamamlanan (2026-05-08)
 - [x] Nav yeniden yapılandırma: Alışkanlıklar tab eklendi, VİRD Ayarlar'a taşındı ✅
 - [x] Hatim ısı haritası secde tap düzeltmesi ✅

@@ -15,6 +15,7 @@ import '../services/notification_service.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
 import 'vird_screen.dart';
+import 'dev_panel_screen.dart';
 import '../utils/seri_calculator.dart';
 
 enum HeatTypeFilter { arapca, meal }
@@ -154,6 +155,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     isHafiz: isHafiz,
                     isDeveloper: isDeveloper,
                     onSettingsTap: () => _showSettings(context, data ?? {}, user),
+                    onDevTap: isDeveloper ? () => DevPanelScreen.show(context) : null,
                     onVirdTap: () => showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
@@ -243,6 +245,7 @@ class _ProfileHeader extends StatelessWidget {
   final bool isDeveloper;
   final VoidCallback onSettingsTap;
   final VoidCallback onVirdTap;
+  final VoidCallback? onDevTap;
 
   const _ProfileHeader({
     required this.name,
@@ -255,6 +258,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.isDeveloper,
     required this.onSettingsTap,
     required this.onVirdTap,
+    this.onDevTap,
   });
 
   @override
@@ -401,18 +405,21 @@ class _ProfileHeader extends StatelessWidget {
                         ],
                         if (isDeveloper) ...[
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'DEV',
-                              style: GoogleFonts.nunito(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                          GestureDetector(
+                            onTap: onDevTap,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'DEV',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),

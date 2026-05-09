@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-08 — son güncelleme: Liderboard iyileştirmeleri + nav yeniden yapılandırma)
+## Genel Durum (2026-05-09 — son güncelleme: isDeveloper sistemi + Seri 5 bug düzeltmesi + Profil header yeniden tasarımı)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -43,6 +43,43 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — isDeveloper Sistemi + Seri Bug Düzeltmeleri + Profil Header (2026-05-09)
+
+#### isDeveloper Sistemi (commit 456f7dc)
+
+- **`lib/providers/user_provider.dart`** — Yeni `UserProvider` eklendi. `isDeveloper: bool` ve `developerTeamIds: List<String>` alanları user doc'tan okunur.
+- **`lib/main.dart`** — `UserProvider` `MultiProvider`'a eklendi.
+- **Profil ekranı (`profil_screen.dart`)** — Kullanıcı `isDeveloper: true` ise `DEV` badge'i profil başlığında gösterilir.
+- **Liderboard (`ekip_profil_screen.dart`)** — `developerTeamIds` alanına sahip developer kullanıcılar, kendi `teamId`'lerinden farklı ekiplerin liderboardunda da görünebilir.
+- **Vird sekmesi (`vird_screen.dart`)** — Yol haritası listesinin alt kısmı giderek solar (fade efekti); Ramazan kartı ~0.08 opaklıkta.
+
+#### Seri Sistemi — 5 Bug Düzeltmesi (commit f0deef9)
+
+**Kök sorunlar:**
+1. `recalculate()` bugün log yokken çağrılınca seri=0 veriyordu (bugünden geriye sayıyor, bugün yoksa hemen duruyordu).
+2. `deleteAllLogs` prayer/habit/tilavet_secde loglarını da siliyordu.
+3. `seriDisplayState()` `stored==0` iken atRisk hesabı yapıyordu.
+4. Migration path: `lastLogDate==null` olan kullanıcılarda seri her zaman 1'e sıfırlanıyordu.
+5. Liderboard'da saklanan ham seri değeri gösteriliyordu — `seriDisplayState()` uygulanmıyordu.
+
+**Düzeltmeler:**
+
+- **`utils/seri_calculator.dart` — `seriDisplayState()`**: `stored==0` iken erken `(value:0, atRisk:false)` döndürme eklendi.
+- **`utils/seri_calculator.dart` — `recalculate()`**: Anchor-day algoritması. Önce en son log günü bulunur (bugünden geriye tarama), ardından o anchor'dan geriye ardışık günler sayılır. Bugün log olmasa bile dünkü log anchor alınır, seri korunur.
+- **`widgets/log_history_sheet.dart` — `_deleteAllLogs()`**: Sadece `type=='arapca'` veya `type=='meal'` olan loglar silinir. Prayer/habit/tilavet_secde loglarına dokunulmaz.
+- **`widgets/log_entry_bottom_sheet.dart` — migration path**: `lastLogDate==null && hadLogYesterday` durumunda batch'e seri yazmak yerine `SeriCalculator.recalculate()` çağrılır. Multi-day seri doğru hesaplanır.
+- **`screens/ekip_profil_screen.dart` — liderboard**: `_loadLeaderboard`'da ham `seri` değerine `seriDisplayState(rawSeri, lastLogTs)` uygulandı. Stale Firestore değerleri görüntüde gerçek zamanlı düzeltilir.
+
+#### Profil Header Yeniden Tasarımı
+
+- **Ayarlar butonu** banner sağ üstünden (`Positioned(top:10, right:12)`) → **banner sağ altına** (`Positioned(bottom:8, right:12)`) taşındı.
+- **Vird logosu butonu** ayarların soluna eklendi (`v_logo.png`, `color: Colors.white, colorBlendMode: BlendMode.srcIn`).
+- Her iki buton aynı stil: `BoxShape.circle`, `Colors.white.withValues(alpha:0.18)` zemin, `padding: 7`, ikon/logo boyutu `19`.
+- `Image.asset(color:, colorBlendMode:)` kullanıldı — `ColorFiltered` PNG'de offscreen layer yaratarak beyaz arka plan gösteriyordu.
+- Info satırındaki pill kapsayıcı kaldırıldı.
+
+---
 
 ### Oturum — VirdScreen + Liderboard Son Güncellemeler (2026-05-08)
 

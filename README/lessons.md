@@ -32,8 +32,42 @@ updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
 ### JPEG'de alpha yok → logo tinting çalışmaz
 `ColorFiltered(colorFilter: ColorFilter.mode(color, BlendMode.srcIn))` JPEG'de siyah/boş kutu döner çünkü alpha kanalı yok. Logo aktif/pasif görünümü için `Opacity` widget'ı kullan.
 
+### PNG tinting: `ColorFiltered` yerine `Image.asset(color:)` kullan
+Alpha kanallı PNG'de bile `ColorFiltered(BlendMode.srcIn)` offscreen kompozit layer oluşturur — bu layer beyaz arka planla birleşince logo arkasında beyaz görünür.
+
+**Çözüm:** `Image.asset` parametrelerini kullan:
+```dart
+Image.asset(
+  'assets/images/v_logo.png',
+  height: 19, width: 19,
+  color: Colors.white,
+  colorBlendMode: BlendMode.srcIn,
+)
+```
+Bu yöntem renk filtresini doğrudan image pipeline'da uygular, offscreen layer yaratmaz.
+
 ### Hot reload asset eklemez
 Yeni asset (`pubspec.yaml` + dosya) eklenince hot reload görmez. `flutter clean` + `flutter run` gerekli.
+
+### `SeriCalculator.recalculate()` — anchor-day algoritması
+Bugünden geriye sayarak seri hesaplamak, bugün log yoksa seriyi yanlışlıkla sıfırlar (kullanıcı dünkü logunu bugün silerken bile seri kırılır).
+
+**Doğru yaklaşım:** Önce en son log gününü bul (anchor), sonra anchor'dan geriye ardışık günleri say:
+```dart
+// 1. Anchor bul — bugünden geriye ilk log günü
+DateTime? mostRecentLogDay;
+for (int i = 0; i <= 90; i++) {
+  final d = todayMidnight.subtract(Duration(days: i));
+  if (logDayKeys.contains('${d.year}-${d.month}-${d.day}')) {
+    mostRecentLogDay = d;
+    break;
+  }
+}
+// 2. Anchor'dan geriye ardışık günleri say
+final anchorOffset = todayMidnight.difference(mostRecentLogDay!).inDays;
+for (int i = anchorOffset; i <= 90; i++) { ... }
+```
+Bu sayede bugün log olmasa da dünkü log anchor alınır, seri doğru korunur. `seriDisplayState()` buna göre `atRisk:true` döndürür.
 
 ### DraggableScrollableSheet ve setState çakışması (Beyaz Ekran / Flash)
 `DraggableScrollableSheet` içerisinde karmaşık bir widget ağacı ve `StreamBuilder` varken en üstte `setState` çağrıldığında tüm sheet sıfırdan hesaplanmaya çalışıp beyaz ekran / height jump sorunlarına sebep olur.
