@@ -9,6 +9,14 @@
 - [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
+### Tamamlanan (2026-05-11)
+- [x] **Seri animasyonu Firestore index hatası** — `whereIn` kaldırıldı, client-side tip filtresi eklendi; `_getWeekFilled` ayrı try-catch'e alındı ✅
+- [x] **`recalculate()` yanlış log tipi sayma** — namaz/alışkanlık logları artık Quran serisi için sayılmıyor ✅
+- [x] **Auth düzeltmeleri** — Google auth ve kayıt ekranında auth/Firestore write ayrı try-catch; `unauthorized-domain`, `popup-blocked` Türkçe hata mesajları ✅
+- [x] **Geçmiş Sıralamalar yeniden tasarımı** — liderboard ile aynı stil, madalya, renk kuralları, ⚠️ <100 Puan filtresi ✅
+- [x] **Avatar baş harf sistemi** — `nameInitials()` utility, 2+ kelimeli isimde AB formatı, 5 dosyada tutarlı ✅
+- [x] **Ekip sıralamalarında username kaldırıldı** — liderboard ve geçmiş sıralamalar ✅
+
 ### Tamamlanan (2026-05-09)
 - [x] **Seri animasyonu ekranı** — StreakAnimationScreen (CustomPainter alev, whip arkleri, haftalık takvim, motivasyon mesajları, elastic pill, parabolic arc token) ✅
 - [x] DevPanel arşiv görünümü — `_ArchiveView` StatefulWidget, BUGS/TO-DO sekmeleri, unarchive ✅

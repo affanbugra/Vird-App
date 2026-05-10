@@ -36,6 +36,8 @@ class SeriCalculator {
 
     final logDayKeys = <String>{};
     for (final doc in snap.docs) {
+      final type = doc.data()['type'] as String?;
+      if (type != 'arapca' && type != 'meal') continue;
       final ts = doc.data()['createdAt'] as Timestamp?;
       if (ts != null) {
         final d = ts.toDate().toLocal();

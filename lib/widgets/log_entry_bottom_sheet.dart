@@ -391,7 +391,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       ({List<bool> filled, List<String> labels})? weekData;
       if (shouldShowAnimation && mounted) {
-        weekData = await _getWeekFilled(user.uid);
+        try {
+          weekData = await _getWeekFilled(user.uid);
+        } catch (e) {
+          debugPrint('Seri animasyonu yüklenemedi: $e');
+        }
       }
       // ─────────────────────────────────────────────────────────────────
 
@@ -442,13 +446,14 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         .collection('users')
         .doc(uid)
         .collection('logs')
-        .where('type', whereIn: ['arapca', 'meal'])  // Bug 3: sadece okuma logları
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
         .get();
 
     final loggedDays = <String>{};
     for (final doc in snap.docs) {
-      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate().toLocal(); // Bug 2
+      final type = doc.data()['type'] as String?;
+      if (type != 'arapca' && type != 'meal') continue;
+      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate().toLocal();
       if (d != null) {
         loggedDays.add('${d.year}-${d.month}-${d.day}');
       }

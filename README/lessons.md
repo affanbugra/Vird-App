@@ -225,6 +225,64 @@ final key = (field ?? '').replaceAll('"', '').trim();
 if (key.startsWith('rical_i_fark')) { ... }
 ```
 
+### `whereIn` + range filter → composite index zorunluluğu
+`whereIn('type', ['arapca', 'meal'])` ile birlikte `createdAt` range filter kullanmak Firestore'da composite index gerektirir. Index oluşturulmamışsa `[cloud_firestore/failed-precondition]` hatası alınır ve query çalışmaz.
+
+**Çözüm:** `whereIn`'i Firestore'dan kaldır, filtrele:
+```dart
+final snap = await FirebaseFirestore.instance
+    .collection('users').doc(uid).collection('logs')
+    .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
+    .get();
+for (final doc in snap.docs) {
+  final type = doc.data()['type'] as String?;
+  if (type != 'arapca' && type != 'meal') continue;
+  // ...
+}
+```
+Bu yaklaşım hem index gerektirmez hem de ekstra network çağrısı yapmaz — küçük koleksiyonlarda tercih edilir.
+
+### Navigation engelleyen async işlemi try-catch ile izole et
+`await` çağrısı `Navigator.pop(context)`'ten önce geliyorsa, exception olduğunda navigation hiç çalışmaz ve ekran (veya sheet) açık kalır.
+
+**Kural:** Navigation'ı engelleyebilecek her opsiyonel async işlemi kendi try-catch bloğuna al:
+```dart
+// ❌ Yanlış — exception Navigator.pop'u atlatır
+final weekData = await _getWeekFilled(uid);
+Navigator.pop(context);
+
+// ✅ Doğru — hata sadece animasyonu atlar
+dynamic weekData;
+try {
+  weekData = await _getWeekFilled(uid);
+} catch (e) {
+  debugPrint('animasyon yüklenemedi: $e');
+}
+Navigator.pop(context);  // her durumda çalışır
+```
+
+### Auth ve Firestore yazısını ayrı try-catch bloklarına ayır
+Kayıt akışında auth ve profil Firestore yazısı aynı try-catch içindeyse, Firestore başarısız olduğunda kullanıcı kayıt hatasıyla karşılaşır — oysa auth zaten başarılıdır. Kullanıcı tekrar denerse "e-posta zaten kullanımda" hatası alır.
+
+**Kural:** Auth ve Firestore yazısını her zaman ayrı try-catch bloklarına al:
+```dart
+// Auth bloğu
+try {
+  await authProvider.registerWithEmail(email, password);
+} catch (e) {
+  showSnackBar(_parseAuthError(e));
+  return;  // burada dur
+}
+
+// Profil yazısı — auth başarılı, hata olsa bile devam et
+try {
+  await firestore.collection('users').doc(uid).set({...});
+} catch (e) {
+  debugPrint('Profil yazma hatası: $e');
+}
+// ProfileSetupScreen'e geç
+```
+
 ### `logs` subcollection okuma kuralı ve liderboard
 `users/{uid}/logs` subcollection'ını yalnızca `isOwner()` ile kısıtlarsan liderboard için başka kullanıcıların loglarını okumak `Permission Denied` hatası verir ve kullanıcı 0 puan görünür. Liderboard gibi cross-user okuma gerektiren senaryolarda `isAuth()` yeterli:
 ```javascript

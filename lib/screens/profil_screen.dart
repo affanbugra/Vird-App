@@ -8,6 +8,7 @@ import '../app_colors.dart';
 import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
+import '../utils/name_utils.dart';
 import '../widgets/duolingo_button.dart';
 import '../widgets/log_history_sheet.dart';
 import '../widgets/seri_calendar_sheet.dart';
@@ -350,7 +351,7 @@ class _ProfileHeader extends StatelessWidget {
                       : null,
                   child: avatarSeed == null
                       ? Text(
-                          name.isNotEmpty ? name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase() : '?',
+                          nameInitials(name),
                           style: GoogleFonts.nunito(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,

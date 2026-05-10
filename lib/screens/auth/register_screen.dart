@@ -22,8 +22,12 @@ String _parseAuthError(dynamic e) {
       case 'popup-closed-by-user':
       case 'cancelled-by-user':
         return 'Google girişi iptal edildi.';
+      case 'unauthorized-domain':
+        return 'Bu alan adı Google girişi için yetkilendirilmemiş. Firebase Console\'dan ekleyin.';
+      case 'popup-blocked':
+        return 'Açılır pencere engellendi. Tarayıcı ayarlarını kontrol edin.';
       default:
-        return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+        return 'Bir hata oluştu: ${e.code}. Lütfen tekrar deneyin.';
     }
   }
   return 'Bir hata oluştu. Lütfen tekrar deneyin.';
@@ -65,9 +69,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
     try {
       await context.read<AuthProvider>().registerWithEmail(email, password);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_parseAuthError(e))),
+        );
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
+    // Auth başarılı — profil yazma hatası kullanıcıyı engellemesin
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
         await user.updateDisplayName(name);
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': name,
@@ -81,24 +96,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'totalPages': 0,
           'hatimCount': 0,
         });
+      } catch (e) {
+        debugPrint('Profil Firestore yazma hatası: $e');
       }
+    }
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProfileSetupScreen(name: name),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_parseAuthError(e))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileSetupScreen(name: name),
+        ),
+      );
     }
   }
 

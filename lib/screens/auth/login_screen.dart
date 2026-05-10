@@ -24,8 +24,12 @@ String _parseAuthError(dynamic e) {
       case 'popup-closed-by-user':
       case 'cancelled-by-user':
         return 'Google girişi iptal edildi.';
+      case 'unauthorized-domain':
+        return 'Bu alan adı Google girişi için yetkilendirilmemiş. Firebase Console\'dan ekleyin.';
+      case 'popup-blocked':
+        return 'Açılır pencere engellendi. Tarayıcı ayarlarını kontrol edin.';
       default:
-        return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+        return 'Bir hata oluştu: ${e.code}. Lütfen tekrar deneyin.';
     }
   }
   return 'Bir hata oluştu. Lütfen tekrar deneyin.';

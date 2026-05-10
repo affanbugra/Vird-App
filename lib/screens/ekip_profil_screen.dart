@@ -8,6 +8,7 @@ import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
 import 'ekip_gecmis_screen.dart';
+import '../utils/name_utils.dart';
 import '../utils/seri_calculator.dart';
 
 // ─── Veri modeli ───────────────────────────────────────────────────────────────
@@ -1003,7 +1004,7 @@ class _RequestRow extends StatelessWidget {
                 : null,
             child: avatarSeed == null
                 ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    nameInitials(name),
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -1553,9 +1554,7 @@ class _LeaderboardRow extends StatelessWidget {
                 : null,
             child: entry.avatarSeed == null
                 ? Text(
-                    entry.name.isNotEmpty
-                        ? entry.name.substring(0, 1).toUpperCase()
-                        : '?',
+                    nameInitials(entry.name),
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -1598,14 +1597,6 @@ class _LeaderboardRow extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    if (entry.username.isNotEmpty)
-                      Text(
-                        '@${entry.username}',
-                        style: GoogleFonts.nunito(
-                            fontSize: 11, color: AppColors.textLight),
-                      ),
-                    if (entry.username.isNotEmpty && seriDisplayState(entry.rawSeri, entry.lastLogTs).value > 0)
-                      const SizedBox(width: 6),
                     Builder(builder: (context) {
                       final ss = seriDisplayState(entry.rawSeri, entry.lastLogTs);
                       if (ss.value <= 0) return const SizedBox.shrink();

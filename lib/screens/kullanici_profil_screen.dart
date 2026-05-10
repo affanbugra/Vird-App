@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
 import '../data/quran_cuz.dart';
+import '../utils/name_utils.dart';
 import '../utils/seri_calculator.dart';
 
 String _fmt(int n) {
@@ -268,11 +269,7 @@ class _UserHeader extends StatelessWidget {
                   : null,
               child: avatarSeed == null
                   ? Text(
-                      name.isNotEmpty
-                          ? name
-                              .substring(0, name.length >= 2 ? 2 : 1)
-                              .toUpperCase()
-                          : '?',
+                      nameInitials(name),
                       style: GoogleFonts.nunito(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,

@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-10 — son güncelleme: Seri + ekip bug düzeltmeleri, web deploy)
+## Genel Durum (2026-05-11 — son güncelleme: Seri animasyonu + auth + geçmiş sıralamalar + avatar baş harf sistemi)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -43,6 +43,69 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — Seri Animasyonu + Auth + Geçmiş Sıralamalar + Avatar Baş Harf (2026-05-11)
+
+#### Seri Animasyonu Bug Düzeltmeleri (`log_entry_bottom_sheet.dart`, `seri_calculator.dart`)
+
+**3 kök neden bulunup düzeltildi:**
+
+1. **Firestore composite index hatası** — `_getWeekFilled`, `whereIn('type', [...])` + `createdAt` range filter kombinasyonu kullandığından `[cloud_firestore/failed-precondition]` hatası veriyordu. `whereIn` Firestore'dan kaldırıldı, client-side tip filtresi eklendi.
+2. **`Navigator.pop` hiç çağrılmıyor** — `_getWeekFilled` await, `Navigator.pop`'tan önce geliyordu. Exception olunca sheet açık kalıyordu. `_getWeekFilled` ayrı try-catch bloğuna alındı; hata sadece animasyonu atlar, sheet her durumda kapanır.
+3. **`recalculate()` namaz/alışkanlık loglarını sayıyordu** — `seri_calculator.dart`'ta Quran log filtresi yoktu. `type == 'arapca' || type == 'meal'` client-side filtresi eklendi.
+
+#### Auth Düzeltmeleri
+
+**Google Sign-In (`auth_service.dart`):**
+- Yeni kullanıcı Firestore yazısı try-catch içine alındı. Firestore hatası auth akışını engellemiyordu zaten, ama hata mesajı olmadan sessizce geçiyordu. Artık `debugPrint` ile loglanıyor.
+
+**Kayıt Ekranı (`register_screen.dart`):**
+- Auth ve Firestore profil yazısı ayrı try-catch bloklarına ayrıldı. Auth başarısız → hata göster, ekranda kal. Auth başarılı + Firestore başarısız → sadece `debugPrint`, `ProfileSetupScreen`'e geç.
+- `unauthorized-domain` ve `popup-blocked` hata kodları için Türkçe mesajlar eklendi. Varsayılan hata artık error code'u da gösteriyor.
+
+**Giriş Ekranı (`login_screen.dart`):**
+- Aynı ek hata kodları (`unauthorized-domain`, `popup-blocked`, daha açıklayıcı default) eklendi.
+
+#### Geçmiş Sıralamalar Yeniden Tasarımı (`ekip_gecmis_screen.dart`)
+
+Sade ListTile tabanlı yapıdan liderboard ile özdeş görsel stile tam geçiş:
+
+- **`_GecmisWeekCard`** (StatefulWidget): Her hafta için ayrı `_showLow` filtre state'i. ExpansionTile ile açılıp kapanıyor. İlk hafta `initiallyExpanded: true`.
+- **`_GecmisRow`** (StatelessWidget): Liderboard satırıyla birebir aynı renk mantığı:
+  - `isDeepRed`: filtredeyken hasanat == 0 → `errorRed` alpha 0.48
+  - `isRed`: kırmızı bölge (son 3) veya filtre aktif
+  - `isTop`: filtre yokken ilk 3 → yeşil arka plan + 🥇🥈🥉
+  - DiceBear avatar, gold hasanat gösterimi
+- **`_FilterChip`**: ⚠️ <100 Puan toggle — filtre aktifken "X / Y kişi" subtitle'ı
+- "Herkes bu hafta 100 puanı aştı 🎉" boş durum mesajı
+- Satıra tıklama → `KullaniciProfilScreen`
+
+#### Avatar Baş Harf Sistemi (`lib/utils/name_utils.dart`)
+
+**Yeni paylaşılan utility fonksiyon:**
+```dart
+String nameInitials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length >= 2 && parts[1].isNotEmpty) {
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+  return name.isEmpty ? '?' : name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+}
+```
+
+**5 dosyada güncellendi:** `profil_screen.dart`, `kullanici_profil_screen.dart`, `ekip_profil_screen.dart` (2 yer), `ekip_gecmis_screen.dart`
+
+| Örnek | Eskisi | Yenisi |
+|---|---|---|
+| "Affan Buğra" | AF (ya da A) | AB |
+| "Affan Buğra Özaytaş" | AF (ya da A) | AB |
+| "Mustafa" (tek kelime) | M | MU |
+
+#### Ekip Sıralamalarında Username Kaldırıldı
+
+`_LeaderboardRow` (`ekip_profil_screen.dart`) ve `_GecmisRow` (`ekip_gecmis_screen.dart`) içindeki `@username` gösterimi kaldırıldı. `_RequestRow` (üyelik istekleri paneli) değişmedi.
+
+---
 
 ### Oturum — Seri + Ekip Bug Düzeltmeleri, Web Deploy (2026-05-10)
 

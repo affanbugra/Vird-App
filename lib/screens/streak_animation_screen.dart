@@ -19,7 +19,7 @@ const _kMessages = [
   (min: 2, max: 4, msgs: [
     '{X}. günün hayırlı olsun! Alev sönmedi, devam ediyor 🔥',
     'Bugün de geldin. Maşallah! Allah nazardan korusun.',
-    '{X} gün üst üste — "Allah\'a en sevimli ameller, az da olsa devamlı olanlarıdır." Sen o yoldasın.',
+    '{X} gün üst üste — "Allah katında amellerin en sevimlis, az da olsa devamlı olanıdır." Sen o yoldasın.',
     '{X}. gün! Kendine maşallah demeyi unutma, çok iyi gidiyorsun.',
   ]),
   // range 5-10

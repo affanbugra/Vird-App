@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -42,19 +42,24 @@ class AuthService {
       if (cred.additionalUserInfo?.isNewUser == true) {
         final user = cred.user;
         if (user != null) {
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-            'name': user.displayName ?? '',
-            'email': user.email ?? '',
-            'city': '',
-            'university': '',
-            'createdAt': FieldValue.serverTimestamp(),
-            'isPro': false,
-            'proExpiresAt': null,
-            'hasanat': 0,
-            'seri': 0,
-            'totalPages': 0,
-            'hatimCount': 0,
-          });
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+              'name': user.displayName ?? '',
+              'email': user.email ?? '',
+              'city': '',
+              'university': '',
+              'createdAt': FieldValue.serverTimestamp(),
+              'isPro': false,
+              'proExpiresAt': null,
+              'hasanat': 0,
+              'seri': 0,
+              'totalPages': 0,
+              'hatimCount': 0,
+            });
+          } catch (e) {
+            // Firestore yazma hatası auth'u engellemesin — profil daha sonra tamamlanabilir
+            debugPrint('Google yeni kullanıcı Firestore hatası: $e');
+          }
         }
       }
       return cred;
