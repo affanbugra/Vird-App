@@ -6,7 +6,6 @@ const _kAccent      = Color(0xFFF5A623);
 const _kFgSoft      = Color(0x8C1F1B14);
 const _kCheckColor  = Color(0xFF2B1610);
 const _kTodayOrange = Color(0xFFE8821C);
-const _kDayLabels   = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
 // Mesajlar streak_messages.json'dan — {X} placeholder'ı gerçek sayıyla değiştirilir
 const _kMessages = [
@@ -61,8 +60,9 @@ String _getMotivation(int count) {
 class StreakAnimationScreen extends StatefulWidget {
   final int count;
   final int? prevCount;
-  final List<bool> filled;   // 7 booleans Mon→Sun
-  final int todayIndex;      // 0=Pzt … 6=Paz
+  final List<bool> filled;      // 7 boolean — son 7 gün, index 6 = bugün
+  final int todayIndex;         // filled içinde bugünün indeksi (daima 6)
+  final List<String> dayLabels; // 7 gün etiketi — dinamik, hafta sınırından bağımsız
   final String ctaLabel;
 
   const StreakAnimationScreen({
@@ -71,6 +71,7 @@ class StreakAnimationScreen extends StatefulWidget {
     this.prevCount,
     required this.filled,
     required this.todayIndex,
+    required this.dayLabels,
     this.ctaLabel = 'Mâşâallah, devam et',
   });
 
@@ -80,6 +81,7 @@ class StreakAnimationScreen extends StatefulWidget {
     int? prevCount,
     required List<bool> filled,
     required int todayIndex,
+    required List<String> dayLabels,
     String ctaLabel = 'Mâşâallah, devam et',
   }) =>
       Navigator.of(context).push(PageRouteBuilder(
@@ -89,6 +91,7 @@ class StreakAnimationScreen extends StatefulWidget {
           prevCount: prevCount,
           filled: filled,
           todayIndex: todayIndex,
+          dayLabels: dayLabels,
           ctaLabel: ctaLabel,
         ),
         transitionsBuilder: (_, anim, _, child) =>
@@ -311,6 +314,7 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
                 filled: widget.filled,
                 todayIndex: widget.todayIndex,
                 accent: _kAccent,
+                dayLabels: widget.dayLabels,
               ),
             ),
 
@@ -761,11 +765,13 @@ class _DayRow extends StatefulWidget {
   final List<bool> filled;
   final int todayIndex;
   final Color accent;
+  final List<String> dayLabels; // dinamik gün etiketleri
 
   const _DayRow({
     required this.filled,
     required this.todayIndex,
     required this.accent,
+    required this.dayLabels,
   });
 
   @override
@@ -867,7 +873,7 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
               return SizedBox(
                 width: cellW,
                 child: Text(
-                  _kDayLabels[i],
+                  widget.dayLabels[i], // Bug 5: dinamik etiket
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,

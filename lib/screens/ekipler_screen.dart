@@ -118,6 +118,7 @@ class _EkiplerBody extends StatelessWidget {
       ),
       builder: (_) => _InviteCodeSheet(
         uid: uid,
+        isDeveloper: isDeveloper,
         onTeamFound: (teamId) => Navigator.push(
           context,
           MaterialPageRoute(
@@ -646,9 +647,10 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
 
 class _InviteCodeSheet extends StatefulWidget {
   final String uid;
+  final bool isDeveloper;
   final void Function(String teamId) onTeamFound;
 
-  const _InviteCodeSheet({required this.uid, required this.onTeamFound});
+  const _InviteCodeSheet({required this.uid, required this.isDeveloper, required this.onTeamFound});
 
   @override
   State<_InviteCodeSheet> createState() => _InviteCodeSheetState();
@@ -683,7 +685,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
       // 1. Önce kullanıcının zaten bir ekipte olup olmadığını kontrol et
       final userDoc = await db.collection('users').doc(widget.uid).get();
       final userData = userDoc.data() ?? {};
-      if (userData['teamId'] != null) {
+      if (!widget.isDeveloper && userData['teamId'] != null) {
         if (mounted) {
           setState(() { _error = 'Zaten bir ekiptesin. Önce mevcut ekibinden ayrıl.'; _isLoading = false; });
         }
@@ -708,10 +710,16 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
 
       // 3. Kullanıcıyı ekibe kat (teamId güncelle + memberCount artır)
       final batch = db.batch();
-      batch.update(db.collection('users').doc(widget.uid), {
-        'teamId': teamId,
-        'teamJoinedAt': FieldValue.serverTimestamp(),
-      });
+      if (widget.isDeveloper) {
+        batch.update(db.collection('users').doc(widget.uid), {
+          'developerTeamIds': FieldValue.arrayUnion([teamId]),
+        });
+      } else {
+        batch.update(db.collection('users').doc(widget.uid), {
+          'teamId': teamId,
+          'teamJoinedAt': FieldValue.serverTimestamp(),
+        });
+      }
       batch.update(db.collection('teams').doc(teamId), {
         'memberCount': FieldValue.increment(1),
       });
