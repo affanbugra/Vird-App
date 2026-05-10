@@ -64,6 +64,14 @@
 - **Başkasının profilinde seri durumu eksikti (`lib/screens/kullanici_profil_screen.dart`):** `lastLogDate` okunup `seriDisplayState()` çağrılmıyordu. Artık kendi profilindeki gibi kırmızı + "TEHLİKEDE" etiketi gösteriliyor
 - **Liderboard seri dinamik güncellenmiyordu (`lib/screens/ekip_profil_screen.dart`):** `_MemberEntry` artık `rawSeri` + `lastLogTs` saklıyor; `_LeaderboardRow.build()` her render'da `seriDisplayState()` çağırıyor — ekran açık kalsa da gece yarısı seri otomatik düşüyor
 
+#### Liderboard <100 Puan Filtresi (`ekip_profil_screen.dart`)
+- Chip satırında "⚠️ <100 Puan" toggle butonu eklendi (kırmızı, sağ tarafta)
+- Filtre açılınca otomatik "Puan" sıralamasına geçer; seri ile aynı anda çalışmaz
+- Filtre aktifken ilk 3 yeşil arka plan kaldırılır — liste tamamen kırmızı
+- **0 puan:** koyu kırmızı arka plan (alpha 0.48) + güçlü border (alpha 0.85)
+- **1–99 puan:** açık pembe arka plan (`errorBg`) + hafif border — görsel kontrast belirgin
+- Sayaç filtre açıkken "X / Y kişi" formatında gösterilir
+
 #### Firestore Şeması Notu
 - `developerTeamIds: List<String>` alanı olan developer kullanıcılar `teamId` ile aynı anda birden fazla ekipte bulunabilir
 - Liderboard her iki alanı da sorgular ve deduplication yapar

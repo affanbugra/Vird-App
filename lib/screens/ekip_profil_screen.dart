@@ -1194,6 +1194,7 @@ class _LeaderboardSection extends StatefulWidget {
 
 class _LeaderboardSectionState extends State<_LeaderboardSection> {
   _SortMode _sortMode = _SortMode.puan;
+  bool _showLow = false;
 
   String _fmtDuration(Duration d) {
     if (d.inDays > 0) {
@@ -1240,9 +1241,21 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
     return list;
   }
 
+  List<_MemberEntry> get _displayed {
+    final s = _sorted;
+    if (!_showLow) return s;
+    return s.where((e) => e.periodHasanat < 100).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final memberCount = widget.loading ? '' : ' · ${widget.leaderboard.length} üye';
+    final total = widget.leaderboard.length;
+    final shown = _showLow ? _displayed.length : total;
+    final memberCount = widget.loading
+        ? ''
+        : _showLow
+            ? ' · $shown / $total kişi'
+            : ' · $total üye';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1297,6 +1310,16 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
               label: '🔥 Seri',
               selected: _sortMode == _SortMode.seri,
               onTap: () => setState(() => _sortMode = _SortMode.seri),
+            ),
+            const Spacer(),
+            _SortChip(
+              label: '⚠️ <100 Puan',
+              selected: _showLow,
+              selectedColor: AppColors.errorRed,
+              onTap: () => setState(() {
+                _showLow = !_showLow;
+                if (_showLow) _sortMode = _SortMode.puan;
+              }),
             ),
           ],
         ),
@@ -1361,16 +1384,20 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
   }
 
   Widget _buildList() {
-    final sorted = _sorted;
+    final sorted = _displayed;
     final count = sorted.length;
-    final showRedZone = count > 3;
+    final showRedZone = !_showLow && count > 3;
     final redStartIdx = count - 3;
 
     return Column(
       children: List.generate(count, (i) {
         final entry = sorted[i];
-        final isTop = i < 3;
-        final isRed = entry.periodHasanat == 0 || (!isTop && showRedZone && i >= redStartIdx);
+        final isTop = !_showLow && i < 3;
+        final isDeepRed = _showLow && entry.periodHasanat == 0;
+        final isRed = isDeepRed ||
+            entry.periodHasanat == 0 ||
+            _showLow ||
+            (!isTop && showRedZone && i >= redStartIdx);
         final isMe = entry.uid == widget.currentUid;
 
         return GestureDetector(
@@ -1380,6 +1407,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
             entry: entry,
             isTop: isTop,
             isRed: isRed,
+            isDeepRed: isDeepRed,
             isMe: isMe,
             fmtHasanat: _fmtHasanat,
           ),
@@ -1393,25 +1421,28 @@ class _SortChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color? selectedColor;
 
   const _SortChip({
     required this.label,
     required this.selected,
     required this.onTap,
+    this.selectedColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = selectedColor ?? AppColors.teal;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.teal : AppColors.lightGrey,
+          color: selected ? activeColor : AppColors.lightGrey,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppColors.teal : AppColors.borderGrey,
+            color: selected ? activeColor : AppColors.borderGrey,
           ),
         ),
         child: Text(
@@ -1434,6 +1465,7 @@ class _LeaderboardRow extends StatelessWidget {
   final _MemberEntry entry;
   final bool isTop;
   final bool isRed;
+  final bool isDeepRed;
   final bool isMe;
   final String Function(int) fmtHasanat;
 
@@ -1442,6 +1474,7 @@ class _LeaderboardRow extends StatelessWidget {
     required this.entry,
     required this.isTop,
     required this.isRed,
+    this.isDeepRed = false,
     required this.isMe,
     required this.fmtHasanat,
   });
@@ -1460,6 +1493,7 @@ class _LeaderboardRow extends StatelessWidget {
   }
 
   Color get _bgColor {
+    if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.48);
     if (isRed) return AppColors.errorBg;
     if (rank == 1) return AppColors.successBg;
     if (rank == 2) return AppColors.successBg.withValues(alpha: 0.6);
@@ -1468,6 +1502,7 @@ class _LeaderboardRow extends StatelessWidget {
   }
 
   Color get _borderColor {
+    if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.85);
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
     if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.3);
