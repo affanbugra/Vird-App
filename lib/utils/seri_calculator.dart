@@ -4,7 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// value  : gösterilecek seri sayısı
 /// atRisk : true ise dün okundu, bugün henüz okuma yok
 ({int value, bool atRisk}) seriDisplayState(int stored, Timestamp? lastLogTs) {
-  if (lastLogTs == null || stored == 0) return (value: stored, atRisk: false);
+  // lastLogDate hiç yazılmamışsa (migration / veri bozulması) —
+  // serinin ne zaman kırıldığını bilemeyiz; stored > 0 ise tehlikede say.
+  if (lastLogTs == null) return (value: stored, atRisk: stored > 0);
+  if (stored == 0) return (value: 0, atRisk: false);
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final yesterday = today.subtract(const Duration(days: 1));
@@ -22,7 +25,7 @@ class SeriCalculator {
     final db = FirebaseFirestore.instance;
     final now = DateTime.now();
     final todayMidnight = DateTime(now.year, now.month, now.day);
-    final cutoff = todayMidnight.subtract(const Duration(days: 90));
+    final cutoff = todayMidnight.subtract(const Duration(days: 365));
 
     final snap = await db
         .collection('users')
@@ -42,7 +45,7 @@ class SeriCalculator {
 
     // Önce en son log gününü bul (bugünden geriye)
     DateTime? mostRecentLogDay;
-    for (int i = 0; i <= 90; i++) {
+    for (int i = 0; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
       final key = '${d.year}-${d.month}-${d.day}';
       if (logDayKeys.contains(key)) {
@@ -62,7 +65,7 @@ class SeriCalculator {
     // En son log gününden geriye ardışık günleri say
     int seri = 0;
     final anchorOffset = todayMidnight.difference(mostRecentLogDay).inDays;
-    for (int i = anchorOffset; i <= 90; i++) {
+    for (int i = anchorOffset; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
       final key = '${d.year}-${d.month}-${d.day}';
       if (logDayKeys.contains(key)) {

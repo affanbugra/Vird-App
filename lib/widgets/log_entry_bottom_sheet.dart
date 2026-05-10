@@ -276,8 +276,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final yesterday = today.subtract(const Duration(days: 1));
-      final lastLogDate = (userData?['lastLogDate'] as Timestamp?)?.toDate();
+      final lastLogTs = userData?['lastLogDate'] as Timestamp?;
+      final lastLogDate = lastLogTs?.toDate();
       final currentSeri = (userData?['seri'] as int?) ?? 0;
+      // Bug 1: Animasyon için gerçek görüntülenen seri (Firestore'daki ham değer değil)
+      final displayedSeri = seriDisplayState(currentSeri, lastLogTs).value;
 
       final Map<String, dynamic> seriUpdate;
       bool needsSeriRecalculate = false;
@@ -371,15 +374,24 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       // ─────────────────────────────────────────────────────────────────
 
       // ── Seri animasyonu ──────────────────────────────────────────────
-      final streakIncreased = seriUpdate.containsKey('seri');
-      int newSeri = currentSeri;
-      if (streakIncreased) newSeri = (seriUpdate['seri'] as int);
+      // Bug 8: needsSeriRecalculate durumunda da animasyon göster
+      int newSeri;
+      if (seriUpdate.containsKey('seri')) {
+        newSeri = (seriUpdate['seri'] as int);
+      } else if (needsSeriRecalculate) {
+        // recalculate yaptı — Firestore'dan güncel seriyi oku
+        final refreshed = await userRef.get();
+        newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
+      } else {
+        newSeri = displayedSeri; // Bugün zaten okunmuş, değişmedi
+      }
 
-      List<bool>? weekFilled;
-      int todayIdx = 0;
-      if (streakIncreased && mounted) {
-        weekFilled = await _getWeekFilled(user.uid);
-        todayIdx = DateTime.now().weekday - 1; // 0=Pzt, 6=Paz
+      // Bug 1: prevCount olarak Firestore ham değeri değil, görüntülenen değer kullanılıyor
+      final shouldShowAnimation = newSeri > displayedSeri;
+
+      ({List<bool> filled, List<String> labels})? weekData;
+      if (shouldShowAnimation && mounted) {
+        weekData = await _getWeekFilled(user.uid);
       }
       // ─────────────────────────────────────────────────────────────────
 
@@ -388,14 +400,15 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       final overlayCtx = Navigator.of(context, rootNavigator: true).context;
       Navigator.pop(context, justCompleted);
 
-      if (streakIncreased && weekFilled != null) {
+      if (shouldShowAnimation && weekData != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           StreakAnimationScreen.show(
             overlayCtx,
             count: newSeri,
-            prevCount: currentSeri,
-            filled: weekFilled!,
-            todayIndex: todayIdx,
+            prevCount: displayedSeri,  // Bug 1: gerçek görüntülenen değer
+            filled: weekData!.filled,
+            dayLabels: weekData!.labels,
+            todayIndex: 6,             // Bug 5: bugün daima son pozisyon
           );
         });
       }
@@ -413,35 +426,46 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     }
   }
 
-  // ── Haftalık doluluk dizisi (seri animasyonu için) ──────────────────
+  // ── Son 7 günlük doluluk verisi (seri animasyonu için) ──────────────
+  // Bug 2: .toLocal() eklendi — gece yarısı UTC/yerel fark sorunu giderildi
+  // Bug 3: whereIn filtresi — namaz/alışkanlık logları sayılmıyor
+  // Bug 5: Hafta sınırı yerine son 7 gün — hafta geçişi görsel kopukluğu giderildi
 
-  Future<List<bool>> _getWeekFilled(String uid) async {
-    final now   = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    // Haftanın başı: Pazartesi
-    final monday     = today.subtract(Duration(days: today.weekday - 1));
-    final sevenAgo   = monday;
+  static const _dayAbbr = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
+
+  Future<({List<bool> filled, List<String> labels})> _getWeekFilled(String uid) async {
+    final now     = DateTime.now();
+    final today   = DateTime(now.year, now.month, now.day);
+    final startDay = today.subtract(const Duration(days: 6)); // 7 gün: 6 gün önce → bugün
 
     final snap = await FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('logs')
-        .where('createdAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(sevenAgo))
+        .where('type', whereIn: ['arapca', 'meal'])  // Bug 3: sadece okuma logları
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
         .get();
 
     final loggedDays = <String>{};
     for (final doc in snap.docs) {
-      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate();
+      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate().toLocal(); // Bug 2
       if (d != null) {
         loggedDays.add('${d.year}-${d.month}-${d.day}');
       }
     }
 
-    return List.generate(7, (i) {
-      final day = monday.add(Duration(days: i));
+    final filled = List.generate(7, (i) {
+      final day = startDay.add(Duration(days: i));
       return loggedDays.contains('${day.year}-${day.month}-${day.day}');
     });
+
+    // Bug 5: Gün etiketleri dinamik — bugün daima index 6 (sağda)
+    final labels = List.generate(7, (i) {
+      final day = startDay.add(Duration(days: i));
+      return _dayAbbr[day.weekday - 1];
+    });
+
+    return (filled: filled, labels: labels);
   }
 
   // ── Tilavet Secdesi Prompt ──────────────────────────────────────────

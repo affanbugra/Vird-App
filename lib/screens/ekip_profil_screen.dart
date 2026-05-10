@@ -19,6 +19,7 @@ class _MemberEntry {
   final String? avatarSeed;
   final int periodHasanat;
   final int seri;
+  final bool seriAtRisk; // Bug 4: seri tehlikede mi (dün okundu, bugün okuma yok)
 
   const _MemberEntry({
     required this.uid,
@@ -27,6 +28,7 @@ class _MemberEntry {
     required this.avatarSeed,
     required this.periodHasanat,
     required this.seri,
+    this.seriAtRisk = false,
   });
 }
 
@@ -57,6 +59,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   bool _isJoinLoading = false;
   Timer? _countdownTimer;
   Duration _untilEnd = Duration.zero;
+
+  // Bug 9: Arşivleme her sayfa açılışında çalışmasın — oturum başına bir kez
+  static final _archivedThisSession = <String>{};
+
 
   @override
   void initState() {
@@ -122,6 +128,9 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   Future<void> _archivePastPeriodsIfNeeded() async {
     if (!mounted) return;
     if (_periodMode != _LeaderboardPeriod.weekly) return;
+    // Bug 9: Bu oturumda bu ekip için zaten çalıştıysa atla
+    if (_archivedThisSession.contains(widget.teamId)) return;
+    _archivedThisSession.add(widget.teamId);
 
     try {
       final db = FirebaseFirestore.instance;
@@ -266,7 +275,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
         final rawSeri = (data['seri'] as int?) ?? 0;
         final lastLogTs = data['lastLogDate'] as Timestamp?;
-        final realSeri = seriDisplayState(rawSeri, lastLogTs).value;
+        final seriState = seriDisplayState(rawSeri, lastLogTs);
 
         entries.add(_MemberEntry(
           uid: uid,
@@ -274,7 +283,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           username: data['username'] as String? ?? '',
           avatarSeed: data['avatarSeed'] as String?,
           periodHasanat: periodHasanat,
-          seri: realSeri,
+          seri: seriState.value,
+          seriAtRisk: seriState.atRisk, // Bug 4
         ));
       }
 
@@ -1562,13 +1572,19 @@ class _LeaderboardRow extends StatelessWidget {
                     if (entry.username.isNotEmpty && entry.seri > 0)
                       const SizedBox(width: 6),
                     if (entry.seri > 0) ...[
-                      const Text('🔥', style: TextStyle(fontSize: 11)),
+                      // Bug 4: atRisk ise ⚠️ (tehlikede), değilse 🔥 (normal)
+                      Text(
+                        entry.seriAtRisk ? '⚠️' : '🔥',
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         '${entry.seri} gün',
                         style: GoogleFonts.nunito(
                           fontSize: 11,
-                          color: AppColors.orange,
+                          color: entry.seriAtRisk
+                              ? AppColors.errorRed
+                              : AppColors.orange,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
