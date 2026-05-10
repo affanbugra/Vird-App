@@ -18,8 +18,8 @@ class _MemberEntry {
   final String username;
   final String? avatarSeed;
   final int periodHasanat;
-  final int seri;
-  final bool seriAtRisk; // Bug 4: seri tehlikede mi (dün okundu, bugün okuma yok)
+  final int rawSeri;
+  final Timestamp? lastLogTs;
 
   const _MemberEntry({
     required this.uid,
@@ -27,8 +27,8 @@ class _MemberEntry {
     required this.username,
     required this.avatarSeed,
     required this.periodHasanat,
-    required this.seri,
-    this.seriAtRisk = false,
+    required this.rawSeri,
+    this.lastLogTs,
   });
 }
 
@@ -213,7 +213,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             username: data['username'] as String? ?? '',
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
-            seri: (data['seri'] as int?) ?? 0,
+            rawSeri: (data['seri'] as int?) ?? 0,
           ));
         }
 
@@ -273,18 +273,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           periodHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
         }
 
-        final rawSeri = (data['seri'] as int?) ?? 0;
-        final lastLogTs = data['lastLogDate'] as Timestamp?;
-        final seriState = seriDisplayState(rawSeri, lastLogTs);
-
         entries.add(_MemberEntry(
           uid: uid,
           name: data['name'] as String? ?? 'İsimsiz',
           username: data['username'] as String? ?? '',
           avatarSeed: data['avatarSeed'] as String?,
           periodHasanat: periodHasanat,
-          seri: seriState.value,
-          seriAtRisk: seriState.atRisk, // Bug 4
+          rawSeri: (data['seri'] as int?) ?? 0,
+          lastLogTs: data['lastLogDate'] as Timestamp?,
         ));
       }
 
@@ -1228,13 +1224,17 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
     final list = List<_MemberEntry>.from(widget.leaderboard);
     if (_sortMode == _SortMode.seri) {
       list.sort((a, b) {
-        final cmp = b.seri.compareTo(a.seri);
+        final aVal = seriDisplayState(a.rawSeri, a.lastLogTs).value;
+        final bVal = seriDisplayState(b.rawSeri, b.lastLogTs).value;
+        final cmp = bVal.compareTo(aVal);
         return cmp != 0 ? cmp : b.periodHasanat.compareTo(a.periodHasanat);
       });
     } else {
       list.sort((a, b) {
         final cmp = b.periodHasanat.compareTo(a.periodHasanat);
-        return cmp != 0 ? cmp : b.seri.compareTo(a.seri);
+        final aVal = seriDisplayState(a.rawSeri, a.lastLogTs).value;
+        final bVal = seriDisplayState(b.rawSeri, b.lastLogTs).value;
+        return cmp != 0 ? cmp : bVal.compareTo(aVal);
       });
     }
     return list;
@@ -1569,26 +1569,27 @@ class _LeaderboardRow extends StatelessWidget {
                         style: GoogleFonts.nunito(
                             fontSize: 11, color: AppColors.textLight),
                       ),
-                    if (entry.username.isNotEmpty && entry.seri > 0)
+                    if (entry.username.isNotEmpty && seriDisplayState(entry.rawSeri, entry.lastLogTs).value > 0)
                       const SizedBox(width: 6),
-                    if (entry.seri > 0) ...[
-                      // Bug 4: atRisk ise ⚠️ (tehlikede), değilse 🔥 (normal)
-                      Text(
-                        entry.seriAtRisk ? '⚠️' : '🔥',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${entry.seri} gün',
-                        style: GoogleFonts.nunito(
-                          fontSize: 11,
-                          color: entry.seriAtRisk
-                              ? AppColors.errorRed
-                              : AppColors.orange,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    Builder(builder: (context) {
+                      final ss = seriDisplayState(entry.rawSeri, entry.lastLogTs);
+                      if (ss.value <= 0) return const SizedBox.shrink();
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(ss.atRisk ? '⚠️' : '🔥', style: const TextStyle(fontSize: 11)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${ss.value} gün',
+                            style: GoogleFonts.nunito(
+                              fontSize: 11,
+                              color: ss.atRisk ? AppColors.errorRed : AppColors.orange,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ],

@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-09 — son güncelleme: Seri animasyonu ekranı + DevPanel arşiv + web deploy)
+## Genel Durum (2026-05-10 — son güncelleme: Seri + ekip bug düzeltmeleri, web deploy)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -43,6 +43,32 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — Seri + Ekip Bug Düzeltmeleri, Web Deploy (2026-05-10)
+
+#### Seri Sistemi — Kapsamlı Düzeltmeler (`fire_bugs` branch → main)
+
+**Düzeltilen 9 temel bug (`lib/widgets/log_entry_bottom_sheet.dart`, `lib/utils/seri_calculator.dart`, `lib/screens/streak_animation_screen.dart`, `lib/screens/ekip_profil_screen.dart`):**
+1. Log kaydında `displayedSeri` yerine raw Firestore seri kullanılıyordu → `seriDisplayState()` ile düzeltildi
+2. Seri animasyonu yanlış `prevCount` ile açılıyordu
+3. `shouldShowAnimation` yanlış koşulda tetikleniyordu
+4. Liderboard seri durumu donmuş Firestore değerini gösteriyordu (atRisk eksikti)
+5. Haftalık takvim gün etiketleri sabit Monday-based yerine son 7 gün mantığındaydı
+6. `_getWeekFilled` log type filtresi yoktu (prayer/habit logları sayılıyordu)
+7. Timestamp `.toLocal()` eksikti (UTC+3 timezone hatası)
+8. Log silinince seri yeniden hesabı animasyonu göstermiyordu
+9. Liderboard arşivi aynı session'da birden fazla çalışıyordu
+
+**Ek düzeltmeler (aynı oturumda):**
+- **`_InviteCodeSheet` developer desteği (`lib/screens/ekipler_screen.dart`):** Developer davet koduyla katılınca `teamId` yerine `developerTeamIds: arrayUnion` yazılıyor; "zaten ekiptesin" kontrolü developer için atlanıyor
+- **Başkasının profilinde seri durumu eksikti (`lib/screens/kullanici_profil_screen.dart`):** `lastLogDate` okunup `seriDisplayState()` çağrılmıyordu. Artık kendi profilindeki gibi kırmızı + "TEHLİKEDE" etiketi gösteriliyor
+- **Liderboard seri dinamik güncellenmiyordu (`lib/screens/ekip_profil_screen.dart`):** `_MemberEntry` artık `rawSeri` + `lastLogTs` saklıyor; `_LeaderboardRow.build()` her render'da `seriDisplayState()` çağırıyor — ekran açık kalsa da gece yarısı seri otomatik düşüyor
+
+#### Firestore Şeması Notu
+- `developerTeamIds: List<String>` alanı olan developer kullanıcılar `teamId` ile aynı anda birden fazla ekipte bulunabilir
+- Liderboard her iki alanı da sorgular ve deduplication yapar
+
+---
 
 ### Oturum — Seri Animasyonu + DevPanel Arşiv + Web Deploy (2026-05-09)
 

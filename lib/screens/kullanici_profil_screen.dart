@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
 import '../data/quran_cuz.dart';
+import '../utils/seri_calculator.dart';
 
 String _fmt(int n) {
   final s = n.toString();
@@ -102,7 +103,11 @@ class _KullaniciProfilScreenState extends State<KullaniciProfilScreen> {
           final avatarSeed = data?['avatarSeed'] as String?;
           final isPro = data?['isPro'] == true;
           final isHafiz = (data?['isHafiz'] as bool?) ?? false;
-          final seri = (data?['seri'] as int?) ?? 0;
+          final seriRaw = (data?['seri'] as int?) ?? 0;
+          final lastLogTs = data?['lastLogDate'] as Timestamp?;
+          final seriState = seriDisplayState(seriRaw, lastLogTs);
+          final seri = seriState.value;
+          final seriAtRisk = seriState.atRisk;
           final hasanat = (data?['hasanat'] as int?) ?? 0;
           final totalPages = (data?['totalPages'] as int?) ?? 0;
 
@@ -167,6 +172,7 @@ class _KullaniciProfilScreenState extends State<KullaniciProfilScreen> {
                             // İstatistikler
                             _StatGrid(
                               seri: seri,
+                              seriAtRisk: seriAtRisk,
                               hasanat: hasanat,
                               hatimCount: hatimCount,
                               totalPages: totalPages,
@@ -359,12 +365,14 @@ class _UserHeader extends StatelessWidget {
 
 class _StatGrid extends StatelessWidget {
   final int seri;
+  final bool seriAtRisk;
   final int hasanat;
   final int hatimCount;
   final int totalPages;
 
   const _StatGrid({
     required this.seri,
+    this.seriAtRisk = false,
     required this.hasanat,
     required this.hatimCount,
     required this.totalPages,
@@ -372,6 +380,8 @@ class _StatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final seriColor = seriAtRisk ? AppColors.errorRed : AppColors.orange;
+    final seriLabel = seriAtRisk ? 'TEHLİKEDE' : 'SERİ';
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -380,8 +390,8 @@ class _StatGrid extends StatelessWidget {
               child: _StatCard(
                   icon: '🔥',
                   value: _fmt(seri),
-                  label: 'SERİ',
-                  color: AppColors.orange)),
+                  label: seriLabel,
+                  color: seriColor)),
           const SizedBox(width: 8),
           Expanded(
               child: _StatCard(
