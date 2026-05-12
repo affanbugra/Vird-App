@@ -4,11 +4,14 @@ class AppColors {
   static const teal = Color(0xFF2A7F8C);
   static const tealDark = Color(0xFF1F6370);
   static const tealLight = Color(0xFFE8F5F7);
+  static const tealSoft = Color(0xFF63A5AB); // Kılındı (Soft Teal)
+  static const emeraldGreen = Color(0xFF2E8B57); // Zümrüt Yeşili
 
   static const orange = Color(0xFFFF9600);
   static const orangeDark = Color(0xFFCC7A00);
 
   static const gold = Color(0xFFFFC200);
+  static const goldSoft = Color(0xFFFFD166); // Kaza (Soft Yellow)
 
   static const white = Color(0xFFFFFFFF);
   static const lightGrey = Color(0xFFF7F7F7);

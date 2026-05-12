@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
@@ -7,6 +8,7 @@ import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../models/reading_log_model.dart';
 import '../data/quran_cuz.dart';
+import '../data/tilavet_secde.dart';
 import '../utils/hatim_calculator.dart';
 import 'log_history_sheet.dart';
 import '../services/notification_service.dart';
@@ -347,6 +349,16 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         justCompleted = await HatimCalculator.recalculate(user.uid, hatimId);
       }
 
+      // ── Tilavet Secdesi kontrolü ─────────────────────────────────────
+      if (mounted && startPage != null && endPage != null) {
+        final secdePages = TilavetSecdeData.secdesInRange(startPage!, endPage!);
+        for (final sPage in secdePages) {
+          if (!mounted) break;
+          await _showSecdePrompt(user.uid, hatimId, sPage);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       if (mounted) Navigator.pop(context, justCompleted);
     } catch (e, st) {
       debugPrint('LOG KAYDETME HATASI: $e\n$st');
@@ -359,6 +371,110 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           ),
         );
       }
+    }
+  }
+
+  // ── Tilavet Secdesi Prompt ──────────────────────────────────────────
+
+  Future<void> _showSecdePrompt(
+      String uid, String? hatimId, int page) async {
+    if (!mounted) return;
+    final label = TilavetSecdeData.secdeLabel(page) ?? 'Tilavet Secdesi';
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🕌', style: TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
+            Text(
+              'Tilavet Secdesi',
+              style: GoogleFonts.nunito(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$label  (Sayfa $page) içeren bir bölüm okudunuz.\nTilavet secdesini yaptınız mı?',
+              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.check_circle_outline,
+                    color: Colors.white, size: 18),
+                label: Text(
+                  'Yaptım',
+                  style: GoogleFonts.nunito(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(ctx, 'done'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.access_time,
+                    color: AppColors.errorRed, size: 18),
+                label: Text(
+                  'Henüz Yapmadım',
+                  style: GoogleFonts.nunito(
+                    color: AppColors.errorRed,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: AppColors.errorRed),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(ctx, 'pending'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    // Firestore'a kaydet
+    try {
+      final docId = hatimId != null
+          ? 'tilavet_secde_$hatimId'
+          : 'tilavet_secde_free';
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .doc(docId);
+      await ref.set({
+        'hatimId': hatimId,
+        'type': 'tilavet_secde',
+        'pages': {page.toString(): result},
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Secde prompt save error: \$e');
     }
   }
 

@@ -14,6 +14,7 @@ import '../widgets/seri_calendar_sheet.dart';
 import '../services/notification_service.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
+import 'gunluk_takipler_screen.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -310,60 +311,107 @@ class _ProfileHeader extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 49, left: 16, right: 16, bottom: 14),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text(
-                    name,
-                    style: GoogleFonts.nunito(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: GoogleFonts.nunito(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isPro) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.tealLight,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'PRO',
+                              style: GoogleFonts.nunito(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.teal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                  if (isPro) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.tealLight,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'PRO',
+                    if (username.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '@$username',
                         style: GoogleFonts.nunito(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.teal,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMid,
                         ),
                       ),
-                    ),
+                    ],
+                    if (locationParts.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        locationParts.join(' · '),
+                        style: GoogleFonts.nunito(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-              if (username.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '@$username',
-                  style: GoogleFonts.nunito(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMid,
-                  ),
-                ),
-              ],
-              if (locationParts.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  locationParts.join(' · '),
-                  style: GoogleFonts.nunito(
-                    fontSize: 11,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ],
+              const SizedBox(width: 8),
+              Builder(
+                builder: (context) {
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GunlukTakiplerScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.tealLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle_outline, size: 16, color: AppColors.teal),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Günlük Takiplerim',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              ),
             ],
           ),
         ),
