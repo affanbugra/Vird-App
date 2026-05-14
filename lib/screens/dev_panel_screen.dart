@@ -768,7 +768,7 @@ class _BacklogViewState extends State<_BacklogView> {
                 : displayed.isEmpty
                     ? _EmptyState(tab: _tab)
                     : _tab == 'idea'
-                        ? _IdeaList(items: displayed, onToggle: _complete, onArchive: _archive, onDelete: _delete)
+                        ? _IdeaList(items: displayed, existingCats: cats, onToggle: _complete, onArchive: _archive, onDelete: _delete)
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                             itemCount: rows.length,
@@ -805,12 +805,22 @@ class _BacklogViewState extends State<_BacklogView> {
                                 );
                               }
                               final item = row as _BacklogItem;
+                              final allCats = _allItems.map((i) => i.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
                               final card = _BacklogCard(
                                 key: ValueKey(item.id),
                                 item: item,
                                 onToggle: () => _complete(item.id, item.completed),
                                 onArchive: () => _archive(item.id),
                                 onDelete: () => _delete(item.id),
+                                onEdit: () => showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) => Padding(
+                                    padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                                    child: _AddItemSheet(initialType: item.type, existingCats: allCats, editItem: item),
+                                  ),
+                                ),
                               );
                               return LongPressDraggable<_BacklogItem>(
                                 data: item,
@@ -1046,8 +1056,9 @@ class _BacklogCard extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onArchive;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
-  const _BacklogCard({super.key, required this.item, required this.onToggle, required this.onArchive, required this.onDelete});
+  const _BacklogCard({super.key, required this.item, required this.onToggle, required this.onArchive, required this.onDelete, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -1105,10 +1116,12 @@ class _BacklogCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textLight),
                 padding: EdgeInsets.zero,
                 onSelected: (val) {
+                  if (val == 'edit') onEdit();
                   if (val == 'archive') onArchive();
                   if (val == 'delete') onDelete();
                 },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Düzenle')])),
                   const PopupMenuItem(value: 'archive', child: Row(children: [Icon(Icons.archive_outlined, size: 16), SizedBox(width: 8), Text('Arşivle')])),
                   PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.errorRed), const SizedBox(width: 8), Text('Sil', style: TextStyle(color: AppColors.errorRed))])),
                 ],
@@ -1125,11 +1138,12 @@ class _BacklogCard extends StatelessWidget {
 
 class _IdeaList extends StatelessWidget {
   final List<_BacklogItem> items;
+  final List<String> existingCats;
   final Future<void> Function(String, bool) onToggle;
   final Future<void> Function(String) onArchive;
   final Future<void> Function(String) onDelete;
 
-  const _IdeaList({required this.items, required this.onToggle, required this.onArchive, required this.onDelete});
+  const _IdeaList({required this.items, required this.existingCats, required this.onToggle, required this.onArchive, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -1206,6 +1220,30 @@ class _IdeaList extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               _CatBadge(cat: item.category),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textLight),
+                padding: EdgeInsets.zero,
+                onSelected: (val) {
+                  if (val == 'edit') {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => Padding(
+                        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                        child: _AddItemSheet(initialType: item.type, existingCats: existingCats, editItem: item),
+                      ),
+                    );
+                  }
+                  if (val == 'archive') onArchive(item.id);
+                  if (val == 'delete') onDelete(item.id);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Düzenle')])),
+                  const PopupMenuItem(value: 'archive', child: Row(children: [Icon(Icons.archive_outlined, size: 16), SizedBox(width: 8), Text('Arşivle')])),
+                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.errorRed), const SizedBox(width: 8), Text('Sil', style: TextStyle(color: AppColors.errorRed))])),
+                ],
+              ),
             ]),
           ),
         );
@@ -2380,8 +2418,9 @@ class _AddItemSheet extends StatefulWidget {
   final String? prefillText;
   final VoidCallback? onSaved;
   final List<String> existingCats;
+  final _BacklogItem? editItem; // non-null = edit mode
 
-  const _AddItemSheet({required this.initialType, this.prefillText, this.onSaved, this.existingCats = const []});
+  const _AddItemSheet({required this.initialType, this.prefillText, this.onSaved, this.existingCats = const [], this.editItem});
 
   @override
   State<_AddItemSheet> createState() => _AddItemSheetState();
@@ -2396,6 +2435,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   final _customCatCtrl = TextEditingController();
   bool _saving = false;
 
+  bool get _isEdit => widget.editItem != null;
+
   static const _backlogCol = 'app_backlog';
   static const _fallbackPresets = ['Seri', 'Ekipler', 'Hasanat', 'UI', 'Auth', 'Bildirim', 'Hatim'];
 
@@ -2404,9 +2445,21 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   @override
   void initState() {
     super.initState();
-    _type = widget.initialType;
-    if (widget.prefillText != null) {
-      _titleCtrl.text = widget.prefillText!;
+    final edit = widget.editItem;
+    if (edit != null) {
+      _type = edit.type;
+      _titleCtrl.text = edit.title;
+      _priority = edit.priority;
+      _selMilestoneId = edit.milestoneId?.isEmpty == true ? null : edit.milestoneId;
+      // category: match against existing cats or fall into custom field
+      if (_cats.contains(edit.category)) {
+        _selCat = edit.category;
+      } else {
+        _customCatCtrl.text = edit.category;
+      }
+    } else {
+      _type = widget.initialType;
+      if (widget.prefillText != null) _titleCtrl.text = widget.prefillText!;
     }
   }
 
@@ -2419,17 +2472,27 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     if (title.isEmpty || cat.isEmpty) return;
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection(_backlogCol).add({
-        'type': _type,
-        'title': title,
-        'category': cat,
-        'priority': _type == 'idea' ? 'normal' : _priority,
-        'milestoneId': (_type == 'idea') ? null : _selMilestoneId,
-        'completed': false,
-        'archived': false,
-        'order': DateTime.now().millisecondsSinceEpoch,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (_isEdit) {
+        await FirebaseFirestore.instance.collection(_backlogCol).doc(widget.editItem!.id).update({
+          'type': _type,
+          'title': title,
+          'category': cat,
+          'priority': _type == 'idea' ? 'normal' : _priority,
+          'milestoneId': (_type == 'idea') ? null : _selMilestoneId,
+        });
+      } else {
+        await FirebaseFirestore.instance.collection(_backlogCol).add({
+          'type': _type,
+          'title': title,
+          'category': cat,
+          'priority': _type == 'idea' ? 'normal' : _priority,
+          'milestoneId': (_type == 'idea') ? null : _selMilestoneId,
+          'completed': false,
+          'archived': false,
+          'order': DateTime.now().millisecondsSinceEpoch,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
       widget.onSaved?.call();
       if (mounted) Navigator.pop(context);
     } catch (_) {
@@ -2456,7 +2519,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
               children: [
                 Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
                 const SizedBox(height: 16),
-                const Text('Yeni Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                Text(_isEdit ? 'Düzenle' : 'Yeni Ekle', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
                 const SizedBox(height: 16),
 
                 // Tip toggle
