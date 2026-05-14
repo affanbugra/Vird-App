@@ -6,6 +6,35 @@
 
 ## Flutter
 
+### `BoxDecoration` + `borderRadius` + karışık `Border` renkleri → paint crash
+`Border(left: renkA, top: renkB, right: renkB, bottom: renkB)` ile birlikte `borderRadius` kullanmak Flutter'da paint aşamasında crash'e yol açar:
+```
+A borderRadius can only be given on borders with uniform colors
+```
+Widget listeye eklenir, `flutter analyze` hata vermez, ama **ekranda hiç görünmez** — sessiz render başarısızlığı.
+
+**Çözüm:** `Border.all(color: tekRenk)` kullan. Sol accent şeridini `Border` olarak değil, `ClipRRect` + `IntrinsicHeight` içinde bir `Container` child olarak uygula:
+```dart
+Container(
+  decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: AppColors.borderGrey), // uniform!
+  ),
+  child: ClipRRect(
+    borderRadius: BorderRadius.circular(11),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(width: 3, color: _priorityColor(priority)), // sol accent
+          // ... diğer içerik
+        ],
+      ),
+    ),
+  ),
+)
+```
+
 ### `withOpacity()` kullanma
 `withValues(alpha: 0.5)` kullan. `withOpacity` deprecated.
 
@@ -225,6 +254,23 @@ final key = (field ?? '').replaceAll('"', '').trim();
 if (key.startsWith('rical_i_fark')) { ... }
 ```
 
+### `where() + orderBy()` farklı alanlarda → composite index zorunluluğu (sessiz hata)
+`where('archived', isEqualTo: false).orderBy('createdAt')` gibi iki farklı alanda filtre + sıralama Firestore composite index gerektirir. **Index yoksa query sessizce boş döner — konsola hata yazmaz.**
+
+**Teşhis:** Veri Firestore'da var ama listede görünmüyor. Firebase Console'da Index sekmesini kontrol et.
+
+**Çözüm:** Server-side `where()` + `orderBy()` yerine `.snapshots()` al, filtrelemeyi ve sıralamayı client-side yap:
+```dart
+stream: FirebaseFirestore.instance.collection('col').snapshots(),
+builder: (ctx, snap) {
+  final items = (snap.data?.docs ?? [])
+      .map((d) => Model.fromDoc(d))
+      .where((m) => !m.archived)        // client-side filtre
+      .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // client-side sort
+```
+Bu yaklaşım aynı zamanda `archived` alanı olmayan eski dokümanları da kapsar.
+
 ### `whereIn` + range filter → composite index zorunluluğu
 `whereIn('type', ['arapca', 'meal'])` ile birlikte `createdAt` range filter kullanmak Firestore'da composite index gerektirir. Index oluşturulmamışsa `[cloud_firestore/failed-precondition]` hatası alınır ve query çalışmaz.
 
@@ -282,6 +328,44 @@ try {
 }
 // ProfileSetupScreen'e geç
 ```
+
+### Silinmiş/arşivlenmiş foreign key'e sahip kayıtlar listelerde kaybolur
+Bir item `milestoneId: "abc"` taşıyor ama o milestone silinmiş/arşivlenmişse: aktif milestone listesinde bulunmaz, "unassigned" koşulu (`milestoneId == null || milestoneId.isEmpty`) da sağlanmaz → item **hiçbir gruba girmez, görünmez.**
+
+**Belirti:** Header "12 açık" gösterir ama section açılınca boş gelir. `openCount` tüm items'ı sayar, `_buildRows` ise sadece aktif milestone'ların items'larını ekler.
+
+**Çözüm:** "unassigned" filtresi aktif milestone ID setini de kontrol etmeli:
+```dart
+final assignedToActive = _milestones.map((m) => m.id).toSet();
+final unassigned = items.where((i) =>
+  i.milestoneId == null ||
+  i.milestoneId!.isEmpty ||
+  !assignedToActive.contains(i.milestoneId)  // ← orphaned items de buraya düşer
+).toList();
+```
+**Genel kural:** Foreign key kontrolü sadece null/empty değil, referansın hâlâ geçerli/aktif olup olmadığını da kapsamalı.
+
+### `StreamBuilder` nested kullanımı widget state'ini sıfırlar
+`StreamBuilder` içinde başka bir `StreamBuilder` veya `StatefulWidget` varsa, dış stream her güncellendiğinde inner widget yeniden oluşturulur. `Set<String> _expanded` gibi local state sıfırlanır.
+
+**Belirti:** Milestone toggle açılıyor, Firestore güncelleniyor (başka bir item tamamlandı), `_expanded` sıfırlanıyor → section kapanıyor.
+
+**Çözüm:** `StreamBuilder` yerine `initState()` içinde `StreamSubscription` kullan, veriyi yerel `List` değişkenlerine `setState()` ile al:
+```dart
+StreamSubscription<QuerySnapshot>? _sub;
+
+@override
+void initState() {
+  super.initState();
+  _sub = FirebaseFirestore.instance.collection('col').snapshots().listen((s) {
+    setState(() => _items = s.docs.map(Model.fromDoc).toList());
+  });
+}
+
+@override
+void dispose() { _sub?.cancel(); super.dispose(); }
+```
+Toggle state (`_expanded: Set<String>`) artık parent StatefulWidget'ta yaşar, stream update'lerinden etkilenmez.
 
 ### `logs` subcollection okuma kuralı ve liderboard
 `users/{uid}/logs` subcollection'ını yalnızca `isOwner()` ile kısıtlarsan liderboard için başka kullanıcıların loglarını okumak `Permission Denied` hatası verir ve kullanıcı 0 puan görünür. Liderboard gibi cross-user okuma gerektiren senaryolarda `isAuth()` yeterli:

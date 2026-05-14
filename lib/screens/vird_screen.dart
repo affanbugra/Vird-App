@@ -74,6 +74,8 @@ class _VirdScreenState extends State<VirdScreen> {
         'text':      text,
         'createdAt': FieldValue.serverTimestamp(),
         'uid':       FirebaseAuth.instance.currentUser?.uid,
+        'isRead':    false,
+        'archived':  false,
       });
       if (!mounted) return;
       setState(() { _sent = true; _submitting = false; });
