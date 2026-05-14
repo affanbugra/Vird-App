@@ -597,6 +597,9 @@ class _BacklogViewState extends State<_BacklogView> {
   Future<void> _delete(String id) =>
       FirebaseFirestore.instance.collection('app_backlog').doc(id).delete();
 
+  Future<void> _assignToMilestone(String itemId, String? milestoneId) =>
+      FirebaseFirestore.instance.collection('app_backlog').doc(itemId).update({'milestoneId': milestoneId ?? ''});
+
   // Düz liste: Map (header) veya _BacklogItem (kart)
   List<Object> _buildRows(List<_BacklogItem> items) {
     final rows = <Object>[];
@@ -746,21 +749,51 @@ class _BacklogViewState extends State<_BacklogView> {
                                     itemCount: row['count'] as int,
                                     isCollapsed: !_expanded.contains(ms.id),
                                     onToggle: () => _toggleSection(ms.id),
+                                    onAcceptDrop: (item) {
+                                      _assignToMilestone(item.id, ms.id);
+                                      if (!_expanded.contains(ms.id)) _toggleSection(ms.id);
+                                    },
                                   );
                                 }
                                 return _UnassignedHeader(
                                   itemCount: row['count'] as int,
                                   isCollapsed: !_expanded.contains('__unassigned'),
                                   onToggle: () => _toggleSection('__unassigned'),
+                                  onAcceptDrop: (item) => _assignToMilestone(item.id, null),
                                 );
                               }
                               final item = row as _BacklogItem;
-                              return _BacklogCard(
+                              final card = _BacklogCard(
                                 key: ValueKey(item.id),
                                 item: item,
                                 onToggle: () => _complete(item.id, item.completed),
                                 onArchive: () => _archive(item.id),
                                 onDelete: () => _delete(item.id),
+                              );
+                              return LongPressDraggable<_BacklogItem>(
+                                data: item,
+                                delay: const Duration(milliseconds: 350),
+                                feedback: Material(
+                                  elevation: 8,
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.transparent,
+                                  child: Container(
+                                    width: MediaQuery.of(ctx).size.width - 32,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
+                                    ),
+                                    child: Row(children: [
+                                      Container(width: 3, height: 32, decoration: BoxDecoration(color: _priorityColor(item.priority), borderRadius: BorderRadius.circular(999))),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                    ]),
+                                  ),
+                                ),
+                                childWhenDragging: Opacity(opacity: 0.3, child: card),
+                                child: card,
                               );
                             },
                           ),
@@ -795,61 +828,66 @@ class _MilestoneHeader extends StatelessWidget {
   final int itemCount;
   final bool isCollapsed;
   final VoidCallback onToggle;
+  final void Function(_BacklogItem)? onAcceptDrop;
 
   const _MilestoneHeader({
     required this.milestone,
     required this.itemCount,
     required this.isCollapsed,
     required this.onToggle,
+    this.onAcceptDrop,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        margin: const EdgeInsets.only(top: 12, bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B).withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF1E293B).withValues(alpha: 0.08)),
-        ),
-        child: Row(children: [
-          // Version badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    return DragTarget<_BacklogItem>(
+      onWillAcceptWithDetails: (d) => d.data.milestoneId != milestone.id,
+      onAcceptWithDetails: (d) => onAcceptDrop?.call(d.data),
+      builder: (ctx, candidates, _) {
+        final over = candidates.isNotEmpty;
+        return GestureDetector(
+          onTap: onToggle,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.teal,
-              borderRadius: BorderRadius.circular(6),
+              color: over ? AppColors.teal.withValues(alpha: 0.08) : const Color(0xFF1E293B).withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: over ? AppColors.teal.withValues(alpha: 0.45) : const Color(0xFF1E293B).withValues(alpha: 0.08),
+                width: over ? 1.5 : 1.0,
+              ),
             ),
-            child: Text(
-              milestone.version,
-              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(6)),
+                child: Text(milestone.version, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(milestone.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark))),
+              if (over) ...[
+                const Icon(Icons.add_circle_rounded, size: 16, color: AppColors.teal),
+                const SizedBox(width: 6),
+              ],
+              if (itemCount > 0 && !over) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Icon(
+                isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: over ? AppColors.teal : AppColors.textMid,
+              ),
+            ]),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              milestone.title,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
-            ),
-          ),
-          if (itemCount > 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
-              child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.teal, fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Icon(
-            isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: AppColors.textMid,
-          ),
-        ]),
-      ),
+        );
+      },
     );
   }
 }
@@ -858,44 +896,60 @@ class _UnassignedHeader extends StatelessWidget {
   final int itemCount;
   final bool isCollapsed;
   final VoidCallback onToggle;
+  final void Function(_BacklogItem)? onAcceptDrop;
 
-  const _UnassignedHeader({required this.itemCount, required this.isCollapsed, required this.onToggle});
+  const _UnassignedHeader({required this.itemCount, required this.isCollapsed, required this.onToggle, this.onAcceptDrop});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        margin: const EdgeInsets.only(top: 12, bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.lightGrey,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.borderGrey),
-        ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
-            child: const Text('—', style: TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('Milestone\'suz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid))),
-          if (itemCount > 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
-              child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+    return DragTarget<_BacklogItem>(
+      onWillAcceptWithDetails: (d) => d.data.milestoneId != null && d.data.milestoneId!.isNotEmpty,
+      onAcceptWithDetails: (d) => onAcceptDrop?.call(d.data),
+      builder: (ctx, candidates, _) {
+        final over = candidates.isNotEmpty;
+        return GestureDetector(
+          onTap: onToggle,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: over ? AppColors.textMid.withValues(alpha: 0.08) : AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: over ? AppColors.textMid.withValues(alpha: 0.45) : AppColors.borderGrey,
+                width: over ? 1.5 : 1.0,
+              ),
             ),
-            const SizedBox(width: 8),
-          ],
-          Icon(
-            isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: AppColors.textMid,
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
+                child: const Text('—', style: TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Milestone\'suz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid))),
+              if (over) ...[
+                const Icon(Icons.remove_circle_outline_rounded, size: 16, color: AppColors.textMid),
+                const SizedBox(width: 6),
+              ],
+              if (itemCount > 0 && !over) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Icon(
+                isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppColors.textMid,
+              ),
+            ]),
           ),
-        ]),
-      ),
+        );
+      },
     );
   }
 }
