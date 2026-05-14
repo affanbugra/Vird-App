@@ -73,6 +73,14 @@ class _BacklogItem {
   }
 }
 
+class _Gap {
+  final String sectionId;
+  final List<_BacklogItem> sectionItems;
+  final int insertAt;
+  final Set<String> activeMilestoneIds;
+  const _Gap({required this.sectionId, required this.sectionItems, required this.insertAt, required this.activeMilestoneIds});
+}
+
 class _FeedbackItem {
   final String id;
   final String text;
@@ -600,25 +608,50 @@ class _BacklogViewState extends State<_BacklogView> {
   Future<void> _assignToMilestone(String itemId, String? milestoneId) =>
       FirebaseFirestore.instance.collection('app_backlog').doc(itemId).update({'milestoneId': milestoneId ?? ''});
 
-  // Düz liste: Map (header) veya _BacklogItem (kart)
+  // Düz liste: Map (header), _BacklogItem (kart) veya _Gap (sıralama drop zone)
   List<Object> _buildRows(List<_BacklogItem> items) {
     final rows = <Object>[];
+    final activeMilestoneIds = _milestones.map((m) => m.id).toSet();
+
+    void addItemsWithGaps(String sectionId, List<_BacklogItem> sectionItems) {
+      rows.add(_Gap(sectionId: sectionId, sectionItems: sectionItems, insertAt: 0, activeMilestoneIds: activeMilestoneIds));
+      for (var j = 0; j < sectionItems.length; j++) {
+        rows.add(sectionItems[j]);
+        rows.add(_Gap(sectionId: sectionId, sectionItems: sectionItems, insertAt: j + 1, activeMilestoneIds: activeMilestoneIds));
+      }
+    }
+
     for (final ms in _milestones) {
       final msItems = items.where((i) => i.milestoneId == ms.id).toList();
       rows.add({'type': 'ms', 'ms': ms, 'count': msItems.where((i) => !i.completed).length});
-      if (_expanded.contains(ms.id)) rows.addAll(msItems);
+      if (_expanded.contains(ms.id)) addItemsWithGaps(ms.id, msItems);
     }
-    final assignedToActive = _milestones.map((m) => m.id).toSet();
     final unassigned = items.where((i) =>
       i.milestoneId == null ||
       i.milestoneId!.isEmpty ||
-      !assignedToActive.contains(i.milestoneId)
+      !activeMilestoneIds.contains(i.milestoneId)
     ).toList();
     if (unassigned.isNotEmpty) {
       rows.add({'type': 'un', 'count': unassigned.where((i) => !i.completed).length});
-      if (_expanded.contains('__unassigned')) rows.addAll(unassigned);
+      if (_expanded.contains('__unassigned')) addItemsWithGaps('__unassigned', unassigned);
     }
     return rows;
+  }
+
+  Future<void> _reorderInSection(List<_BacklogItem> sectionItems, _BacklogItem draggedItem, int insertAt) async {
+    final currentIndex = sectionItems.indexWhere((i) => i.id == draggedItem.id);
+    if (currentIndex == -1) return;
+    final reordered = List<_BacklogItem>.from(sectionItems);
+    reordered.removeAt(currentIndex);
+    final adjusted = (currentIndex < insertAt) ? insertAt - 1 : insertAt;
+    reordered.insert(adjusted.clamp(0, reordered.length), draggedItem);
+    final unchanged = Iterable.generate(reordered.length, (i) => reordered[i].id == sectionItems[i].id).every((x) => x);
+    if (unchanged) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (var i = 0; i < reordered.length; i++) {
+      batch.update(FirebaseFirestore.instance.collection('app_backlog').doc(reordered[i].id), {'order': i * 1000});
+    }
+    await batch.commit();
   }
 
   @override
@@ -741,10 +774,18 @@ class _BacklogViewState extends State<_BacklogView> {
                             itemCount: rows.length,
                             itemBuilder: (ctx, i) {
                               final row = rows[i];
+                              if (row is _Gap) {
+                                return _GapTarget(
+                                  key: ValueKey('gap_${row.sectionId}_${row.insertAt}'),
+                                  gap: row,
+                                  onInsert: (item) => _reorderInSection(row.sectionItems, item, row.insertAt),
+                                );
+                              }
                               if (row is Map<String, Object>) {
                                 if (row['type'] == 'ms') {
                                   final ms = row['ms'] as _Milestone;
                                   return _MilestoneHeader(
+                                    key: ValueKey('ms_${ms.id}'),
                                     milestone: ms,
                                     itemCount: row['count'] as int,
                                     isCollapsed: !_expanded.contains(ms.id),
@@ -756,6 +797,7 @@ class _BacklogViewState extends State<_BacklogView> {
                                   );
                                 }
                                 return _UnassignedHeader(
+                                  key: const ValueKey('un_header'),
                                   itemCount: row['count'] as int,
                                   isCollapsed: !_expanded.contains('__unassigned'),
                                   onToggle: () => _toggleSection('__unassigned'),
@@ -831,6 +873,7 @@ class _MilestoneHeader extends StatelessWidget {
   final void Function(_BacklogItem)? onAcceptDrop;
 
   const _MilestoneHeader({
+    super.key,
     required this.milestone,
     required this.itemCount,
     required this.isCollapsed,
@@ -898,7 +941,7 @@ class _UnassignedHeader extends StatelessWidget {
   final VoidCallback onToggle;
   final void Function(_BacklogItem)? onAcceptDrop;
 
-  const _UnassignedHeader({required this.itemCount, required this.isCollapsed, required this.onToggle, this.onAcceptDrop});
+  const _UnassignedHeader({super.key, required this.itemCount, required this.isCollapsed, required this.onToggle, this.onAcceptDrop});
 
   @override
   Widget build(BuildContext context) {
@@ -948,6 +991,48 @@ class _UnassignedHeader extends StatelessWidget {
               ),
             ]),
           ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Gap Drop Target (within-section reorder) ─────────────────────────────────
+
+class _GapTarget extends StatelessWidget {
+  final _Gap gap;
+  final void Function(_BacklogItem) onInsert;
+
+  const _GapTarget({super.key, required this.gap, required this.onInsert});
+
+  String _itemSection(_BacklogItem item) {
+    if (item.milestoneId != null && item.milestoneId!.isNotEmpty && gap.activeMilestoneIds.contains(item.milestoneId)) {
+      return item.milestoneId!;
+    }
+    return '__unassigned';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<_BacklogItem>(
+      onWillAcceptWithDetails: (d) => _itemSection(d.data) == gap.sectionId,
+      onAcceptWithDetails: (d) => onInsert(d.data),
+      builder: (ctx, candidates, _) {
+        final over = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: over ? 24 : 4,
+          margin: over ? const EdgeInsets.symmetric(vertical: 2) : EdgeInsets.zero,
+          decoration: over
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  color: AppColors.teal.withValues(alpha: 0.06),
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
+                )
+              : null,
+          child: over
+              ? const Center(child: Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.teal))
+              : null,
         );
       },
     );
