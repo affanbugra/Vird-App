@@ -697,16 +697,29 @@ class _BacklogViewState extends State<_BacklogView> {
             const SizedBox(height: 10),
             SizedBox(
               height: 30,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: cats.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  if (i == 0) return _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null));
-                  final c = cats[i - 1];
-                  return _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c));
-                },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(left: 16),
+                      itemCount: cats.length + 1,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        if (i == 0) return _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null));
+                        final c = cats[i - 1];
+                        return _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c));
+                      },
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _CatManagerSheet.show(context),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(Icons.tune_rounded, size: 16, color: AppColors.textMid),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -755,15 +768,18 @@ class _BacklogViewState extends State<_BacklogView> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (ctx) => Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: _AddItemSheet(initialType: _tab),
-          ),
-        ),
+        onPressed: () {
+          final allCats = _allItems.map((i) => i.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: _AddItemSheet(initialType: _tab, existingCats: allCats),
+            ),
+          );
+        },
         backgroundColor: AppColors.teal,
         elevation: 3,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
@@ -2224,8 +2240,9 @@ class _AddItemSheet extends StatefulWidget {
   final String initialType;
   final String? prefillText;
   final VoidCallback? onSaved;
+  final List<String> existingCats;
 
-  const _AddItemSheet({required this.initialType, this.prefillText, this.onSaved});
+  const _AddItemSheet({required this.initialType, this.prefillText, this.onSaved, this.existingCats = const []});
 
   @override
   State<_AddItemSheet> createState() => _AddItemSheetState();
@@ -2241,7 +2258,9 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   bool _saving = false;
 
   static const _backlogCol = 'app_backlog';
-  static const _presets = ['Seri', 'Ekipler', 'Hasanat', 'UI', 'Auth', 'Bildirim', 'Hatim'];
+  static const _fallbackPresets = ['Seri', 'Ekipler', 'Hasanat', 'UI', 'Auth', 'Bildirim', 'Hatim'];
+
+  List<String> get _cats => widget.existingCats.isNotEmpty ? widget.existingCats : _fallbackPresets;
 
   @override
   void initState() {
@@ -2417,7 +2436,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                 Wrap(
                   spacing: 8, runSpacing: 8,
                   children: [
-                    ..._presets.map((c) {
+                    ..._cats.map((c) {
                       final sel = _selCat == c;
                       final color = _catColor(c);
                       return GestureDetector(
@@ -2478,6 +2497,220 @@ class _AddItemSheetState extends State<_AddItemSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Category Manager ──────────────────────────────────────────────────────────
+
+class _CatManagerSheet extends StatefulWidget {
+  const _CatManagerSheet();
+
+  static void show(BuildContext context) => showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const FractionallySizedBox(
+      heightFactor: 0.65,
+      child: _CatManagerSheet(),
+    ),
+  );
+
+  @override
+  State<_CatManagerSheet> createState() => _CatManagerSheetState();
+}
+
+class _CatManagerSheetState extends State<_CatManagerSheet> {
+  List<String> _cats = [];
+  bool _loading = true;
+
+  @override
+  void initState() { super.initState(); _loadCats(); }
+
+  Future<void> _loadCats() async {
+    final snap = await FirebaseFirestore.instance.collection('app_backlog').get();
+    final cats = snap.docs
+        .map((d) => ((d.data())['category'] as String?) ?? '')
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()..sort();
+    if (mounted) setState(() { _cats = cats; _loading = false; });
+  }
+
+  Future<void> _rename(String oldName, String newName) async {
+    if (newName.isEmpty || newName == oldName) return;
+    final snap = await FirebaseFirestore.instance
+        .collection('app_backlog')
+        .where('category', isEqualTo: oldName)
+        .get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'category': newName});
+    }
+    await batch.commit();
+    await _loadCats();
+  }
+
+  Future<void> _delete(String cat) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('app_backlog')
+        .where('category', isEqualTo: cat)
+        .get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'category': 'Genel'});
+    }
+    await batch.commit();
+    await _loadCats();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: Scaffold(
+        backgroundColor: AppColors.white,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 12),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Kategori Yönetimi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            ),
+            const SizedBox(height: 4),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Kategorileri yeniden adlandır veya sil.', style: TextStyle(fontSize: 12, color: AppColors.textMid)),
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.borderGrey),
+            if (_loading)
+              const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)))
+            else if (_cats.isEmpty)
+              const Expanded(child: Center(child: Text('Henüz kategori yok.', style: TextStyle(color: AppColors.textLight, fontSize: 14))))
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  itemCount: _cats.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.borderGrey),
+                  itemBuilder: (ctx, i) {
+                    final cat = _cats[i];
+                    return _CatRow(
+                      key: ValueKey(cat),
+                      cat: cat,
+                      onRename: (newName) => _rename(cat, newName),
+                      onDelete: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Kategori Sil'),
+                            content: Text('"$cat" kategorisi silinecek.\nBu kategorideki öğeler "Genel"e taşınır.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+                              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sil', style: TextStyle(color: AppColors.errorRed))),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) await _delete(cat);
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatRow extends StatefulWidget {
+  final String cat;
+  final Future<void> Function(String) onRename;
+  final VoidCallback onDelete;
+  const _CatRow({super.key, required this.cat, required this.onRename, required this.onDelete});
+
+  @override
+  State<_CatRow> createState() => _CatRowState();
+}
+
+class _CatRowState extends State<_CatRow> {
+  bool _editing = false;
+  late final TextEditingController _ctrl;
+  bool _saving = false;
+
+  @override
+  void initState() { super.initState(); _ctrl = TextEditingController(text: widget.cat); }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _catColor(widget.cat);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _editing
+                ? TextField(
+                    controller: _ctrl,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 4),
+                      border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.teal)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.teal, width: 2)),
+                    ),
+                  )
+                : Text(widget.cat, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          ),
+          if (_editing) ...[
+            if (_saving)
+              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
+            else
+              IconButton(
+                icon: const Icon(Icons.check_rounded, color: AppColors.teal, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () async {
+                  final newName = _ctrl.text.trim();
+                  if (newName.isEmpty) return;
+                  setState(() => _saving = true);
+                  await widget.onRename(newName);
+                  if (mounted) setState(() { _editing = false; _saving = false; });
+                },
+              ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, color: AppColors.textLight, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: () => setState(() { _editing = false; _ctrl.text = widget.cat; }),
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: AppColors.textMid, size: 18),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: () => setState(() => _editing = true),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.errorRed, size: 18),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: widget.onDelete,
+            ),
+          ],
+        ],
       ),
     );
   }
