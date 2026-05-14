@@ -61,15 +61,25 @@ service cloud.firestore {
       }
     }
 
+    // ── Feedback Klasörleri ────────────────────────────────────────────
+    match /feedback_labels/{labelId} {
+      allow read, write: if isAuth();
+    }
+
     // ── Developer Backlog ──────────────────────────────────────────────
     match /app_backlog/{itemId} {
+      allow read, write: if isAuth();
+    }
+
+    // ── Developer Milestones ───────────────────────────────────────────
+    match /app_milestones/{milestoneId} {
       allow read, write: if isAuth();
     }
 
     // ── Özellik önerileri ──────────────────────────────────────────────
     match /feature_requests/{requestId} {
       allow create: if isAuth();
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAuth();
     }
 
     // ── Ekip katılma istekleri ─────────────────────────────────────────

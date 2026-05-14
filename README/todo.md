@@ -9,6 +9,12 @@
 - [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
+### Tamamlanan (2026-05-14)
+- [x] **DevPanel border crash** — `Border.all` uniform + `ClipRRect` + `IntrinsicHeight` + sol aksan child Container ✅
+- [x] **Orphaned milestoneId bug** — `assignedToActive` set check ile silinmiş milestone'a bağlı item'lar "Milestone'suz" grubuna düştü ✅
+- [x] **FeedbackView composite index** — client-side filter+sort, HomeView badge fix ✅
+- [x] **Feedback klasör sistemi** — `feedback_labels` koleksiyonu, `folderId` alanı, inbox mantığı (folderId==null), label yönetimi sheet'leri ✅
+
 ### Tamamlanan (2026-05-11)
 - [x] **Seri animasyonu Firestore index hatası** — `whereIn` kaldırıldı, client-side tip filtresi eklendi; `_getWeekFilled` ayrı try-catch'e alındı ✅
 - [x] **`recalculate()` yanlış log tipi sayma** — namaz/alışkanlık logları artık Quran serisi için sayılmıyor ✅

@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-11 — son güncelleme: Seri animasyonu + auth + geçmiş sıralamalar + avatar baş harf sistemi)
+## Genel Durum (2026-05-14 — son güncelleme: DevPanel feedback klasör sistemi + border crash + orphaned milestoneId)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -43,6 +43,59 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — DevPanel Feedback Klasör Sistemi + Bug Düzeltmeleri (2026-05-14)
+
+#### DevPanelScreen — 3 Kritik Bug Düzeltmesi + Feedback Klasör Sistemi (`lib/screens/dev_panel_screen.dart`)
+
+**Bug 1: Backlog kartları render crash (border + borderRadius uyumsuzluğu)**
+
+- Flutter kısıtı: `BoxDecoration`'da `borderRadius` + farklı kenarlara farklı renkler (`Border(left: renkA, top: renkB, ...)`) → `A borderRadius can only be given on borders with uniform colors` assertion crash
+- Kartlar doğru verilere sahipti ama sessizce render edilemiyordu — toggle çalışıyordu, veri geliyordu, ama ekranda hiçbir şey görünmüyordu
+- **Düzeltme:** `Border.all(color: AppColors.borderGrey)` (uniform) + `ClipRRect` + `IntrinsicHeight` + `crossAxisAlignment: CrossAxisAlignment.stretch` + sol aksan rengi ayrı `Container(width: 3, color: priorityColor)` child olarak eklendi
+
+**Bug 2: Silinmiş milestone'a bağlı kartlar kayboluyordu (orphaned foreign key)**
+
+- `_buildRows()` aktif milestone'ların altına veya `milestoneId == null/empty` grubuna eklerdi
+- Silinmiş bir milestone'a ait `milestoneId` olan item'lar her iki gruptan da dışarıda kalıyordu → `openCount` sayımına katılıyor ama hiçbir yerde gösterilmiyordu
+- **Düzeltme:** `assignedToActive` set ile check — aktif milestone'larda bulunmayan `milestoneId`'li item'lar da "Milestone'suz" grubuna eklendi
+
+**Bug 3: FeedbackView composite index hatası**
+
+- `where('archived', isEqualTo: false).orderBy('createdAt')` farklı alanda index gerektiriyordu → sessiz boş sonuç
+- `HomeView` badge'i: `where('archived', isEqualTo: false)` `archived` alanı hiç olmayan eski doc'ları atlıyordu
+- **Düzeltme:** İki yerde de `.snapshots()` ile tümünü çek, client-side filtrele + sırala
+
+#### Feedback Klasör (Label) Sistemi
+
+Yeni `feedback_labels` Firestore koleksiyonu. `feature_requests` doc'larına `folderId` alanı eklendi.
+
+**Veri modeli:**
+```
+feedback_labels/{labelId}
+  name: string
+  colorHex: string (ör. '#FF6B6B')
+
+feature_requests/{requestId}
+  folderId: string?   (null = Gelen Kutusu)
+```
+
+**Inbox mantığı:** `folderId == null || folderId.isEmpty` → Gelen Kutusu. Klasöre taşınınca Gelen Kutusu'ndan kalkar.
+
+**UI bileşenleri:**
+- `_FeedbackViewState`: sol sidebar (Gelen Kutusu / Tümü / klasörler), StreamSubscription tabanlı
+- `_FeedbackCard`: genişletilmiş görünümde klasör atama (chip row), dar görünümde klasör chip badge
+- `_LabelManagerSheet`: klasör listesi + renk gösterimi, silme
+- `_NewLabelSheet`: isim + 8 renk paleti (`#FF6B6B, #FF9600, #FFD166, #58CC02, #2A7F8C, #1CB0F6, #9B59B6, #FF69B4`)
+
+**Firestore kuralları güncellendi (`firestore.rules`):**
+```
+match /feedback_labels/{labelId} {
+  allow read, write: if isAuth();
+}
+```
+
+---
 
 ### Oturum — Seri Animasyonu + Auth + Geçmiş Sıralamalar + Avatar Baş Harf (2026-05-11)
 

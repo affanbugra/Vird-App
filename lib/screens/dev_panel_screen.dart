@@ -1,16 +1,46 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../app_colors.dart';
 import '../providers/user_provider.dart';
 
-// ─── Model ────────────────────────────────────────────────────────────────────
+// ─── Modeller ─────────────────────────────────────────────────────────────────
+
+class _Milestone {
+  final String id;
+  final String title;
+  final String version;
+  final String status; // 'active' | 'archived'
+  final int order;
+
+  const _Milestone({
+    required this.id,
+    required this.title,
+    required this.version,
+    required this.status,
+    required this.order,
+  });
+
+  factory _Milestone.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return _Milestone(
+      id: doc.id,
+      title: (d['title'] as String?) ?? '',
+      version: (d['version'] as String?) ?? '',
+      status: (d['status'] as String?) ?? 'active',
+      order: (d['order'] as int?) ?? 0,
+    );
+  }
+}
 
 class _BacklogItem {
   final String id;
-  final String type;     // 'bug' | 'todo'
+  final String type;        // 'bug' | 'plan' | 'idea'
   final String title;
   final String category;
+  final String priority;    // 'critical' | 'normal' | 'low'
+  final String? milestoneId;
   final bool completed;
   final bool archived;
   final int order;
@@ -20,6 +50,8 @@ class _BacklogItem {
     required this.type,
     required this.title,
     required this.category,
+    required this.priority,
+    this.milestoneId,
     required this.completed,
     required this.archived,
     required this.order,
@@ -29,9 +61,11 @@ class _BacklogItem {
     final d = doc.data() as Map<String, dynamic>;
     return _BacklogItem(
       id: doc.id,
-      type: (d['type'] as String?) ?? 'todo',
+      type: (d['type'] as String?) ?? 'plan',
       title: (d['title'] as String?) ?? '',
       category: (d['category'] as String?) ?? 'Genel',
+      priority: (d['priority'] as String?) ?? 'normal',
+      milestoneId: d['milestoneId'] as String?,
       completed: (d['completed'] as bool?) ?? false,
       archived: (d['archived'] as bool?) ?? false,
       order: (d['order'] as int?) ?? 0,
@@ -39,7 +73,65 @@ class _BacklogItem {
   }
 }
 
-// ─── Category color ───────────────────────────────────────────────────────────
+class _FeedbackItem {
+  final String id;
+  final String text;
+  final String uid;
+  final bool isRead;
+  final bool archived;
+  final String? folderId;
+  final DateTime? createdAt;
+
+  const _FeedbackItem({
+    required this.id,
+    required this.text,
+    required this.uid,
+    required this.isRead,
+    required this.archived,
+    this.folderId,
+    this.createdAt,
+  });
+
+  factory _FeedbackItem.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return _FeedbackItem(
+      id: doc.id,
+      text: (d['text'] as String?) ?? '',
+      uid: (d['uid'] as String?) ?? '',
+      isRead: (d['isRead'] as bool?) ?? false,
+      archived: (d['archived'] as bool?) ?? false,
+      folderId: d['folderId'] as String?,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+class _Label {
+  final String id;
+  final String name;
+  final String colorHex;
+
+  const _Label({required this.id, required this.name, required this.colorHex});
+
+  factory _Label.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return _Label(
+      id: doc.id,
+      name: (d['name'] as String?) ?? '',
+      colorHex: (d['colorHex'] as String?) ?? '#777777',
+    );
+  }
+
+  Color get color {
+    try {
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return AppColors.textMid;
+    }
+  }
+}
+
+// ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
 Color _catColor(String cat) {
   switch (cat.toLowerCase().trim()) {
@@ -57,9 +149,27 @@ Color _catColor(String cat) {
   }
 }
 
+Color _priorityColor(String priority) {
+  switch (priority) {
+    case 'critical': return AppColors.errorRed;
+    case 'low':      return const Color(0xFF58CC02);
+    default:         return AppColors.gold;
+  }
+}
+
+String _relativeTime(DateTime? dt) {
+  if (dt == null) return '';
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'az önce';
+  if (diff.inHours < 1) return '${diff.inMinutes} dk önce';
+  if (diff.inDays < 1) return '${diff.inHours} sa önce';
+  if (diff.inDays < 7) return '${diff.inDays} gün önce';
+  return '${(diff.inDays / 7).floor()} hafta önce';
+}
+
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog }
+enum _PanelView { home, backlog, feedback }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -96,15 +206,21 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-      child: _view == _PanelView.home
-          ? _HomeView(
-              key: const ValueKey('home'),
-              onBacklogTap: () => setState(() => _view = _PanelView.backlog),
-            )
-          : _BacklogView(
-              key: const ValueKey('backlog'),
-              onBack: () => setState(() => _view = _PanelView.home),
-            ),
+      child: switch (_view) {
+        _PanelView.home     => _HomeView(
+            key: const ValueKey('home'),
+            onBacklogTap:  () => setState(() => _view = _PanelView.backlog),
+            onFeedbackTap: () => setState(() => _view = _PanelView.feedback),
+          ),
+        _PanelView.backlog  => _BacklogView(
+            key: const ValueKey('backlog'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
+        _PanelView.feedback => _FeedbackView(
+            key: const ValueKey('feedback'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
+      },
     );
   }
 }
@@ -113,7 +229,8 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
 
 class _HomeView extends StatelessWidget {
   final VoidCallback onBacklogTap;
-  const _HomeView({super.key, required this.onBacklogTap});
+  final VoidCallback onFeedbackTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap});
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +305,7 @@ class _HomeView extends StatelessWidget {
                           child: _PanelCard(
                             icon: Icons.checklist_rtl_outlined,
                             title: 'Backlog',
-                            subtitle: 'Bug & görev yönetimi',
+                            subtitle: 'Bug, plan ve fikirler',
                             active: true,
                             onTap: onBacklogTap,
                           ),
@@ -196,11 +313,28 @@ class _HomeView extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           flex: 5,
-                          child: _PanelCard(
-                            icon: Icons.rocket_launch_outlined,
-                            title: 'Neler Geldi\nNeler Gelecek',
-                            subtitle: 'Yol haritası yönetimi',
-                            active: false,
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('feature_requests')
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final unread = (snap.data?.docs ?? [])
+                                  .where((d) {
+                                    final data = d.data() as Map;
+                                    final archived = data['archived'] as bool? ?? false;
+                                    final folderId = data['folderId'] as String?;
+                                    return !archived && (folderId == null || folderId.isEmpty);
+                                  })
+                                  .length;
+                              return _PanelCard(
+                                icon: Icons.inbox_outlined,
+                                title: 'Feedback',
+                                subtitle: 'Kullanıcı geri bildirimleri',
+                                active: true,
+                                badgeCount: unread,
+                                onTap: onFeedbackTap,
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -214,9 +348,9 @@ class _HomeView extends StatelessWidget {
                         Expanded(
                           flex: 5,
                           child: _PanelCard(
-                            icon: Icons.analytics_outlined,
-                            title: 'Kullanıcı\nİstatistikleri',
-                            subtitle: 'Uygulama metrikleri',
+                            icon: Icons.rocket_launch_outlined,
+                            title: 'Neler Geldi\nNeler Gelecek',
+                            subtitle: 'Yol haritası yönetimi',
                             active: false,
                           ),
                         ),
@@ -262,6 +396,7 @@ class _PanelCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool active;
+  final int badgeCount;
   final VoidCallback? onTap;
 
   const _PanelCard({
@@ -269,6 +404,7 @@ class _PanelCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.active,
+    this.badgeCount = 0,
     this.onTap,
   });
 
@@ -301,7 +437,23 @@ class _PanelCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: Colors.white, size: 26),
+                Row(children: [
+                  Icon(icon, color: Colors.white, size: 26),
+                  if (badgeCount > 0) ...[
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$badgeCount yeni',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ]),
                 const SizedBox(height: 16),
                 Text(
                   title,
@@ -331,10 +483,7 @@ class _PanelCard extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.textLight, size: 26),
           const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(color: AppColors.textMid, fontSize: 14, fontWeight: FontWeight.w800, height: 1.3),
-          ),
+          Text(title, style: const TextStyle(color: AppColors.textMid, fontSize: 14, fontWeight: FontWeight.w800, height: 1.3)),
           const SizedBox(height: 4),
           Text(subtitle, style: const TextStyle(color: AppColors.textLight, fontSize: 11)),
           const SizedBox(height: 12),
@@ -400,326 +549,210 @@ class _BacklogViewState extends State<_BacklogView> {
   String? _filterCat;
   bool _showCompleted = true;
   bool _showArchive = false;
+  final Set<String> _expanded = {};
 
-  static const _col = 'app_backlog';
+  List<_BacklogItem> _allItems = [];
+  List<_Milestone> _milestones = [];
+  bool _loading = true;
 
-  Future<void> _toggle(String id, bool current) =>
-      FirebaseFirestore.instance.collection(_col).doc(id).update({'completed': !current});
+  StreamSubscription<QuerySnapshot>? _itemSub;
+  StreamSubscription<QuerySnapshot>? _msSub;
 
-  Future<void> _delete(String id) =>
-      FirebaseFirestore.instance.collection(_col).doc(id).delete();
+  @override
+  void initState() {
+    super.initState();
+    _itemSub = FirebaseFirestore.instance.collection('app_backlog').snapshots().listen((s) {
+      setState(() {
+        _allItems = s.docs.map(_BacklogItem.fromDoc).toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+        _loading = false;
+      });
+    });
+    _msSub = FirebaseFirestore.instance.collection('app_milestones').snapshots().listen((s) {
+      setState(() {
+        _milestones = s.docs.map(_Milestone.fromDoc)
+            .where((m) => m.status == 'active')
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _itemSub?.cancel();
+    _msSub?.cancel();
+    super.dispose();
+  }
+
+  void _toggleSection(String id) =>
+      setState(() => _expanded.contains(id) ? _expanded.remove(id) : _expanded.add(id));
+
+  Future<void> _complete(String id, bool cur) =>
+      FirebaseFirestore.instance.collection('app_backlog').doc(id).update({'completed': !cur});
 
   Future<void> _archive(String id) =>
-      FirebaseFirestore.instance.collection(_col).doc(id).update({'archived': true});
+      FirebaseFirestore.instance.collection('app_backlog').doc(id).update({'archived': true});
 
-  Future<void> _reorder(List<_BacklogItem> visible, int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex--;
-    final list = List<_BacklogItem>.from(visible);
-    list.insert(newIndex, list.removeAt(oldIndex));
-    final batch = FirebaseFirestore.instance.batch();
-    for (int i = 0; i < list.length; i++) {
-      batch.update(
-        FirebaseFirestore.instance.collection(_col).doc(list[i].id),
-        {'order': i},
-      );
+  Future<void> _delete(String id) =>
+      FirebaseFirestore.instance.collection('app_backlog').doc(id).delete();
+
+  // Düz liste: Map (header) veya _BacklogItem (kart)
+  List<Object> _buildRows(List<_BacklogItem> items) {
+    final rows = <Object>[];
+    for (final ms in _milestones) {
+      final msItems = items.where((i) => i.milestoneId == ms.id).toList();
+      rows.add({'type': 'ms', 'ms': ms, 'count': msItems.where((i) => !i.completed).length});
+      if (_expanded.contains(ms.id)) rows.addAll(msItems);
     }
-    await batch.commit();
+    final assignedToActive = _milestones.map((m) => m.id).toSet();
+    final unassigned = items.where((i) =>
+      i.milestoneId == null ||
+      i.milestoneId!.isEmpty ||
+      !assignedToActive.contains(i.milestoneId)
+    ).toList();
+    if (unassigned.isNotEmpty) {
+      rows.add({'type': 'un', 'count': unassigned.where((i) => !i.completed).length});
+      if (_expanded.contains('__unassigned')) rows.addAll(unassigned);
+    }
+    return rows;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_showArchive) {
-      return _ArchiveView(onBack: () => setState(() => _showArchive = false));
-    }
+    if (_showArchive) return _ArchiveView(onBack: () => setState(() => _showArchive = false));
+
+    final tabItems = _allItems.where((i) {
+      if (i.archived) return false;
+      if (_tab == 'plan') return i.type == 'plan' || i.type == 'todo';
+      return i.type == _tab;
+    }).toList();
+    final archivedCount = _allItems.where((i) => i.archived).length;
+    final cats = tabItems.map((i) => i.category).toSet().toList()..sort();
+    final filtered = _filterCat == null ? tabItems : tabItems.where((i) => i.category == _filterCat).toList();
+    final displayed = _showCompleted ? filtered : filtered.where((i) => !i.completed).toList();
+    final openCount = tabItems.where((i) => !i.completed).length;
+    final rows = _tab != 'idea' ? _buildRows(displayed) : <Object>[];
 
     return Scaffold(
       backgroundColor: AppColors.white,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(_col)
-            .orderBy('order')
-            .snapshots(),
-        builder: (context, snap) {
-          if (snap.hasError) {
-            return const Center(
-              child: Text('Yükleme hatası', style: TextStyle(color: AppColors.textMid)),
-            );
-          }
-
-          final allItems = (snap.data?.docs ?? []).map((d) => _BacklogItem.fromDoc(d)).toList();
-          // Arşivlenmiş öğeleri ana listeden çıkar
-          final tabItems = allItems.where((i) => i.type == _tab && !i.archived).toList();
-          final archivedCount = allItems.where((i) => i.archived).length;
-          final cats = tabItems.map((i) => i.category).toSet().toList()..sort();
-          final byCat = _filterCat == null
-              ? tabItems
-              : tabItems.where((i) => i.category == _filterCat).toList();
-          final displayed = _showCompleted ? byCat : byCat.where((i) => !i.completed).toList();
-          final openCount = tabItems.where((i) => !i.completed).length;
-          final canDrag = _filterCat == null && _showCompleted;
-
-          return Column(
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(4, 16, 12, 16),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.borderGrey)),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(4, 16, 12, 16),
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+            child: Row(children: [
+              IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark), onPressed: widget.onBack),
+              const Text('Backlog', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const Spacer(),
+              if (openCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$openCount açık', style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
                 ),
-                child: Row(children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
-                    onPressed: widget.onBack,
-                  ),
-                  const Text(
-                    'Backlog',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
-                  ),
-                  const Spacer(),
-                  if (openCount > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.tealLight,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$openCount açık',
-                        style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  // Arşiv butonu
-                  if (archivedCount > 0) ...[
-                    GestureDetector(
-                      onTap: () => setState(() => _showArchive = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.archive_outlined, size: 14, color: AppColors.textMid),
-                          const SizedBox(width: 4),
-                          Text('$archivedCount', style: const TextStyle(fontSize: 11, color: AppColors.textMid, fontWeight: FontWeight.w700)),
-                        ]),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  // Tamamlananları göster/gizle
-                  GestureDetector(
-                    onTap: () => setState(() => _showCompleted = !_showCompleted),
-                    child: Icon(
-                      _showCompleted ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      size: 20,
-                      color: _showCompleted ? AppColors.teal : AppColors.textLight,
-                    ),
-                  ),
-                ]),
-              ),
-
-              // Tab toggle
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(children: [
-                    _TabBtn(
-                      label: 'BUGS',
-                      active: _tab == 'bug',
-                      onTap: () => setState(() { _tab = 'bug'; _filterCat = null; }),
-                    ),
-                    _TabBtn(
-                      label: 'TO-DO',
-                      active: _tab == 'todo',
-                      onTap: () => setState(() { _tab = 'todo'; _filterCat = null; }),
-                    ),
-                  ]),
-                ),
-              ),
-
-              // Kategori filtre chips
-              if (cats.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 30,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: cats.length + 1,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (_, i) {
-                      if (i == 0) {
-                        return _CatChip(
-                          label: 'Tümü',
-                          color: AppColors.teal,
-                          active: _filterCat == null,
-                          onTap: () => setState(() => _filterCat = null),
-                        );
-                      }
-                      final c = cats[i - 1];
-                      return _CatChip(
-                        label: c,
-                        color: _catColor(c),
-                        active: _filterCat == c,
-                        onTap: () => setState(() => _filterCat = _filterCat == c ? null : c),
-                      );
-                    },
-                  ),
-                ),
+                const SizedBox(width: 8),
               ],
+              GestureDetector(
+                onTap: () => _MilestoneManagerSheet.show(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.teal.withValues(alpha: 0.25))),
+                  child: const Row(children: [Icon(Icons.flag_outlined, size: 14, color: AppColors.teal), SizedBox(width: 4), Text('Milestone', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700))]),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (archivedCount > 0) ...[
+                GestureDetector(
+                  onTap: () => setState(() => _showArchive = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFF1E293B).withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8)),
+                    child: Row(children: [const Icon(Icons.archive_outlined, size: 14, color: AppColors.textMid), const SizedBox(width: 4), Text('$archivedCount', style: const TextStyle(fontSize: 11, color: AppColors.textMid, fontWeight: FontWeight.w700))]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              GestureDetector(
+                onTap: () => setState(() => _showCompleted = !_showCompleted),
+                child: Icon(_showCompleted ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: _showCompleted ? AppColors.teal : AppColors.textLight),
+              ),
+            ]),
+          ),
 
-              const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                _TabBtn(label: 'BUGS',    active: _tab == 'bug',  onTap: () => setState(() { _tab = 'bug';  _filterCat = null; })),
+                _TabBtn(label: 'PLAN',    active: _tab == 'plan', onTap: () => setState(() { _tab = 'plan'; _filterCat = null; })),
+                _TabBtn(label: 'FİKİRLER', active: _tab == 'idea', onTap: () => setState(() { _tab = 'idea'; _filterCat = null; })),
+              ]),
+            ),
+          ),
 
-              // Liste
-              Expanded(
-                child: snap.connectionState == ConnectionState.waiting
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
-                    : displayed.isEmpty
-                        ? Center(
-                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Icon(
-                                _tab == 'bug' ? Icons.bug_report_outlined : Icons.checklist_outlined,
-                                size: 48,
-                                color: AppColors.borderGrey,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _tab == 'bug' ? 'Bug yok! 🎉' : 'Yapılacak yok!',
-                                style: const TextStyle(color: AppColors.textMid, fontSize: 15),
-                              ),
-                            ]),
-                          )
-                        : ReorderableListView.builder(
+          if (cats.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 30,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: cats.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  if (i == 0) return _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null));
+                  final c = cats[i - 1];
+                  return _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c));
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 4),
+
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
+                : displayed.isEmpty
+                    ? _EmptyState(tab: _tab)
+                    : _tab == 'idea'
+                        ? _IdeaList(items: displayed, onToggle: _complete, onArchive: _archive, onDelete: _delete)
+                        : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                            buildDefaultDragHandles: false,
-                            onReorder: canDrag
-                                ? (o, n) => _reorder(displayed, o, n)
-                                : (_, _) {},
-                            itemCount: displayed.length,
-                            itemBuilder: (context, i) {
-                              final item = displayed[i];
-                              return Dismissible(
+                            itemCount: rows.length,
+                            itemBuilder: (ctx, i) {
+                              final row = rows[i];
+                              if (row is Map<String, Object>) {
+                                if (row['type'] == 'ms') {
+                                  final ms = row['ms'] as _Milestone;
+                                  return _MilestoneHeader(
+                                    milestone: ms,
+                                    itemCount: row['count'] as int,
+                                    isCollapsed: !_expanded.contains(ms.id),
+                                    onToggle: () => _toggleSection(ms.id),
+                                  );
+                                }
+                                return _UnassignedHeader(
+                                  itemCount: row['count'] as int,
+                                  isCollapsed: !_expanded.contains('__unassigned'),
+                                  onToggle: () => _toggleSection('__unassigned'),
+                                );
+                              }
+                              final item = row as _BacklogItem;
+                              return _BacklogCard(
                                 key: ValueKey(item.id),
-                                direction: DismissDirection.horizontal,
-                                // Sağa kaydır → Arşivle (teal)
-                                background: Container(
-                                  alignment: Alignment.centerLeft,
-                                  padding: const EdgeInsets.only(left: 20),
-                                  margin: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.teal,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(children: [
-                                    Icon(Icons.archive_outlined, color: Colors.white, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('Arşivle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                                  ]),
-                                ),
-                                // Sola kaydır → Sil (kırmızı)
-                                secondaryBackground: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.only(right: 20),
-                                  margin: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.errorRed,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Text('Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                                    SizedBox(width: 8),
-                                    Icon(Icons.delete_outline, color: Colors.white, size: 20),
-                                  ]),
-                                ),
-                                confirmDismiss: (direction) async {
-                                  if (direction == DismissDirection.startToEnd) {
-                                    // Arşivle — stream item'ı kaldıracak, false dön
-                                    await _archive(item.id);
-                                    return false;
-                                  }
-                                  // Sil
-                                  return true;
-                                },
-                                onDismissed: (_) => _delete(item.id),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: item.completed ? const Color(0xFFF9FAFB) : AppColors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.borderGrey),
-                                  ),
-                                  child: Row(children: [
-                                    canDrag
-                                        ? ReorderableDragStartListener(
-                                            index: i,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                                              child: Icon(
-                                                Icons.drag_indicator_rounded,
-                                                color: AppColors.textLight.withValues(alpha: 0.5),
-                                                size: 18,
-                                              ),
-                                            ),
-                                          )
-                                        : const SizedBox(width: 14),
-                                    GestureDetector(
-                                      onTap: () => _toggle(item.id, item.completed),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
-                                        width: 20,
-                                        height: 20,
-                                        decoration: BoxDecoration(
-                                          color: item.completed ? AppColors.teal : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(5),
-                                          border: Border.all(
-                                            color: item.completed ? AppColors.teal : AppColors.borderGrey,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: item.completed
-                                            ? const Icon(Icons.check_rounded, color: Colors.white, size: 13)
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 13),
-                                        child: Text(
-                                          item.title,
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            color: item.completed ? AppColors.textLight : AppColors.textDark,
-                                            decoration: item.completed ? TextDecoration.lineThrough : null,
-                                            decorationColor: AppColors.textLight,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 12),
-                                      child: _CatBadge(cat: item.category),
-                                    ),
-                                  ]),
-                                ),
+                                item: item,
+                                onToggle: () => _complete(item.id, item.completed),
+                                onArchive: () => _archive(item.id),
+                                onDelete: () => _delete(item.id),
                               );
                             },
                           ),
-              ),
-            ],
-          );
-        },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showModalBottomSheet(
@@ -734,11 +767,294 @@ class _BacklogViewState extends State<_BacklogView> {
         backgroundColor: AppColors.teal,
         elevation: 3,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          _tab == 'bug' ? 'Bug Ekle' : 'Görev Ekle',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+        label: Text(_tab == 'bug' ? 'Bug Ekle' : _tab == 'plan' ? 'Görev Ekle' : 'Fikir Ekle',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+      ),
+    );
+  }
+}
+
+class _MilestoneHeader extends StatelessWidget {
+  final _Milestone milestone;
+  final int itemCount;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+
+  const _MilestoneHeader({
+    required this.milestone,
+    required this.itemCount,
+    required this.isCollapsed,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        margin: const EdgeInsets.only(top: 12, bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B).withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF1E293B).withValues(alpha: 0.08)),
+        ),
+        child: Row(children: [
+          // Version badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.teal,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              milestone.version,
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              milestone.title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+            ),
+          ),
+          if (itemCount > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+              child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.teal, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Icon(
+            isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: AppColors.textMid,
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _UnassignedHeader extends StatelessWidget {
+  final int itemCount;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+
+  const _UnassignedHeader({required this.itemCount, required this.isCollapsed, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        margin: const EdgeInsets.only(top: 12, bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.borderGrey),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
+            child: const Text('—', style: TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('Milestone\'suz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid))),
+          if (itemCount > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+              child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Icon(
+            isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: AppColors.textMid,
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Backlog Kart ─────────────────────────────────────────────────────────────
+
+class _BacklogCard extends StatelessWidget {
+  final _BacklogItem item;
+  final VoidCallback onToggle;
+  final VoidCallback onArchive;
+  final VoidCallback onDelete;
+
+  const _BacklogCard({super.key, required this.item, required this.onToggle, required this.onArchive, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: item.completed ? const Color(0xFFF9FAFB) : AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 3, color: _priorityColor(item.priority)),
+              const SizedBox(width: 7),
+              GestureDetector(
+                onTap: onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 20, height: 20,
+                    decoration: BoxDecoration(
+                      color: item.completed ? AppColors.teal : Colors.transparent,
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: item.completed ? AppColors.teal : AppColors.borderGrey, width: 1.5),
+                    ),
+                    child: item.completed ? const Icon(Icons.check_rounded, color: Colors.white, size: 13) : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: item.completed ? AppColors.textLight : AppColors.textDark,
+                      decoration: item.completed ? TextDecoration.lineThrough : null,
+                      decorationColor: AppColors.textLight,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Center(child: _CatBadge(cat: item.category)),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textLight),
+                padding: EdgeInsets.zero,
+                onSelected: (val) {
+                  if (val == 'archive') onArchive();
+                  if (val == 'delete') onDelete();
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'archive', child: Row(children: [Icon(Icons.archive_outlined, size: 16), SizedBox(width: 8), Text('Arşivle')])),
+                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.errorRed), const SizedBox(width: 8), Text('Sil', style: TextStyle(color: AppColors.errorRed))])),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Fikir Listesi ────────────────────────────────────────────────────────────
+
+class _IdeaList extends StatelessWidget {
+  final List<_BacklogItem> items;
+  final Future<void> Function(String, bool) onToggle;
+  final Future<void> Function(String) onArchive;
+  final Future<void> Function(String) onDelete;
+
+  const _IdeaList({required this.items, required this.onToggle, required this.onArchive, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return Dismissible(
+          key: ValueKey(item.id),
+          direction: DismissDirection.horizontal,
+          background: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 20),
+            margin: const EdgeInsets.symmetric(vertical: 3),
+            decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(12)),
+            child: const Row(children: [
+              Icon(Icons.archive_outlined, color: Colors.white, size: 18),
+              SizedBox(width: 6),
+              Text('Arşivle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+            ]),
+          ),
+          secondaryBackground: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            margin: const EdgeInsets.symmetric(vertical: 3),
+            decoration: BoxDecoration(color: AppColors.errorRed, borderRadius: BorderRadius.circular(12)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+              SizedBox(width: 6),
+              Icon(Icons.delete_outline, color: Colors.white, size: 18),
+            ]),
+          ),
+          confirmDismiss: (dir) async {
+            if (dir == DismissDirection.startToEnd) { await onArchive(item.id); return false; }
+            return true;
+          },
+          onDismissed: (_) => onDelete(item.id),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: item.completed ? const Color(0xFFF9FAFB) : AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderGrey),
+            ),
+            child: Row(children: [
+              GestureDetector(
+                onTap: () => onToggle(item.id, item.completed),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 20, height: 20,
+                  decoration: BoxDecoration(
+                    color: item.completed ? AppColors.teal : Colors.transparent,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: item.completed ? AppColors.teal : AppColors.borderGrey, width: 1.5),
+                  ),
+                  child: item.completed ? const Icon(Icons.check_rounded, color: Colors.white, size: 13) : null,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: item.completed ? AppColors.textLight : AppColors.textDark,
+                    decoration: item.completed ? TextDecoration.lineThrough : null,
+                    decorationColor: AppColors.textLight,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CatBadge(cat: item.category),
+            ]),
+          ),
+        );
+      },
     );
   }
 }
@@ -755,12 +1071,10 @@ class _ArchiveView extends StatefulWidget {
 
 class _ArchiveViewState extends State<_ArchiveView> {
   String _tab = 'bug';
-
   static const _col = 'app_backlog';
 
   Future<void> _unarchive(String id) =>
       FirebaseFirestore.instance.collection(_col).doc(id).update({'archived': false});
-
   Future<void> _delete(String id) =>
       FirebaseFirestore.instance.collection(_col).doc(id).delete();
 
@@ -769,68 +1083,53 @@ class _ArchiveViewState extends State<_ArchiveView> {
     return Scaffold(
       backgroundColor: AppColors.white,
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection(_col).orderBy('order').snapshots(),
+        stream: FirebaseFirestore.instance.collection(_col).snapshots(),
         builder: (context, snap) {
-          if (snap.hasError) {
-            return const Center(child: Text('Yükleme hatası', style: TextStyle(color: AppColors.textMid)));
-          }
-
-          final allItems = (snap.data?.docs ?? []).map((d) => _BacklogItem.fromDoc(d)).toList();
-          final tabItems = allItems.where((i) => i.type == _tab && i.archived).toList();
+          if (snap.hasError) return const Center(child: Text('Yükleme hatası', style: TextStyle(color: AppColors.textMid)));
+          final allItems = (snap.data?.docs ?? []).map((d) => _BacklogItem.fromDoc(d)).toList()
+              ..sort((a, b) => a.order.compareTo(b.order));
+          final tabItems = allItems.where((i) {
+                if (!i.archived) return false;
+                if (_tab == 'plan') return i.type == 'plan' || i.type == 'todo';
+                return i.type == _tab;
+              }).toList();
 
           return Column(
             children: [
-              // Header
               Container(
                 padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.borderGrey)),
-                ),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
                 child: Row(children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
-                    onPressed: widget.onBack,
-                  ),
+                  IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark), onPressed: widget.onBack),
                   const Icon(Icons.archive_outlined, size: 18, color: AppColors.textDark),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Arşiv',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
-                  ),
+                  const Text('Arşiv', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
                   const Spacer(),
-                  Text(
-                    '${tabItems.length} öğe',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMid),
-                  ),
+                  Text('${tabItems.length} öğe', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
                 ]),
               ),
-
-              // Tab toggle
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Container(
                   height: 44,
                   decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
                   child: Row(children: [
-                    _TabBtn(label: 'BUGS', active: _tab == 'bug', onTap: () => setState(() => _tab = 'bug')),
-                    _TabBtn(label: 'TO-DO', active: _tab == 'todo', onTap: () => setState(() => _tab = 'todo')),
+                    _TabBtn(label: 'BUGS',    active: _tab == 'bug',  onTap: () => setState(() => _tab = 'bug')),
+                    _TabBtn(label: 'PLAN',    active: _tab == 'plan', onTap: () => setState(() => _tab = 'plan')),
+                    _TabBtn(label: 'FİKİRLER', active: _tab == 'idea', onTap: () => setState(() => _tab = 'idea')),
                   ]),
                 ),
               ),
-
               const SizedBox(height: 4),
-
               Expanded(
                 child: snap.connectionState == ConnectionState.waiting
                     ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
                     : tabItems.isEmpty
-                        ? const Center(
-                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Icon(Icons.archive_outlined, size: 48, color: AppColors.borderGrey),
-                              SizedBox(height: 12),
-                              Text('Arşiv boş', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
-                            ]),
-                          )
+                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.archive_outlined, size: 48, color: AppColors.borderGrey),
+                            SizedBox(height: 12),
+                            Text('Arşiv boş', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+                          ]))
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
                             itemCount: tabItems.length,
@@ -843,10 +1142,7 @@ class _ArchiveViewState extends State<_ArchiveView> {
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 20),
                                   margin: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.errorRed,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                                  decoration: BoxDecoration(color: AppColors.errorRed, borderRadius: BorderRadius.circular(12)),
                                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                                     Text('Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
                                     SizedBox(width: 8),
@@ -866,15 +1162,7 @@ class _ArchiveViewState extends State<_ArchiveView> {
                                     Expanded(
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 13),
-                                        child: Text(
-                                          item.title,
-                                          style: const TextStyle(
-                                            fontSize: 13.5,
-                                            color: AppColors.textDark,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.4,
-                                          ),
-                                        ),
+                                        child: Text(item.title, style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, fontWeight: FontWeight.w600, height: 1.4)),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -895,6 +1183,961 @@ class _ArchiveViewState extends State<_ArchiveView> {
           );
         },
       ),
+    );
+  }
+}
+
+// ─── Milestone Manager Sheet ──────────────────────────────────────────────────
+
+class _MilestoneManagerSheet extends StatefulWidget {
+  const _MilestoneManagerSheet();
+
+  static Future<void> show(BuildContext context) =>
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: const ClipRRect(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            child: _MilestoneManagerSheet(),
+          ),
+        ),
+      );
+
+  @override
+  State<_MilestoneManagerSheet> createState() => _MilestoneManagerSheetState();
+}
+
+class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
+  static const _col = 'app_milestones';
+
+  Future<void> _archiveMilestone(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'status': 'archived'});
+
+  Future<void> _deleteMilestone(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).delete();
+
+  Future<void> _reorder(List<_Milestone> current, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final list = List<_Milestone>.from(current);
+    list.insert(newIndex, list.removeAt(oldIndex));
+    final batch = FirebaseFirestore.instance.batch();
+    for (int i = 0; i < list.length; i++) {
+      batch.update(FirebaseFirestore.instance.collection(_col).doc(list[i].id), {'order': i});
+    }
+    await batch.commit();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection(_col).snapshots(),
+        builder: (context, snap) {
+          final milestones = (snap.data?.docs ?? [])
+              .map((d) => _Milestone.fromDoc(d))
+              .where((m) => m.status == 'active')
+              .toList()
+              ..sort((a, b) => a.order.compareTo(b.order));
+
+          return Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+                child: Row(children: [
+                  const Icon(Icons.flag_outlined, size: 20, color: AppColors.textDark),
+                  const SizedBox(width: 10),
+                  const Text('Milestones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: AppColors.textMid, size: 20),
+                  ),
+                ]),
+              ),
+
+              Expanded(
+                child: snap.connectionState == ConnectionState.waiting
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
+                    : milestones.isEmpty
+                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.flag_outlined, size: 48, color: AppColors.borderGrey),
+                            SizedBox(height: 12),
+                            Text('Milestone yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+                            SizedBox(height: 4),
+                            Text('Aşağıdan yeni milestone ekle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                          ]))
+                        : ReorderableListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            buildDefaultDragHandles: false,
+                            onReorder: (o, n) => _reorder(milestones, o, n),
+                            itemCount: milestones.length,
+                            itemBuilder: (context, i) {
+                              final ms = milestones[i];
+                              return Container(
+                                key: ValueKey(ms.id),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.borderGrey),
+                                ),
+                                child: Row(children: [
+                                  ReorderableDragStartListener(
+                                    index: i,
+                                    child: Icon(Icons.drag_indicator_rounded, color: AppColors.textLight.withValues(alpha: 0.5), size: 18),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(6)),
+                                    child: Text(ms.version, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                  // Arşivle
+                                  IconButton(
+                                    onPressed: () => showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Milestone\'u arşivle'),
+                                        content: Text('"${ms.version} — ${ms.title}" arşive taşınacak. Bu sürüm tamamlandı mı?'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+                                          TextButton(
+                                            onPressed: () { Navigator.pop(ctx); _archiveMilestone(ms.id); },
+                                            child: const Text('Arşivle', style: TextStyle(color: AppColors.teal)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.archive_outlined, size: 18, color: AppColors.textLight),
+                                  ),
+                                  // Sil
+                                  IconButton(
+                                    onPressed: () => showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Milestone\'u sil'),
+                                        content: const Text('Bu işlem geri alınamaz. Bağlı görevler milestone\'suz kalır.'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+                                          TextButton(
+                                            onPressed: () { Navigator.pop(ctx); _deleteMilestone(ms.id); },
+                                            child: const Text('Sil', style: TextStyle(color: AppColors.errorRed)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textLight),
+                                  ),
+                                ]),
+                              );
+                            },
+                          ),
+              ),
+
+              // Yeni milestone ekle butonu
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _NewMilestoneSheet.show(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                    label: const Text('Yeni Milestone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Yeni Milestone Sheet ─────────────────────────────────────────────────────
+
+class _NewMilestoneSheet extends StatefulWidget {
+  const _NewMilestoneSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: const ClipRRect(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        child: _NewMilestoneSheet(),
+      ),
+    ),
+  );
+
+  @override
+  State<_NewMilestoneSheet> createState() => _NewMilestoneSheetState();
+}
+
+class _NewMilestoneSheetState extends State<_NewMilestoneSheet> {
+  final _titleCtrl = TextEditingController();
+  final _versionCtrl = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() { _titleCtrl.dispose(); _versionCtrl.dispose(); super.dispose(); }
+
+  Future<void> _save() async {
+    final title = _titleCtrl.text.trim();
+    final version = _versionCtrl.text.trim();
+    if (title.isEmpty || version.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance.collection('app_milestones').add({
+        'title': title,
+        'version': version,
+        'status': 'active',
+        'order': DateTime.now().millisecondsSinceEpoch,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSave = _titleCtrl.text.trim().isNotEmpty && _versionCtrl.text.trim().isNotEmpty;
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      resizeToAvoidBottomInset: false,
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            const SizedBox(height: 16),
+            const Text('Yeni Milestone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            const SizedBox(height: 16),
+            // Version
+            _InputField(controller: _versionCtrl, hint: 'Versiyon (örn: v1.1)', onChanged: (_) => setState(() {}), maxLines: 1),
+            const SizedBox(height: 10),
+            // Başlık
+            _InputField(controller: _titleCtrl, hint: 'Başlık (örn: Beta Düzeltmeleri)', onChanged: (_) => setState(() {}), maxLines: 1),
+            const SizedBox(height: 24),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: canSave ? 1.0 : 0.45,
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: (canSave && !_saving) ? _save : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    disabledBackgroundColor: AppColors.teal,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('OLUŞTUR', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.8, color: Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Feedback Ekranı ──────────────────────────────────────────────────────────
+
+class _FeedbackView extends StatefulWidget {
+  final VoidCallback onBack;
+  const _FeedbackView({super.key, required this.onBack});
+
+  @override
+  State<_FeedbackView> createState() => _FeedbackViewState();
+}
+
+class _FeedbackViewState extends State<_FeedbackView> {
+  static const _col = 'feature_requests';
+  static const _labelsCol = 'feedback_labels';
+
+  List<_FeedbackItem> _items = [];
+  List<_Label> _labels = [];
+  String _activeFilter = '__inbox';
+  bool _loading = true;
+
+  StreamSubscription<QuerySnapshot>? _itemSub;
+  StreamSubscription<QuerySnapshot>? _labelSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemSub = FirebaseFirestore.instance.collection(_col).snapshots().listen((s) {
+      setState(() {
+        _items = s.docs
+            .map((d) => _FeedbackItem.fromDoc(d))
+            .where((f) => !f.archived)
+            .toList()
+          ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+        _loading = false;
+      });
+    });
+    _labelSub = FirebaseFirestore.instance.collection(_labelsCol).snapshots().listen((s) {
+      setState(() => _labels = s.docs.map((d) => _Label.fromDoc(d)).toList());
+    });
+  }
+
+  @override
+  void dispose() {
+    _itemSub?.cancel();
+    _labelSub?.cancel();
+    super.dispose();
+  }
+
+  List<_FeedbackItem> get _filtered {
+    if (_activeFilter == '__inbox') return _items.where((f) => f.folderId == null || f.folderId!.isEmpty).toList();
+    if (_activeFilter == '__all') return _items;
+    return _items.where((f) => f.folderId == _activeFilter).toList();
+  }
+
+  Future<void> _markRead(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'isRead': true});
+  Future<void> _archive(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'archived': true});
+  Future<void> _delete(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).delete();
+  Future<void> _setFolder(String id, String? folderId) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'folderId': folderId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: AppColors.white,
+        body: Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)),
+      );
+    }
+
+    final filtered = _filtered;
+    final inboxCount = _items.where((f) => f.folderId == null || f.folderId!.isEmpty).length;
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+            child: Row(children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+                onPressed: widget.onBack,
+              ),
+              const Text('Feedback', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const Spacer(),
+              if (inboxCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$inboxCount bekliyor', style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              GestureDetector(
+                onTap: () => _LabelManagerSheet.show(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderGrey),
+                  ),
+                  child: const Row(children: [
+                    Icon(Icons.folder_outlined, size: 14, color: AppColors.textMid),
+                    SizedBox(width: 4),
+                    Text('Klasörler', style: TextStyle(fontSize: 11, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              children: [
+                _CatChip(label: 'Gelen Kutusu', color: AppColors.teal, active: _activeFilter == '__inbox', onTap: () => setState(() => _activeFilter = '__inbox')),
+                const SizedBox(width: 8),
+                _CatChip(label: 'Tümü', color: AppColors.textMid, active: _activeFilter == '__all', onTap: () => setState(() => _activeFilter = '__all')),
+                ..._labels.map((l) => Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: _CatChip(label: l.name, color: l.color, active: _activeFilter == l.id, onTap: () => setState(() => _activeFilter = l.id)),
+                )),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(
+                      _activeFilter == '__inbox' ? Icons.mark_email_read_outlined : Icons.folder_open_outlined,
+                      size: 48, color: AppColors.borderGrey,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _activeFilter == '__inbox' ? 'Gelen kutusu boş — tüm feedbackler klasörlendi' : 'Bu klasörde feedback yok',
+                      style: const TextStyle(color: AppColors.textMid, fontSize: 15),
+                      textAlign: TextAlign.center,
+                    ),
+                  ]))
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) {
+                      final item = filtered[i];
+                      return _FeedbackCard(
+                        key: ValueKey(item.id),
+                        item: item,
+                        labels: _labels,
+                        onMarkRead: () => _markRead(item.id),
+                        onArchive: () => _archive(item.id),
+                        onDelete: () => _delete(item.id),
+                        onSetFolder: (folderId) => _setFolder(item.id, folderId),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedbackCard extends StatefulWidget {
+  final _FeedbackItem item;
+  final List<_Label> labels;
+  final VoidCallback onMarkRead;
+  final VoidCallback onArchive;
+  final VoidCallback onDelete;
+  final void Function(String? folderId) onSetFolder;
+
+  const _FeedbackCard({super.key, required this.item, required this.labels, required this.onMarkRead, required this.onArchive, required this.onDelete, required this.onSetFolder});
+
+  @override
+  State<_FeedbackCard> createState() => _FeedbackCardState();
+}
+
+class _FeedbackCardState extends State<_FeedbackCard> {
+  bool _expanded = false;
+  String? _userName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+    if (!widget.item.isRead) widget.onMarkRead();
+  }
+
+  Future<void> _loadUserName() async {
+    if (widget.item.uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.item.uid).get();
+      if (!mounted) return;
+      final data = doc.data();
+      setState(() => _userName = (data?['name'] as String?) ?? (data?['username'] as String?) ?? 'Kullanıcı');
+    } catch (_) {}
+  }
+
+  void _promote(BuildContext context, String type) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: _AddItemSheet(
+          initialType: type,
+          prefillText: widget.item.text,
+          onSaved: () {
+              FirebaseFirestore.instance
+                  .collection('feature_requests')
+                  .doc(widget.item.id)
+                  .update({'archived': true});
+            },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey(widget.item.id),
+      direction: DismissDirection.horizontal,
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(12)),
+        child: const Row(children: [
+          Icon(Icons.archive_outlined, color: Colors.white, size: 18),
+          SizedBox(width: 6),
+          Text('Arşivle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+        ]),
+      ),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(color: AppColors.errorRed, borderRadius: BorderRadius.circular(12)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Text('Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+          SizedBox(width: 6),
+          Icon(Icons.delete_outline, color: Colors.white, size: 18),
+        ]),
+      ),
+      confirmDismiss: (dir) async {
+        if (dir == DismissDirection.startToEnd) { widget.onArchive(); return false; }
+        return true;
+      },
+      onDismissed: (_) => widget.onDelete(),
+      child: GestureDetector(
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: widget.item.isRead ? AppColors.white : AppColors.tealLight.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: widget.item.isRead ? AppColors.borderGrey : AppColors.teal.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                // Okundu/okunmadı nokta
+                Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    color: widget.item.isRead ? AppColors.borderGrey : AppColors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _userName ?? '...',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                ),
+                const Spacer(),
+                Builder(builder: (context) {
+                  final label = widget.labels.where((l) => l.id == widget.item.folderId).firstOrNull;
+                  if (label == null) return const SizedBox.shrink();
+                  return Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: label.color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(label.name, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: label.color)),
+                  );
+                }),
+                Text(_relativeTime(widget.item.createdAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                const SizedBox(width: 6),
+                Icon(
+                  _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  size: 16, color: AppColors.textLight,
+                ),
+              ]),
+              const SizedBox(height: 8),
+              Text(
+                widget.item.text,
+                style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, height: 1.4),
+                maxLines: _expanded ? null : 2,
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+
+              // Aksiyon butonları (açıkken)
+              if (_expanded) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: AppColors.borderGrey),
+                const SizedBox(height: 10),
+                Row(children: [
+                  _PromoteBtn(label: 'Bug Ekle', color: AppColors.errorRed, onTap: () => _promote(context, 'bug')),
+                  const SizedBox(width: 8),
+                  _PromoteBtn(label: 'Fikre Ekle', color: AppColors.textMid, onTap: () => _promote(context, 'idea')),
+                  const SizedBox(width: 8),
+                  _PromoteBtn(label: 'Plana Ekle', color: AppColors.teal, onTap: () => _promote(context, 'plan')),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: widget.onArchive,
+                    child: const Icon(Icons.archive_outlined, size: 18, color: AppColors.textLight),
+                  ),
+                ]),
+                if (widget.labels.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: AppColors.borderGrey),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text('Klasör', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Wrap(
+                          spacing: 6, runSpacing: 4,
+                          children: [
+                            GestureDetector(
+                              onTap: () => widget.onSetFolder(null),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: widget.item.folderId == null ? AppColors.textMid : AppColors.borderGrey,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text('Yok', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: widget.item.folderId == null ? Colors.white : AppColors.textMid)),
+                              ),
+                            ),
+                            ...widget.labels.map((l) => GestureDetector(
+                              onTap: () => widget.onSetFolder(l.id),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: widget.item.folderId == l.id ? l.color : l.color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(l.name, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: widget.item.folderId == l.id ? Colors.white : l.color)),
+                              ),
+                            )),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PromoteBtn extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _PromoteBtn({required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+      ),
+    );
+  }
+}
+
+// ─── Klasör Yöneticisi ────────────────────────────────────────────────────────
+
+class _LabelManagerSheet extends StatelessWidget {
+  const _LabelManagerSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => SizedBox(
+      height: MediaQuery.of(ctx).size.height * 0.6,
+      child: const ClipRRect(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        child: _LabelManagerSheet(),
+      ),
+    ),
+  );
+
+  static const _col = 'feedback_labels';
+
+  Future<void> _delete(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).delete();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection(_col).snapshots(),
+        builder: (context, snap) {
+          final labels = (snap.data?.docs ?? []).map((d) => _Label.fromDoc(d)).toList();
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+                child: Row(children: [
+                  const Icon(Icons.folder_outlined, size: 20, color: AppColors.textDark),
+                  const SizedBox(width: 10),
+                  const Text('Klasörler', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  const Spacer(),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: AppColors.textMid, size: 20)),
+                ]),
+              ),
+              Expanded(
+                child: snap.connectionState == ConnectionState.waiting
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
+                    : labels.isEmpty
+                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.folder_open_outlined, size: 48, color: AppColors.borderGrey),
+                            SizedBox(height: 12),
+                            Text('Klasör yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+                            SizedBox(height: 4),
+                            Text('Aşağıdan yeni klasör ekle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                          ]))
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            itemCount: labels.length,
+                            itemBuilder: (context, i) {
+                              final label = labels[i];
+                              return Container(
+                                key: ValueKey(label.id),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.borderGrey),
+                                ),
+                                child: Row(children: [
+                                  Container(
+                                    width: 12, height: 12,
+                                    decoration: BoxDecoration(color: label.color, shape: BoxShape.circle),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: Text(label.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                  IconButton(
+                                    onPressed: () => showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Klasörü sil'),
+                                        content: Text('"${label.name}" silinecek. Bu klasördeki feedbackler klasörsüz kalır.'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+                                          TextButton(
+                                            onPressed: () { Navigator.pop(ctx); _delete(label.id); },
+                                            child: const Text('Sil', style: TextStyle(color: AppColors.errorRed)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textLight),
+                                  ),
+                                ]),
+                              );
+                            },
+                          ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+                child: SizedBox(
+                  width: double.infinity, height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _NewLabelSheet.show(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                    label: const Text('Yeni Klasör', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NewLabelSheet extends StatefulWidget {
+  const _NewLabelSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: const ClipRRect(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        child: _NewLabelSheet(),
+      ),
+    ),
+  );
+
+  @override
+  State<_NewLabelSheet> createState() => _NewLabelSheetState();
+}
+
+class _NewLabelSheetState extends State<_NewLabelSheet> {
+  final _nameCtrl = TextEditingController();
+  String _selectedHex = '#2A7F8C';
+  bool _saving = false;
+
+  static const _palette = [
+    '#FF6B6B', '#FF9600', '#FFD166', '#58CC02',
+    '#2A7F8C', '#1CB0F6', '#9B59B6', '#FF69B4',
+  ];
+
+  @override
+  void dispose() { _nameCtrl.dispose(); super.dispose(); }
+
+  Color _hex(String h) {
+    try { return Color(int.parse(h.replaceFirst('#', '0xFF'))); } catch (_) { return AppColors.teal; }
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance.collection('feedback_labels').add({
+        'name': name,
+        'colorHex': _selectedHex,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSave = _nameCtrl.text.trim().isNotEmpty;
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      resizeToAvoidBottomInset: false,
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            const SizedBox(height: 16),
+            const Text('Yeni Klasör', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            const SizedBox(height: 16),
+            _InputField(controller: _nameCtrl, hint: 'Klasör adı (örn: Dualar)', onChanged: (_) => setState(() {}), maxLines: 1),
+            const SizedBox(height: 16),
+            const Text('Renk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10, runSpacing: 10,
+              children: _palette.map((h) {
+                final selected = _selectedHex == h;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedHex = h),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: _hex(h),
+                      shape: BoxShape.circle,
+                      border: selected ? Border.all(color: AppColors.textDark, width: 2.5) : null,
+                      boxShadow: selected ? [BoxShadow(color: _hex(h).withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))] : null,
+                    ),
+                    child: selected ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: canSave ? 1.0 : 0.45,
+              child: SizedBox(
+                width: double.infinity, height: 52,
+                child: ElevatedButton(
+                  onPressed: (canSave && !_saving) ? _save : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    disabledBackgroundColor: AppColors.teal,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('OLUŞTUR', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.8, color: Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Boş Durum ────────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final String tab;
+  const _EmptyState({required this.tab});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(
+          tab == 'bug' ? Icons.bug_report_outlined : tab == 'plan' ? Icons.checklist_outlined : Icons.lightbulb_outline_rounded,
+          size: 48,
+          color: AppColors.borderGrey,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          tab == 'bug' ? 'Bug yok! 🎉' : tab == 'plan' ? 'Yapılacak yok!' : 'Fikir yok henüz',
+          style: const TextStyle(color: AppColors.textMid, fontSize: 15),
+        ),
+      ]),
     );
   }
 }
@@ -934,10 +2177,42 @@ class _CatChip extends StatelessWidget {
           color: active ? color : color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Text(
-          label,
-          style: TextStyle(color: active ? Colors.white : color, fontSize: 11, fontWeight: FontWeight.w700),
+        child: Text(label, style: TextStyle(color: active ? Colors.white : color, fontSize: 11, fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+// ─── Input Field ─────────────────────────────────────────────────────────────
+
+class _InputField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final int maxLines;
+
+  const _InputField({required this.controller, required this.hint, required this.onChanged, this.maxLines = 3});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        minLines: 1,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(14),
+          hintText: hint,
+          hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 14),
         ),
+        style: const TextStyle(fontSize: 14, color: AppColors.textDark, height: 1.5),
       ),
     );
   }
@@ -947,7 +2222,10 @@ class _CatChip extends StatelessWidget {
 
 class _AddItemSheet extends StatefulWidget {
   final String initialType;
-  const _AddItemSheet({required this.initialType});
+  final String? prefillText;
+  final VoidCallback? onSaved;
+
+  const _AddItemSheet({required this.initialType, this.prefillText, this.onSaved});
 
   @override
   State<_AddItemSheet> createState() => _AddItemSheetState();
@@ -956,49 +2234,47 @@ class _AddItemSheet extends StatefulWidget {
 class _AddItemSheetState extends State<_AddItemSheet> {
   late String _type;
   String? _selCat;
+  String _priority = 'normal';
+  String? _selMilestoneId;
   final _titleCtrl = TextEditingController();
   final _customCatCtrl = TextEditingController();
   bool _saving = false;
 
-  static const _col = 'app_backlog';
+  static const _backlogCol = 'app_backlog';
   static const _presets = ['Seri', 'Ekipler', 'Hasanat', 'UI', 'Auth', 'Bildirim', 'Hatim'];
 
   @override
   void initState() {
     super.initState();
     _type = widget.initialType;
+    if (widget.prefillText != null) {
+      _titleCtrl.text = widget.prefillText!;
+    }
   }
 
   @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _customCatCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _titleCtrl.dispose(); _customCatCtrl.dispose(); super.dispose(); }
 
   Future<void> _save() async {
     final title = _titleCtrl.text.trim();
     final cat = _selCat ?? _customCatCtrl.text.trim();
     if (title.isEmpty || cat.isEmpty) return;
-
     setState(() => _saving = true);
     try {
-      // Composite index gerektirmemek için timestamp'i order olarak kullan —
-      // yeni öğeler listenin sonuna eklenir, kullanıcı sonra sürükleyerek sıralayabilir.
-      final order = DateTime.now().millisecondsSinceEpoch;
-
-      await FirebaseFirestore.instance.collection(_col).add({
+      await FirebaseFirestore.instance.collection(_backlogCol).add({
         'type': _type,
         'title': title,
         'category': cat,
+        'priority': _type == 'idea' ? 'normal' : _priority,
+        'milestoneId': (_type == 'idea') ? null : _selMilestoneId,
         'completed': false,
         'archived': false,
-        'order': order,
+        'order': DateTime.now().millisecondsSinceEpoch,
         'createdAt': FieldValue.serverTimestamp(),
       });
-
+      widget.onSaved?.call();
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _saving = false);
     }
   }
@@ -1020,15 +2296,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 36, height: 4,
-                    decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
-                  ),
-                ),
+                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
                 const SizedBox(height: 16),
-
                 const Text('Yeni Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
                 const SizedBox(height: 16),
 
@@ -1038,51 +2307,121 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                   child: Container(
                     decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(11)),
                     child: Row(children: [
-                      _TabBtn(label: 'BUG', active: _type == 'bug', onTap: () => setState(() => _type = 'bug')),
-                      _TabBtn(label: 'TO-DO', active: _type == 'todo', onTap: () => setState(() => _type = 'todo')),
+                      _TabBtn(label: 'BUG',     active: _type == 'bug',  onTap: () => setState(() => _type = 'bug')),
+                      _TabBtn(label: 'PLAN',    active: _type == 'plan', onTap: () => setState(() => _type = 'plan')),
+                      _TabBtn(label: 'FİKİR',   active: _type == 'idea', onTap: () => setState(() => _type = 'idea')),
                     ]),
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // Başlık alanı
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.borderGrey),
-                  ),
-                  child: TextField(
-                    controller: _titleCtrl,
-                    maxLines: 4,
-                    minLines: 3,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(14),
-                      hintText: 'Açıklama yaz...',
-                      hintStyle: TextStyle(color: AppColors.textLight, fontSize: 14),
-                    ),
-                    style: const TextStyle(fontSize: 14, color: AppColors.textDark, height: 1.5),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                // Açıklama
+                _InputField(controller: _titleCtrl, hint: 'Açıklama yaz...', onChanged: (_) => setState(() {}), maxLines: 4),
+                const SizedBox(height: 14),
 
-                // Kategori seçimi
-                const Text('Kategori Seç', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                // Priority (FİKİR için gösterilmez)
+                if (_type != 'idea') ...[
+                  const Text('Öncelik', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    for (final p in [('critical', 'Kritik'), ('normal', 'Normal'), ('low', 'Düşük')]) ...[
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _priority = p.$1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _priority == p.$1 ? _priorityColor(p.$1) : _priorityColor(p.$1).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              p.$2,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _priority == p.$1 ? Colors.white : _priorityColor(p.$1),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ]),
+                  const SizedBox(height: 14),
+                ],
+
+                // Milestone seçimi (FİKİR için gösterilmez)
+                if (_type != 'idea') ...[
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('app_milestones')
+                        .snapshots(),
+                    builder: (context, snap) {
+                      final milestones = (snap.data?.docs ?? [])
+                          .map((d) => _Milestone.fromDoc(d))
+                          .where((m) => m.status == 'active')
+                          .toList()
+                          ..sort((a, b) => a.order.compareTo(b.order));
+                      if (milestones.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Milestone', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8, runSpacing: 8,
+                            children: [
+                              GestureDetector(
+                                onTap: () => setState(() => _selMilestoneId = null),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _selMilestoneId == null ? AppColors.textMid : AppColors.borderGrey,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text('Yok', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _selMilestoneId == null ? Colors.white : AppColors.textMid)),
+                                ),
+                              ),
+                              for (final ms in milestones)
+                                GestureDetector(
+                                  onTap: () => setState(() => _selMilestoneId = ms.id),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _selMilestoneId == ms.id ? AppColors.teal : AppColors.teal.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      ms.version,
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _selMilestoneId == ms.id ? Colors.white : AppColors.teal),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+
+                // Kategori
+                const Text('Kategori', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
                 const SizedBox(height: 10),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 8, runSpacing: 8,
                   children: [
                     ..._presets.map((c) {
                       final sel = _selCat == c;
                       final color = _catColor(c);
                       return GestureDetector(
-                        onTap: () => setState(() {
-                          _selCat = sel ? null : c;
-                          if (!sel) _customCatCtrl.clear();
-                        }),
+                        onTap: () => setState(() { _selCat = sel ? null : c; if (!sel) _customCatCtrl.clear(); }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -1090,21 +2429,13 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                             color: sel ? color : color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text(
-                            c,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: sel ? Colors.white : color,
-                            ),
-                          ),
+                          child: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: sel ? Colors.white : color)),
                         ),
                       );
                     }),
                     if (_selCat == null)
                       SizedBox(
-                        height: 34,
-                        width: 140,
+                        height: 34, width: 140,
                         child: TextField(
                           controller: _customCatCtrl,
                           onChanged: (_) => setState(() {}),
@@ -1113,14 +2444,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             hintText: 'Yeni kategori...',
                             hintStyle: const TextStyle(fontSize: 11, color: AppColors.textLight),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
-                              borderSide: const BorderSide(color: AppColors.borderGrey),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
-                              borderSide: const BorderSide(color: AppColors.teal),
-                            ),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppColors.borderGrey)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppColors.teal)),
                           ),
                           style: const TextStyle(fontSize: 12, color: AppColors.textDark),
                         ),
@@ -1129,13 +2454,12 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                 ),
                 const SizedBox(height: 24),
 
-                // Kaydet butonu
+                // Kaydet
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 200),
                   opacity: canSave ? 1.0 : 0.45,
                   child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
+                    width: double.infinity, height: 52,
                     child: ElevatedButton(
                       onPressed: (canSave && !_saving) ? _save : null,
                       style: ElevatedButton.styleFrom(
@@ -1145,15 +2469,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                         elevation: 0,
                       ),
                       child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text(
-                              'KAYDET',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.8, color: Colors.white),
-                            ),
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('KAYDET', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.8, color: Colors.white)),
                     ),
                   ),
                 ),
