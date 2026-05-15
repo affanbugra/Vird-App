@@ -750,28 +750,22 @@ class _BacklogViewState extends State<_BacklogView> {
 
           if (cats.isNotEmpty) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              height: 30,
-              child: Row(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.only(left: 16),
-                      itemCount: cats.length + 1,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) {
-                        if (i == 0) return _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null));
-                        final c = cats[i - 1];
-                        return _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c));
-                      },
-                    ),
-                  ),
+                  _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null)),
+                  ...cats.map((c) => _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c))),
                   GestureDetector(
                     onTap: () => _CatManagerSheet.show(context),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(Icons.tune_rounded, size: 16, color: AppColors.textMid),
+                    child: Container(
+                      height: 30,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.tune_rounded, size: 15, color: AppColors.textMid),
                     ),
                   ),
                 ],
