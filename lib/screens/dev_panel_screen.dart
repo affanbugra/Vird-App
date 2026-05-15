@@ -560,11 +560,15 @@ class _BacklogViewState extends State<_BacklogView> {
   final Set<String> _expanded = {};
 
   List<_BacklogItem> _allItems = [];
-  List<_Milestone> _milestones = [];
+  List<_Milestone> _activeMilestones = [];
+  List<_Milestone> _completedMilestones = [];
   bool _loading = true;
 
   StreamSubscription<QuerySnapshot>? _itemSub;
   StreamSubscription<QuerySnapshot>? _msSub;
+
+  // backward compat helper for _buildRows / _GapTarget
+  List<_Milestone> get _milestones => _activeMilestones;
 
   @override
   void initState() {
@@ -577,11 +581,11 @@ class _BacklogViewState extends State<_BacklogView> {
       });
     });
     _msSub = FirebaseFirestore.instance.collection('app_milestones').snapshots().listen((s) {
+      final all = s.docs.map(_Milestone.fromDoc).toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
       setState(() {
-        _milestones = s.docs.map(_Milestone.fromDoc)
-            .where((m) => m.status == 'active')
-            .toList()
-          ..sort((a, b) => a.order.compareTo(b.order));
+        _activeMilestones    = all.where((m) => m.status == 'active').toList();
+        _completedMilestones = all.where((m) => m.status == 'completed').toList();
       });
     });
   }
@@ -626,15 +630,30 @@ class _BacklogViewState extends State<_BacklogView> {
       rows.add({'type': 'ms', 'ms': ms, 'count': msItems.where((i) => !i.completed).length});
       if (_expanded.contains(ms.id)) addItemsWithGaps(ms.id, msItems);
     }
+
+    final allMilestoneIds = {...activeMilestoneIds, ..._completedMilestones.map((m) => m.id)};
     final unassigned = items.where((i) =>
       i.milestoneId == null ||
       i.milestoneId!.isEmpty ||
-      !activeMilestoneIds.contains(i.milestoneId)
+      !allMilestoneIds.contains(i.milestoneId)
     ).toList();
     if (unassigned.isNotEmpty) {
       rows.add({'type': 'un', 'count': unassigned.where((i) => !i.completed).length});
       if (_expanded.contains('__unassigned')) addItemsWithGaps('__unassigned', unassigned);
     }
+
+    // Tamamlanan milestone'lar — listede en altta, daraltılmış bölüm
+    if (_completedMilestones.isNotEmpty) {
+      rows.add({'type': 'comp_divider', 'count': _completedMilestones.length});
+      if (_expanded.contains('__completed')) {
+        for (final ms in _completedMilestones) {
+          final msItems = items.where((i) => i.milestoneId == ms.id).toList();
+          rows.add({'type': 'ms_done', 'ms': ms, 'count': msItems.length});
+          if (_expanded.contains('${ms.id}_done')) addItemsWithGaps(ms.id, msItems);
+        }
+      }
+    }
+
     return rows;
   }
 
@@ -782,7 +801,8 @@ class _BacklogViewState extends State<_BacklogView> {
                                 );
                               }
                               if (row is Map<String, Object>) {
-                                if (row['type'] == 'ms') {
+                                final type = row['type'] as String;
+                                if (type == 'ms') {
                                   final ms = row['ms'] as _Milestone;
                                   return _MilestoneHeader(
                                     key: ValueKey('ms_${ms.id}'),
@@ -794,6 +814,28 @@ class _BacklogViewState extends State<_BacklogView> {
                                       _assignToMilestone(item.id, ms.id);
                                       if (!_expanded.contains(ms.id)) _toggleSection(ms.id);
                                     },
+                                  );
+                                }
+                                if (type == 'comp_divider') {
+                                  final n = row['count'] as int;
+                                  final open = _expanded.contains('__completed');
+                                  return _CompletedDivider(
+                                    key: const ValueKey('comp_divider'),
+                                    count: n,
+                                    isOpen: open,
+                                    onToggle: () => _toggleSection('__completed'),
+                                  );
+                                }
+                                if (type == 'ms_done') {
+                                  final ms = row['ms'] as _Milestone;
+                                  final key = '${ms.id}_done';
+                                  return _MilestoneHeader(
+                                    key: ValueKey('ms_done_${ms.id}'),
+                                    milestone: ms,
+                                    itemCount: row['count'] as int,
+                                    isCollapsed: !_expanded.contains(key),
+                                    onToggle: () => _toggleSection(key),
+                                    isDone: true,
                                   );
                                 }
                                 return _UnassignedHeader(
@@ -881,6 +923,7 @@ class _MilestoneHeader extends StatelessWidget {
   final bool isCollapsed;
   final VoidCallback onToggle;
   final void Function(_BacklogItem)? onAcceptDrop;
+  final bool isDone;
 
   const _MilestoneHeader({
     super.key,
@@ -889,37 +932,46 @@ class _MilestoneHeader extends StatelessWidget {
     required this.isCollapsed,
     required this.onToggle,
     this.onAcceptDrop,
+    this.isDone = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<_BacklogItem>(
-      onWillAcceptWithDetails: (d) => d.data.milestoneId != milestone.id,
+      onWillAcceptWithDetails: (d) => !isDone && d.data.milestoneId != milestone.id,
       onAcceptWithDetails: (d) => onAcceptDrop?.call(d.data),
       builder: (ctx, candidates, _) {
         final over = candidates.isNotEmpty;
+        final badgeColor = isDone ? AppColors.textMid : AppColors.teal;
+        final bgColor = isDone
+            ? AppColors.lightGrey
+            : over ? AppColors.teal.withValues(alpha: 0.08) : const Color(0xFF1E293B).withValues(alpha: 0.04);
+        final borderColor = isDone
+            ? AppColors.borderGrey
+            : over ? AppColors.teal.withValues(alpha: 0.45) : const Color(0xFF1E293B).withValues(alpha: 0.08);
         return GestureDetector(
           onTap: onToggle,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            margin: const EdgeInsets.only(top: 8, bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: over ? AppColors.teal.withValues(alpha: 0.08) : const Color(0xFF1E293B).withValues(alpha: 0.04),
+              color: bgColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: over ? AppColors.teal.withValues(alpha: 0.45) : const Color(0xFF1E293B).withValues(alpha: 0.08),
-                width: over ? 1.5 : 1.0,
-              ),
+              border: Border.all(color: borderColor, width: over ? 1.5 : 1.0),
             ),
             child: Row(children: [
+              if (isDone) ...[
+                const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.textMid),
+                const SizedBox(width: 6),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(6)),
-                child: Text(milestone.version, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                decoration: BoxDecoration(color: badgeColor.withValues(alpha: isDone ? 0.15 : 1.0), borderRadius: BorderRadius.circular(6)),
+                child: Text(milestone.version, style: TextStyle(color: isDone ? AppColors.textMid : Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(milestone.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark))),
+              Expanded(child: Text(milestone.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDone ? AppColors.textMid : AppColors.textDark))),
               if (over) ...[
                 const Icon(Icons.add_circle_rounded, size: 16, color: AppColors.teal),
                 const SizedBox(width: 6),
@@ -927,8 +979,12 @@ class _MilestoneHeader extends StatelessWidget {
               if (itemCount > 0 && !over) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
-                  child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                  decoration: BoxDecoration(
+                    color: isDone ? AppColors.borderGrey : AppColors.tealLight,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(isDone ? '$itemCount görev' : '$itemCount açık',
+                      style: TextStyle(fontSize: 10, color: isDone ? AppColors.textMid : AppColors.teal, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -1003,6 +1059,48 @@ class _UnassignedHeader extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ─── Tamamlanan Sürümler Divider ──────────────────────────────────────────────
+
+class _CompletedDivider extends StatelessWidget {
+  final int count;
+  final bool isOpen;
+  final VoidCallback onToggle;
+  const _CompletedDivider({super.key, required this.count, required this.isOpen, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        margin: const EdgeInsets.only(top: 16, bottom: 4),
+        child: Row(children: [
+          Expanded(child: Container(height: 1, color: AppColors.borderGrey)),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.borderGrey),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.check_circle_outline_rounded, size: 12, color: AppColors.textMid),
+              const SizedBox(width: 5),
+              Text('Tamamlanan Sürümler ($count)',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+              const SizedBox(width: 4),
+              Icon(isOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  size: 14, color: AppColors.textMid),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Container(height: 1, color: AppColors.borderGrey)),
+        ]),
+      ),
     );
   }
 }
@@ -1406,6 +1504,12 @@ class _MilestoneManagerSheet extends StatefulWidget {
 class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
   static const _col = 'app_milestones';
 
+  Future<void> _completeMilestone(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'status': 'completed'});
+
+  Future<void> _reactivateMilestone(String id) =>
+      FirebaseFirestore.instance.collection(_col).doc(id).update({'status': 'active'});
+
   Future<void> _archiveMilestone(String id) =>
       FirebaseFirestore.instance.collection(_col).doc(id).update({'status': 'archived'});
 
@@ -1430,11 +1534,10 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection(_col).snapshots(),
         builder: (context, snap) {
-          final milestones = (snap.data?.docs ?? [])
-              .map((d) => _Milestone.fromDoc(d))
-              .where((m) => m.status == 'active')
-              .toList()
-              ..sort((a, b) => a.order.compareTo(b.order));
+          final all = (snap.data?.docs ?? []).map((d) => _Milestone.fromDoc(d)).toList()
+            ..sort((a, b) => a.order.compareTo(b.order));
+          final milestones = all.where((m) => m.status == 'active').toList();
+          final completed = all.where((m) => m.status == 'completed').toList();
 
           return Column(
             children: [
@@ -1494,18 +1597,24 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                  // Tamamlandı
+                                  IconButton(
+                                    tooltip: 'Tamamlandı olarak işaretle',
+                                    onPressed: () => _completeMilestone(ms.id),
+                                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18, color: AppColors.teal),
+                                  ),
                                   // Arşivle
                                   IconButton(
                                     onPressed: () => showDialog(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
                                         title: const Text('Milestone\'u arşivle'),
-                                        content: Text('"${ms.version} — ${ms.title}" arşive taşınacak. Bu sürüm tamamlandı mı?'),
+                                        content: Text('"${ms.version} — ${ms.title}" tamamen arşive kaldırılacak.'),
                                         actions: [
                                           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
                                           TextButton(
                                             onPressed: () { Navigator.pop(ctx); _archiveMilestone(ms.id); },
-                                            child: const Text('Arşivle', style: TextStyle(color: AppColors.teal)),
+                                            child: const Text('Arşivle', style: TextStyle(color: AppColors.textMid)),
                                           ),
                                         ],
                                       ),
@@ -1535,6 +1644,60 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                             },
                           ),
               ),
+
+              // Tamamlanan milestone'lar bölümü
+              if (completed.isNotEmpty) ...[
+                const Divider(height: 1, color: AppColors.borderGrey),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: Row(children: [
+                    const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textMid),
+                    const SizedBox(width: 6),
+                    Text('Tamamlananlar (${completed.length})',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                  ]),
+                ),
+                ...completed.map((ms) => Container(
+                  margin: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderGrey),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
+                      child: Text(ms.version, style: const TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid))),
+                    TextButton(
+                      onPressed: () => _reactivateMilestone(ms.id),
+                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      child: const Text('Geri Al', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                    ),
+                    IconButton(
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Milestone\'u sil'),
+                          content: const Text('Bu işlem geri alınamaz. Bağlı görevler milestone\'suz kalır.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+                            TextButton(onPressed: () { Navigator.pop(ctx); _deleteMilestone(ms.id); }, child: const Text('Sil', style: TextStyle(color: AppColors.errorRed))),
+                          ],
+                        ),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textLight),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
+                  ]),
+                )),
+                const SizedBox(height: 8),
+              ],
 
               // Yeni milestone ekle butonu
               Padding(
