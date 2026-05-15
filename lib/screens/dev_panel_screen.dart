@@ -1497,6 +1497,7 @@ class _MilestoneManagerSheet extends StatefulWidget {
 
 class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
   static const _col = 'app_milestones';
+  bool _showCompleted = false;
 
   Future<void> _completeMilestone(String id) =>
       FirebaseFirestore.instance.collection(_col).doc(id).update({'status': 'completed'});
@@ -1639,58 +1640,68 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                           ),
               ),
 
-              // Tamamlanan milestone'lar bölümü
+              // Tamamlanan milestone'lar — daraltılabilir
               if (completed.isNotEmpty) ...[
                 const Divider(height: 1, color: AppColors.borderGrey),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                  child: Row(children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textMid),
-                    const SizedBox(width: 6),
-                    Text('Tamamlananlar (${completed.length})',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
-                  ]),
-                ),
-                ...completed.map((ms) => Container(
-                  margin: const EdgeInsets.fromLTRB(16, 2, 16, 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.borderGrey),
-                  ),
-                  child: Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
-                      child: Text(ms.version, style: const TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid))),
-                    TextButton(
-                      onPressed: () => _reactivateMilestone(ms.id),
-                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                      child: const Text('Geri Al', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
-                    ),
-                    IconButton(
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Milestone\'u sil'),
-                          content: const Text('Bu işlem geri alınamaz. Bağlı görevler milestone\'suz kalır.'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
-                            TextButton(onPressed: () { Navigator.pop(ctx); _deleteMilestone(ms.id); }, child: const Text('Sil', style: TextStyle(color: AppColors.errorRed))),
-                          ],
-                        ),
+                InkWell(
+                  onTap: () => setState(() => _showCompleted = !_showCompleted),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textMid),
+                      const SizedBox(width: 6),
+                      Text('Tamamlananlar (${completed.length})',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                      const Spacer(),
+                      Icon(
+                        _showCompleted ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        size: 16, color: AppColors.textMid,
                       ),
-                      icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textLight),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ]),
+                  ),
+                ),
+                if (_showCompleted) ...[
+                  ...completed.map((ms) => Container(
+                    margin: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.borderGrey),
                     ),
-                  ]),
-                )),
-                const SizedBox(height: 8),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
+                        child: Text(ms.version, style: const TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid))),
+                      TextButton(
+                        onPressed: () => _reactivateMilestone(ms.id),
+                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        child: const Text('Geri Al', style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                      ),
+                      IconButton(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Milestone\'u sil'),
+                            content: const Text('Bu işlem geri alınamaz. Bağlı görevler milestone\'suz kalır.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+                              TextButton(onPressed: () { Navigator.pop(ctx); _deleteMilestone(ms.id); }, child: const Text('Sil', style: TextStyle(color: AppColors.errorRed))),
+                            ],
+                          ),
+                        ),
+                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textLight),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    ]),
+                  )),
+                  const SizedBox(height: 8),
+                ],
               ],
 
               // Yeni milestone ekle butonu
