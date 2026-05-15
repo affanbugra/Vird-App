@@ -581,13 +581,25 @@ class _BacklogViewState extends State<_BacklogView> {
       });
     });
     _msSub = FirebaseFirestore.instance.collection('app_milestones').snapshots().listen((s) {
-      final all = s.docs.map(_Milestone.fromDoc).toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
+      final all = s.docs.map(_Milestone.fromDoc).toList();
       setState(() {
-        _activeMilestones    = all.where((m) => m.status == 'active').toList();
-        _completedMilestones = all.where((m) => m.status == 'completed').toList();
+        _activeMilestones = all.where((m) => m.status == 'active').toList()
+          ..sort((a, b) => _cmpVersion(a.version, b.version));
+        _completedMilestones = all.where((m) => m.status == 'completed').toList()
+          ..sort((a, b) => _cmpVersion(b.version, a.version));
       });
     });
+  }
+
+  static int _cmpVersion(String a, String b) {
+    List<int> parse(String v) => v.replaceFirst(RegExp(r'^[vV]'), '').split('.').map((s) => int.tryParse(s) ?? 0).toList();
+    final pa = parse(a), pb = parse(b);
+    final len = pa.length > pb.length ? pa.length : pb.length;
+    for (var i = 0; i < len; i++) {
+      final diff = (i < pa.length ? pa[i] : 0) - (i < pb.length ? pb[i] : 0);
+      if (diff != 0) return diff;
+    }
+    return 0;
   }
 
   @override
@@ -750,17 +762,20 @@ class _BacklogViewState extends State<_BacklogView> {
 
           if (cats.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
+            SizedBox(
+              height: 34,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
                   _CatChip(label: 'Tümü', color: AppColors.teal, active: _filterCat == null, onTap: () => setState(() => _filterCat = null)),
-                  ...cats.map((c) => _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c))),
+                  ...cats.map((c) => Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _CatChip(label: c, color: _catColor(c), active: _filterCat == c, onTap: () => setState(() => _filterCat = _filterCat == c ? null : c)),
+                  )),
+                  const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => _CatManagerSheet.show(context),
+                    onTap: () => _CatManagerSheet.show(context, _tab),
                     child: Container(
                       height: 30,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -781,7 +796,7 @@ class _BacklogViewState extends State<_BacklogView> {
                 : displayed.isEmpty
                     ? _EmptyState(tab: _tab)
                     : _tab == 'idea'
-                        ? _IdeaList(items: displayed, existingCats: cats, onToggle: _complete, onArchive: _archive, onDelete: _delete)
+                        ? _IdeaList(items: displayed, existingCats: cats, onToggle: _complete, onArchive: _archive, onDelete: _delete, onReorder: (item, insertAt) => _reorderInSection(displayed, item, insertAt))
                         : _tab == 'bug'
                             ? _BugList(
                                 items: displayed,
@@ -850,7 +865,6 @@ class _BacklogViewState extends State<_BacklogView> {
                                 );
                               }
                               final item = row as _BacklogItem;
-                              final allCats = _allItems.map((i) => i.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
                               final card = _BacklogCard(
                                 key: ValueKey(item.id),
                                 item: item,
@@ -863,7 +877,7 @@ class _BacklogViewState extends State<_BacklogView> {
                                   backgroundColor: Colors.transparent,
                                   builder: (ctx) => Padding(
                                     padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-                                    child: _AddItemSheet(initialType: item.type, existingCats: allCats, editItem: item),
+                                    child: _AddItemSheet(initialType: item.type, existingCats: cats, editItem: item),
                                   ),
                                 ),
                               );
@@ -899,14 +913,13 @@ class _BacklogViewState extends State<_BacklogView> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          final allCats = _allItems.map((i) => i.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (ctx) => Padding(
               padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-              child: _AddItemSheet(initialType: _tab, existingCats: allCats),
+              child: _AddItemSheet(initialType: _tab, existingCats: cats),
             ),
           );
         },
@@ -1243,18 +1256,27 @@ class _IdeaList extends StatelessWidget {
   final Future<void> Function(String, bool) onToggle;
   final Future<void> Function(String) onArchive;
   final Future<void> Function(String) onDelete;
+  final void Function(_BacklogItem, int) onReorder;
 
-  const _IdeaList({required this.items, required this.existingCats, required this.onToggle, required this.onArchive, required this.onDelete});
+  const _IdeaList({required this.items, required this.existingCats, required this.onToggle, required this.onArchive, required this.onDelete, required this.onReorder});
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-      itemCount: items.length,
+      itemCount: items.length * 2 + 1,
       itemBuilder: (context, i) {
-        final item = items[i];
-        return Dismissible(
-          key: ValueKey(item.id),
+        if (i.isEven) {
+          final insertAt = i ~/ 2;
+          return _BugGap(
+            key: ValueKey('idea_gap_$insertAt'),
+            onWillAccept: (_) => true,
+            onAccept: (item) => onReorder(item, insertAt),
+          );
+        }
+        final item = items[i ~/ 2];
+        final dismissible = Dismissible(
+          key: ValueKey('dismiss_${item.id}'),
           direction: DismissDirection.horizontal,
           background: Container(
             alignment: Alignment.centerLeft,
@@ -1347,6 +1369,27 @@ class _IdeaList extends StatelessWidget {
               ),
             ]),
           ),
+        );
+        return LongPressDraggable<_BacklogItem>(
+          data: item,
+          delay: const Duration(milliseconds: 350),
+          feedback: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width - 32,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+            ),
+          ),
+          childWhenDragging: Opacity(opacity: 0.3, child: dismissible),
+          child: dismissible,
         );
       },
     );
@@ -3028,15 +3071,16 @@ class _AddItemSheetState extends State<_AddItemSheet> {
 // ─── Category Manager ──────────────────────────────────────────────────────────
 
 class _CatManagerSheet extends StatefulWidget {
-  const _CatManagerSheet();
+  final String type;
+  const _CatManagerSheet({required this.type});
 
-  static void show(BuildContext context) => showModalBottomSheet(
+  static void show(BuildContext context, String type) => showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const FractionallySizedBox(
+    builder: (_) => FractionallySizedBox(
       heightFactor: 0.65,
-      child: _CatManagerSheet(),
+      child: _CatManagerSheet(type: type),
     ),
   );
 
@@ -3052,7 +3096,10 @@ class _CatManagerSheetState extends State<_CatManagerSheet> {
   void initState() { super.initState(); _loadCats(); }
 
   Future<void> _loadCats() async {
-    final snap = await FirebaseFirestore.instance.collection('app_backlog').get();
+    final snap = await FirebaseFirestore.instance
+        .collection('app_backlog')
+        .where('type', isEqualTo: widget.type)
+        .get();
     final cats = snap.docs
         .map((d) => ((d.data())['category'] as String?) ?? '')
         .where((c) => c.isNotEmpty)
@@ -3065,6 +3112,7 @@ class _CatManagerSheetState extends State<_CatManagerSheet> {
     if (newName.isEmpty || newName == oldName) return;
     final snap = await FirebaseFirestore.instance
         .collection('app_backlog')
+        .where('type', isEqualTo: widget.type)
         .where('category', isEqualTo: oldName)
         .get();
     final batch = FirebaseFirestore.instance.batch();
@@ -3078,6 +3126,7 @@ class _CatManagerSheetState extends State<_CatManagerSheet> {
   Future<void> _delete(String cat) async {
     final snap = await FirebaseFirestore.instance
         .collection('app_backlog')
+        .where('type', isEqualTo: widget.type)
         .where('category', isEqualTo: cat)
         .get();
     final batch = FirebaseFirestore.instance.batch();

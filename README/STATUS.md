@@ -4,7 +4,7 @@
 
 ---
 
-## Genel Durum (2026-05-14 — son güncelleme: DevPanel feedback klasör sistemi + border crash + orphaned milestoneId)
+## Genel Durum (2026-05-15 — son güncelleme: DevPanel backlog iyileştirmeleri — sürükle-bırak, kategori izolasyonu, milestone sıralama)
 
 - **Uygulama:** Günlük Kuran okuma takip uygulaması. Flutter + Firebase.
 - **İlk kullanıcı grubu:** YTÜ Fark Kulübü (~40 kişi) — 1 haftalık beta test aşamasına hazır
@@ -43,6 +43,30 @@
 ---
 
 ## Tamamlanan Modüller
+
+### Oturum — DevPanel Backlog İyileştirmeleri (2026-05-15)
+
+#### DevPanelScreen — Backlog Geliştirmeleri (`lib/screens/dev_panel_screen.dart`)
+
+**Sürükle-bırak (Fikir sekmesi)**
+- `_IdeaList`'e `_BugList` ile aynı gap-based `LongPressDraggable` sıralama eklendi
+- `onReorder` callback → `_reorderInSection` → Firestore batch `order` güncelleme
+
+**Kategori filtresi — tek satır yatay kaydırma**
+- `Wrap` (çok satır) → `SizedBox(height: 34) + ListView(scrollDirection: Axis.horizontal)` dönüştürüldü
+- "Tümü" başta, ayar ikonu sonda, arası yatay kaydırılabilir
+
+**Milestone sıralama**
+- Aktif milestone'lar: versiyon numarasına göre küçükten büyüğe (v1.6 → v2.0)
+- Tamamlanan milestone'lar: büyükten küçüğe (en son sürüm üstte)
+- `_cmpVersion` yardımcı fonksiyonu eklendi — `v1.1.5` gibi çok parçalı versiyonları doğru karşılaştırır
+
+**Kategori izolasyonu (sekme başına bağımsız)**
+- Plan / Bug / Fikir sekmelerinin kategorileri artık birbirinden tamamen bağımsız
+- `_CatManagerSheet`'e `type` parametresi eklendi — yükleme, rename, silme işlemleri yalnızca o sekmenin tipini etkiliyor
+- `existingCats` önerisi ve FAB'daki kategori listesi de `tabItems`'dan türetiliyor
+
+---
 
 ### Oturum — DevPanel Feedback Klasör Sistemi + Bug Düzeltmeleri (2026-05-14)
 

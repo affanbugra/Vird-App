@@ -9,6 +9,12 @@
 - [ ] **Liderboard dönemini günlük → haftalık çevir** — `ekip_profil_screen.dart`'ta `_LeaderboardPeriod.daily` → `weekly`. Dönem sonu: Cuma 13:00. Geri sayım sayacı ve `periodStart` hesabı buna göre güncellenmeli.
 - [ ] **Son hata testleri & QA** — tüm akışlar manuel test; `/systematic-debugging` skill'i kullanılacak
 
+### Tamamlanan (2026-05-15)
+- [x] **Fikir sekmesi sürükle-bırak sıralama** — `_IdeaList`'e gap-based `LongPressDraggable` eklendi ✅
+- [x] **Kategori filtresi tek satır kaydırma** — `Wrap` → yatay `ListView` ✅
+- [x] **Milestone sıralama** — aktif: küçükten büyüğe, tamamlanan: büyükten küçüğe; `_cmpVersion` yardımcısı ✅
+- [x] **Kategori sekme izolasyonu** — Plan/Bug/Fikir kategorileri birbirinden bağımsız; `_CatManagerSheet` type parametresi ✅
+
 ### Tamamlanan (2026-05-14)
 - [x] **DevPanel border crash** — `Border.all` uniform + `ClipRRect` + `IntrinsicHeight` + sol aksan child Container ✅
 - [x] **Orphaned milestoneId bug** — `assignedToActive` set check ile silinmiş milestone'a bağlı item'lar "Milestone'suz" grubuna düştü ✅
