@@ -687,7 +687,7 @@ class _BacklogViewState extends State<_BacklogView> {
     final filtered = _filterCat == null ? tabItems : tabItems.where((i) => i.category == _filterCat).toList();
     final displayed = _showCompleted ? filtered : filtered.where((i) => !i.completed).toList();
     final openCount = tabItems.where((i) => !i.completed).length;
-    final rows = _tab != 'idea' ? _buildRows(displayed) : <Object>[];
+    final rows = _tab == 'plan' ? _buildRows(displayed) : <Object>[];
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -782,6 +782,15 @@ class _BacklogViewState extends State<_BacklogView> {
                     ? _EmptyState(tab: _tab)
                     : _tab == 'idea'
                         ? _IdeaList(items: displayed, existingCats: cats, onToggle: _complete, onArchive: _archive, onDelete: _delete)
+                        : _tab == 'bug'
+                            ? _BugList(
+                                items: displayed,
+                                existingCats: cats,
+                                onToggle: _complete,
+                                onArchive: _archive,
+                                onDelete: _delete,
+                                onReorder: (item, insertAt) => _reorderInSection(displayed, item, insertAt),
+                              )
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                             itemCount: rows.length,
@@ -1338,6 +1347,150 @@ class _IdeaList extends StatelessWidget {
               ),
             ]),
           ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Bug Listesi (düz, milestone'suz) ────────────────────────────────────────
+
+class _BugList extends StatelessWidget {
+  final List<_BacklogItem> items;
+  final List<String> existingCats;
+  final Future<void> Function(String, bool) onToggle;
+  final Future<void> Function(String) onArchive;
+  final Future<void> Function(String) onDelete;
+  final void Function(_BacklogItem, int) onReorder;
+
+  const _BugList({
+    required this.items,
+    required this.existingCats,
+    required this.onToggle,
+    required this.onArchive,
+    required this.onDelete,
+    required this.onReorder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+      itemCount: items.length * 2 + 1,
+      itemBuilder: (ctx, i) {
+        if (i.isEven) {
+          final insertAt = i ~/ 2;
+          return _BugGap(
+            key: ValueKey('bug_gap_$insertAt'),
+            onWillAccept: (_) => true,
+            onAccept: (item) => onReorder(item, insertAt),
+          );
+        }
+        final item = items[i ~/ 2];
+        final allCats = existingCats;
+        final card = _BacklogCard(
+          key: ValueKey(item.id),
+          item: item,
+          onToggle: () => onToggle(item.id, item.completed),
+          onArchive: () => onArchive(item.id),
+          onDelete: () => onDelete(item.id),
+          onEdit: () => showModalBottomSheet(
+            context: ctx,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (c) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
+              child: _AddItemSheet(initialType: 'bug', existingCats: allCats, editItem: item),
+            ),
+          ),
+        );
+        return LongPressDraggable<_BacklogItem>(
+          data: item,
+          delay: const Duration(milliseconds: 350),
+          feedback: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(ctx).size.width - 32,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Row(children: [
+                Container(width: 3, height: 32, decoration: BoxDecoration(color: _priorityColor(item.priority), borderRadius: BorderRadius.circular(999))),
+                const SizedBox(width: 10),
+                Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+              ]),
+            ),
+          ),
+          childWhenDragging: Opacity(opacity: 0.3, child: card),
+          child: Dismissible(
+            key: ValueKey('dismiss_${item.id}'),
+            background: Container(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(left: 20),
+              margin: const EdgeInsets.symmetric(vertical: 3),
+              decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(12)),
+              child: const Row(children: [
+                Icon(Icons.archive_outlined, color: Colors.white, size: 18),
+                SizedBox(width: 6),
+                Text('Arşivle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+              ]),
+            ),
+            secondaryBackground: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              margin: const EdgeInsets.symmetric(vertical: 3),
+              decoration: BoxDecoration(color: AppColors.errorRed, borderRadius: BorderRadius.circular(12)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                SizedBox(width: 6),
+                Icon(Icons.delete_outline, color: Colors.white, size: 18),
+              ]),
+            ),
+            confirmDismiss: (dir) async {
+              if (dir == DismissDirection.startToEnd) {
+                await onArchive(item.id);
+                return false;
+              }
+              return true;
+            },
+            onDismissed: (_) => onDelete(item.id),
+            child: card,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BugGap extends StatelessWidget {
+  final bool Function(_BacklogItem) onWillAccept;
+  final void Function(_BacklogItem) onAccept;
+  const _BugGap({super.key, required this.onWillAccept, required this.onAccept});
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<_BacklogItem>(
+      onWillAcceptWithDetails: (d) => onWillAccept(d.data),
+      onAcceptWithDetails: (d) => onAccept(d.data),
+      builder: (ctx, candidates, _) {
+        final over = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: over ? 24 : 4,
+          margin: over ? const EdgeInsets.symmetric(vertical: 2) : EdgeInsets.zero,
+          decoration: over
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  color: AppColors.teal.withValues(alpha: 0.06),
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
+                )
+              : null,
+          child: over ? const Center(child: Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.teal)) : null,
         );
       },
     );
@@ -2742,8 +2895,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                   const SizedBox(height: 14),
                 ],
 
-                // Milestone seçimi (FİKİR için gösterilmez)
-                if (_type != 'idea') ...[
+                // Milestone seçimi (sadece PLAN için)
+                if (_type == 'plan') ...[
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('app_milestones')
