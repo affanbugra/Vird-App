@@ -8,7 +8,6 @@ import 'firebase_options.dart';
 import 'app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
-import 'services/notification_service.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -28,8 +27,6 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
-
-  await NotificationService.init();
 
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;

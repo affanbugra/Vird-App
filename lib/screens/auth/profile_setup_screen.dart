@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../../app_colors.dart';
 import '../../constants/app_constants.dart';
+import '../../utils/text_utils.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String name;
@@ -42,20 +43,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return normalizeForSort(a).compareTo(normalizeForSort(b));
   }
 
-  bool _turkishSearchFilter(String item, String filter) {
-    if (filter.isEmpty) return true;
-    String normalize(String text) {
-      return text.toLowerCase()
-          .replaceAll('ı', 'i')
-          .replaceAll('i̇', 'i')
-          .replaceAll('ğ', 'g')
-          .replaceAll('ü', 'u')
-          .replaceAll('ş', 's')
-          .replaceAll('ö', 'o')
-          .replaceAll('ç', 'c');
-    }
-    return normalize(item).contains(normalize(filter));
-  }
+  bool _turkishSearchFilter(String item, String filter) => turkishContains(item, filter);
 
   Future<void> _saveProfileInfo() async {
     setState(() => _isLoading = true);

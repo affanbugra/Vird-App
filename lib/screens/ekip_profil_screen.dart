@@ -1352,32 +1352,34 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
           _buildList(),
 
         const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            children: [
-              Text(
-                '"Onlar, Allah\'a ve ahiret gününe inanırlar. İyiliği emrederler, kötülükten men ederler, hayır işlerinde birbirleriyle yarışırlar. İşte onlar salihlerdendir."',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 12.5,
-                  color: AppColors.textMid,
-                  height: 1.6,
-                  fontStyle: FontStyle.italic,
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              children: [
+                Text(
+                  '"Onlar, Allah\'a ve ahiret gününe inanırlar. İyiliği emrederler, kötülükten men ederler, hayır işlerinde birbirleriyle yarışırlar. İşte onlar salihlerdendir."',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12.5,
+                    color: AppColors.textMid,
+                    height: 1.6,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Âl-i İmrân, 114',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 11,
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
+                const SizedBox(height: 4),
+                Text(
+                  'Âl-i İmrân, 114',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 11,
+                    color: AppColors.textLight,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

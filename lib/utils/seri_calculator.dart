@@ -19,6 +19,57 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 }
 
 class SeriCalculator {
+  /// Belirtilen log silinirse serisinin ne olacağını simüle eder.
+  /// Gerçek silme yapmaz — sadece hesaplar.
+  static Future<int> simulateWithoutLog(String uid, String logId) async {
+    final db = FirebaseFirestore.instance;
+    final now = DateTime.now();
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final cutoff = todayMidnight.subtract(const Duration(days: 365));
+
+    final snap = await db
+        .collection('users')
+        .doc(uid)
+        .collection('logs')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
+        .get();
+
+    final logDayKeys = <String>{};
+    for (final doc in snap.docs) {
+      if (doc.id == logId) continue; // bu logu dışla
+      final type = doc.data()['type'] as String?;
+      if (type != 'arapca' && type != 'meal') continue;
+      final ts = doc.data()['createdAt'] as Timestamp?;
+      if (ts != null) {
+        final d = ts.toDate().toLocal();
+        logDayKeys.add('${d.year}-${d.month}-${d.day}');
+      }
+    }
+
+    DateTime? mostRecentLogDay;
+    for (int i = 0; i <= 365; i++) {
+      final d = todayMidnight.subtract(Duration(days: i));
+      if (logDayKeys.contains('${d.year}-${d.month}-${d.day}')) {
+        mostRecentLogDay = d;
+        break;
+      }
+    }
+
+    if (mostRecentLogDay == null) return 0;
+
+    int seri = 0;
+    final anchorOffset = todayMidnight.difference(mostRecentLogDay).inDays;
+    for (int i = anchorOffset; i <= 365; i++) {
+      final d = todayMidnight.subtract(Duration(days: i));
+      if (logDayKeys.contains('${d.year}-${d.month}-${d.day}')) {
+        seri++;
+      } else {
+        break;
+      }
+    }
+    return seri;
+  }
+
   /// Log silindikten sonra çağrılır. Son 90 günlük loglara bakarak
   /// kullanıcının gerçek mevcut serisini hesaplar ve Firestore'u günceller.
   static Future<void> recalculate(String uid) async {

@@ -25,7 +25,7 @@ class HatimCalculator {
     int lastReadPage = 0;
 
     for (var doc in logsSnap.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+      final data = doc.data();
       // tilavet_secde gibi log olmayan dokumanlari atla
       if (data['createdAt'] == null) continue;
       if (data['method'] == null) continue;
@@ -53,37 +53,42 @@ class HatimCalculator {
     final bool isCompleted = readPages.length >= 604 &&
         List.generate(604, (i) => i + 1).every((p) => readPages.contains(p));
 
-    // 5. Transaction ile Hatim ve User dokümanlarını güncelle
+    // 5. Hatim ve User dokümanlarını güncelle
+    // Not: runTransaction yerine get()+batch kullanılıyor — transaction offline'da
+    // anında fail eder; batch ise yerel cache'e yazıp ağa geri döndüğünde sync eder.
     final hatimRef = db.collection('users').doc(uid).collection('hatims').doc(hatimId);
     final userRef = db.collection('users').doc(uid);
 
     bool justCompleted = false;
 
-    await db.runTransaction((tx) async {
-      final hatimDoc = await tx.get(hatimRef);
-      if (!hatimDoc.exists) return;
+    final hatimDoc = await hatimRef.get();
+    if (!hatimDoc.exists) return false;
 
-      final hatimData = hatimDoc.data()!;
-      final bool wasCompleted = hatimData['isCompleted'] == true;
+    final hatimData = hatimDoc.data()!;
+    final bool wasCompleted = hatimData['isCompleted'] == true;
 
-      final updateData = <String, dynamic>{
-        'currentPage': calculatedPage,
-        'lastReadPage': lastReadPage,
-        'firstUnreadPage': firstUnreadPage,
-        'isCompleted': isCompleted,
-      };
+    final updateData = <String, dynamic>{
+      'currentPage': calculatedPage,
+      'lastReadPage': lastReadPage,
+      'firstUnreadPage': firstUnreadPage,
+      'isCompleted': isCompleted,
+    };
 
-      if (isCompleted && !wasCompleted) {
-        justCompleted = true;
-        updateData['completedAt'] = FieldValue.serverTimestamp();
-        tx.update(userRef, {'hatimCount': FieldValue.increment(1)});
-      } else if (!isCompleted && wasCompleted) {
-        updateData['completedAt'] = null;
-        tx.update(userRef, {'hatimCount': FieldValue.increment(-1)});
-      }
+    if (isCompleted && !wasCompleted) {
+      justCompleted = true;
+      updateData['completedAt'] = FieldValue.serverTimestamp();
+    } else if (!isCompleted && wasCompleted) {
+      updateData['completedAt'] = null;
+    }
 
-      tx.update(hatimRef, updateData);
-    });
+    final batch = db.batch();
+    batch.update(hatimRef, updateData);
+    if (isCompleted && !wasCompleted) {
+      batch.update(userRef, {'hatimCount': FieldValue.increment(1)});
+    } else if (!isCompleted && wasCompleted) {
+      batch.update(userRef, {'hatimCount': FieldValue.increment(-1)});
+    }
+    await batch.commit();
 
     return justCompleted;
   }

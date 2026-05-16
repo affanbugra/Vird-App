@@ -12,12 +12,12 @@ import '../utils/name_utils.dart';
 import '../widgets/duolingo_button.dart';
 import '../widgets/log_history_sheet.dart';
 import '../widgets/seri_calendar_sheet.dart';
-import '../services/notification_service.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
 import 'vird_screen.dart';
 import 'dev_panel_screen.dart';
 import '../utils/seri_calculator.dart';
+import '../utils/text_utils.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -391,16 +391,27 @@ class _ProfileHeader extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.tealLight,
+                              color: AppColors.gold.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'PRO',
-                              style: GoogleFonts.nunito(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.teal,
+                              border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.35),
+                                width: 1,
                               ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.star_rounded, size: 9, color: AppColors.gold),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'PRO',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.gold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1034,16 +1045,6 @@ class _SettingsSheet extends StatefulWidget {
 }
 
 class _SettingsSheetState extends State<_SettingsSheet> {
-  TimeOfDay? _notifTime;
-
-  @override
-  void initState() {
-    super.initState();
-    NotificationService.getSavedTime().then((t) {
-      if (mounted) setState(() => _notifTime = t);
-    });
-  }
-
   void _showEditProfile(BuildContext context) {
     Navigator.pop(context);
     showModalBottomSheet(
@@ -1066,30 +1067,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
       ),
       builder: (_) => _PasswordSheet(user: widget.user),
     );
-  }
-
-  Future<void> _handleNotifTap(BuildContext context) async {
-    if (_notifTime != null) {
-      await NotificationService.cancel();
-      if (mounted) setState(() => _notifTime = null);
-      return;
-    }
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 20, minute: 0),
-      helpText: 'Hatırlatıcı saati',
-    );
-    if (picked != null) {
-      await NotificationService.scheduleDaily(picked.hour, picked.minute);
-      if (!context.mounted) return;
-      if (mounted) {
-        setState(() => _notifTime = picked);
-        final formatted = picked.format(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hatırlatıcı her gün $formatted için kuruldu')),
-        );
-      }
-    }
   }
 
   @override
@@ -1144,15 +1121,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               Navigator.pop(context);
               LogHistorySheet.show(context);
             },
-          ),
-          const SizedBox(height: 12),
-          _SettingsItem(
-            icon: Icons.notifications_outlined,
-            title: _notifTime == null
-                ? 'Günlük Hatırlatıcı'
-                : 'Hatırlatıcı: ${_notifTime!.format(context)}',
-            subtitle: _notifTime == null ? 'Kapalı — ayarlamak için dokun' : 'Kapatmak için dokun',
-            onTap: () => _handleNotifTap(context),
           ),
           const SizedBox(height: 20),
           Text(
@@ -1209,10 +1177,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
 class _SettingsItem extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String? subtitle;
   final VoidCallback onTap;
 
-  const _SettingsItem({required this.icon, required this.title, required this.onTap, this.subtitle});
+  const _SettingsItem({required this.icon, required this.title, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1230,26 +1197,13 @@ class _SettingsItem extends StatelessWidget {
             Icon(icon, color: AppColors.textDark, size: 22),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.nunito(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        color: AppColors.textLight,
-                      ),
-                    ),
-                ],
+              child: Text(
+                title,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
               ),
             ),
             const Icon(Icons.chevron_right, color: AppColors.textMid),
@@ -1306,13 +1260,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     return norm(a).compareTo(norm(b));
   }
 
-  bool _turkishFilter(String item, String filter) {
-    if (filter.isEmpty) return true;
-    String norm(String t) => t.toLowerCase()
-        .replaceAll('ı', 'i').replaceAll('ğ', 'g').replaceAll('ü', 'u')
-        .replaceAll('ş', 's').replaceAll('ö', 'o').replaceAll('ç', 'c');
-    return norm(item).contains(norm(filter));
-  }
+  bool _turkishFilter(String item, String filter) => turkishContains(item, filter);
 
   @override
   void dispose() {

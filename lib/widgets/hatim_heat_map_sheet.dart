@@ -642,10 +642,12 @@ class _BinaryHeatGrid extends StatelessWidget {
     final hasSecde = TilavetSecdeData.hasSecde(page);
     final sStatus = hasSecde ? secdeStatus[page] : null;
 
-    // Köşe rozet rengi
+    // Köşe rozet rengi — okunmamış sayfada secde durumu gösterilmez
     Color? badgeColor;
     if (hasSecde) {
-      if (sStatus == 'done') {
+      if (!isRead) {
+        badgeColor = AppColors.textLight;
+      } else if (sStatus == 'done') {
         badgeColor = AppColors.gold;
       } else if (sStatus == 'pending') {
         badgeColor = AppColors.errorRed;
@@ -710,9 +712,10 @@ class _BinaryHeatGrid extends StatelessWidget {
 
         final rows = <Widget>[];
 
-        // Bekleyen tilavet secdesi sayısı (sadece 'pending' olanlar)
-        final pendingCount =
-            secdeStatus.values.where((v) => v == 'pending').length;
+        // Bekleyen tilavet secdesi sayısı — sadece okunmuş sayfalardaki 'pending'ler
+        final pendingCount = secdeStatus.entries
+            .where((e) => e.value == 'pending' && readPages.contains(e.key))
+            .length;
 
         rows.add(Padding(
           padding: const EdgeInsets.only(bottom: _squareGap),
@@ -953,28 +956,132 @@ class _AllLogsSheet extends StatefulWidget {
 }
 
 class _AllLogsSheetState extends State<_AllLogsSheet> {
-  final Set<String> _deletingIds = {};
-
   Future<void> _deleteLog(QueryDocumentSnapshot doc) async {
-    setState(() => _deletingIds.add(doc.id));
     final data = doc.data() as Map<String, dynamic>;
     final pagesRead = data['pagesRead'] as int? ?? 0;
-    final batch = FirebaseFirestore.instance.batch();
-    batch.delete(doc.reference);
-    batch.update(
-      FirebaseFirestore.instance.collection('users').doc(widget.uid),
-      {
-        'hasanat': FieldValue.increment(-(pagesRead * 10)),
-        'totalPages': FieldValue.increment(-pagesRead),
-      },
-    );
-    await batch.commit();
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      batch.delete(doc.reference);
+      batch.update(
+        FirebaseFirestore.instance.collection('users').doc(widget.uid),
+        {
+          'hasanat': FieldValue.increment(-(pagesRead * 10)),
+          'totalPages': FieldValue.increment(-pagesRead),
+        },
+      );
+      await batch.commit();
 
-    final hatimId = data['hatimId'] as String?;
-    if (hatimId != null) {
-      await HatimCalculator.recalculate(widget.uid, hatimId);
+      final hatimId = data['hatimId'] as String?;
+      if (hatimId != null) {
+        await HatimCalculator.recalculate(widget.uid, hatimId);
+      }
+      await SeriCalculator.recalculate(widget.uid);
+    } catch (e) {
+      debugPrint('Log sil hatası: $e');
     }
-    await SeriCalculator.recalculate(widget.uid);
+  }
+
+  Future<void> _confirmAndDelete(BuildContext context, QueryDocumentSnapshot doc) async {
+    // Seri etkisini önceden hesapla
+    int currentSeri = 0;
+    int? newSeri;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users').doc(widget.uid).get();
+      final stored = (userDoc.data()?['seri'] as int?) ?? 0;
+      final lastLogTs = userDoc.data()?['lastLogDate'] as Timestamp?;
+      currentSeri = seriDisplayState(stored, lastLogTs).value;
+      if (currentSeri > 0) {
+        newSeri = await SeriCalculator.simulateWithoutLog(widget.uid, doc.id);
+      }
+    } catch (_) {}
+
+    final seriDrops = newSeri != null && newSeri < currentSeri;
+    if (!context.mounted) return;
+
+    final pagesRead =
+        (doc.data() as Map<String, dynamic>)['pagesRead'] as int? ?? 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (seriDrops) ...[
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                      color: AppColors.textMid, fontSize: 14),
+                  children: [
+                    const TextSpan(text: 'Seriniz '),
+                    TextSpan(
+                      text: '$currentSeri gün',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark),
+                    ),
+                    const TextSpan(text: '\'den '),
+                    TextSpan(
+                      text: '$newSeri gün',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: newSeri == 0
+                            ? AppColors.errorRed
+                            : AppColors.orange,
+                      ),
+                    ),
+                    const TextSpan(text: '\'e düşecek.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Text(
+              'Bu okuma kaydı silinsin mi?\nHasanat ${pagesRead * 10} geri alınacak.',
+              style: const TextStyle(color: AppColors.textMid),
+            ),
+            if (seriDrops) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Bu işlem geri alınamaz.',
+                style: TextStyle(
+                    color: AppColors.errorRed,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal',
+                style: TextStyle(color: AppColors.textMid)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              seriDrops ? 'Yine de Sil' : 'Sil',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    ) ?? false;
+    if (confirmed) await _deleteLog(doc);
   }
 
   @override
@@ -1030,15 +1137,16 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                     return const Center(
                         child: CircularProgressIndicator(color: AppColors.teal));
                   }
-                  final docs = ((snap.data?.docs ?? [])
-                        .where((d) => !_deletingIds.contains(d.id))
-                        .toList())
-                      ..sort((a, b) {
-                        final aT = (a.data() as Map)['createdAt'] as Timestamp?;
-                        final bT = (b.data() as Map)['createdAt'] as Timestamp?;
-                        if (aT == null || bT == null) return 0;
-                        return bT.compareTo(aT);
-                      });
+                  final docs = (snap.data?.docs ?? []).where((d) {
+                    final t = (d.data() as Map<String, dynamic>)['type'] as String?;
+                    return t == 'arapca' || t == 'meal';
+                  }).toList()
+                    ..sort((a, b) {
+                      final aT = (a.data() as Map)['createdAt'] as Timestamp?;
+                      final bT = (b.data() as Map)['createdAt'] as Timestamp?;
+                      if (aT == null || bT == null) return 0;
+                      return bT.compareTo(aT);
+                    });
 
                   if (docs.isEmpty) {
                     return Center(
@@ -1047,69 +1155,18 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                     );
                   }
 
-                  return ListView.builder(
+                  return ListView.separated(
                     controller: controller,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     itemCount: docs.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, color: AppColors.borderGrey),
                     itemBuilder: (context, i) {
                       final doc = docs[i];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Dismissible(
-                          key: ValueKey(doc.id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            decoration: BoxDecoration(
-                                color: AppColors.errorRed,
-                                borderRadius: BorderRadius.circular(10)),
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 16),
-                            child: const Icon(Icons.delete_outline,
-                                color: Colors.white, size: 20),
-                          ),
-                          confirmDismiss: (_) async {
-                            return await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                title: const Text('Kaydı sil',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
-                                content: const Text(
-                                  'Bu okuma kaydı silinsin mi?\nHasanat ve toplam sayfa güncellenir.',
-                                  style: TextStyle(color: AppColors.textMid),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(ctx, false),
-                                    child: const Text('İptal',
-                                        style: TextStyle(
-                                            color: AppColors.textMid)),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.errorRed,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(ctx, true),
-                                    child: const Text('Sil',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            ) ??
-                                false;
-                          },
-                          onDismissed: (_) => _deleteLog(doc),
-                          child: _LogRowDetailed(doc: doc, uid: widget.uid),
-                        ),
+                      return _LogRowDetailed(
+                        doc: doc,
+                        uid: widget.uid,
+                        onDelete: () => _confirmAndDelete(context, doc),
                       );
                     },
                   );
@@ -1126,90 +1183,131 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
 class _LogRowDetailed extends StatelessWidget {
   final QueryDocumentSnapshot doc;
   final String uid;
-  const _LogRowDetailed({required this.doc, required this.uid});
+  final VoidCallback onDelete;
+
+  const _LogRowDetailed({
+    required this.doc,
+    required this.uid,
+    required this.onDelete,
+  });
+
+  String _timeText(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Az önce';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    final today = DateTime(now.year, now.month, now.day);
+    final logDay = DateTime(dt.year, dt.month, dt.day);
+    final dayDiff = today.difference(logDay).inDays;
+    if (dayDiff == 1) return 'Dün';
+    if (dayDiff < 7) return '$dayDiff gün önce';
+    return '${dt.day}.${dt.month}.${dt.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final data = doc.data() as Map<String, dynamic>;
-    final startPage = data['startPage'] as int?;
-    final endPage = data['endPage'] as int?;
-    final pagesRead = data['pagesRead'] as int? ?? 0;
-    final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-    final method = data['method'] as String? ?? '';
+    final log = ReadingLog.fromFirestore(doc);
 
-    final pageText = (startPage != null && endPage != null)
-        ? '$startPage–$endPage. sayfa'
-        : '$pagesRead sayfa';
-    final dateText = createdAt != null ? _fmtDate(createdAt) : '';
+    final title = switch (log.method) {
+      LogMethod.hatim => '+${log.pagesRead} sayfa devam',
+      LogMethod.pages => '${log.startPage}–${log.endPage}. sayfalar',
+      LogMethod.cuz => () {
+          final cuz = QuranData.cuzler
+              .where((c) => c.startPage == log.startPage)
+              .firstOrNull;
+          return cuz != null ? '${cuz.cuzNo}. Cüz' : '${log.pagesRead} sayfa';
+        }(),
+      LogMethod.surah => () {
+          final surah = log.surahId != null
+              ? QuranData.surahlar.where((s) => s.id == log.surahId).firstOrNull
+              : null;
+          return surah?.name ?? '${log.pagesRead} sayfa';
+        }(),
+    };
 
-    final icon = method == 'hatim'
-        ? Icons.bookmark_border
-        : method == 'cuz'
-            ? Icons.pie_chart_outline
-            : method == 'surah'
-                ? Icons.menu_book_outlined
-                : Icons.article_outlined;
+    final typeLabel = log.type == HatimType.arapca ? 'Arapça' : 'Meal';
+    final iconColor = log.method == LogMethod.hatim ? AppColors.orange : AppColors.teal;
+    final icon = switch (log.method) {
+      LogMethod.hatim => Icons.bookmark_border,
+      LogMethod.pages => Icons.article_outlined,
+      LogMethod.cuz => Icons.pie_chart_outline,
+      LogMethod.surah => Icons.menu_book_outlined,
+    };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(6),
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 14, color: AppColors.textMid),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(pageText,
-                    style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
-                if (dateText.isNotEmpty)
-                  Text(dateText,
-                      style: GoogleFonts.nunito(
-                          fontSize: 11, color: AppColors.textLight)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppColors.textDark,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.tealLight,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        typeLabel,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.teal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_timeText(log.createdAt)} · +${log.pagesRead * 10} ✨',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                ),
               ],
             ),
           ),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.tealLight,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text('$pagesRead sy.',
-                style: GoogleFonts.nunito(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.teal)),
-          ),
-          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: AppColors.teal, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
             onPressed: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
               backgroundColor: Colors.transparent,
               builder: (_) => Padding(
-                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: LogEditSheet(log: ReadingLog.fromFirestore(doc), uid: uid),
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: LogEditSheet(log: log, uid: uid),
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.errorRed, size: 20),
+            onPressed: onDelete,
           ),
         ],
       ),

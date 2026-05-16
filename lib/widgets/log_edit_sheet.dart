@@ -6,6 +6,7 @@ import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
 import '../utils/hatim_calculator.dart';
+import '../utils/text_utils.dart';
 import '../utils/seri_calculator.dart';
 import 'duolingo_button.dart';
 
@@ -64,6 +65,12 @@ class _LogEditSheetState extends State<LogEditSheet> {
     super.dispose();
   }
 
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.errorRed),
+    );
+  }
+
   Future<void> _save() async {
     final log = widget.log;
     int newPagesRead;
@@ -71,21 +78,29 @@ class _LogEditSheetState extends State<LogEditSheet> {
 
     switch (log.method) {
       case LogMethod.hatim:
-        newPagesRead = int.tryParse(_pagesCtrl.text) ?? log.pagesRead;
-        if (newPagesRead <= 0) return;
-        updateData['pagesRead'] = newPagesRead;
-        // startPage/endPage'i de güncelle — ısı haritası ve diğer bileşenler bunlara bağlı
+        final rawPages = int.tryParse(_pagesCtrl.text) ?? 0;
+        if (rawPages <= 0) {
+          _showError('Sayfa sayısı 0\'dan büyük olmalı.');
+          return;
+        }
         if (log.startPage != null) {
-          final newEnd = (log.startPage! + newPagesRead - 1).clamp(1, 604);
+          final newEnd = (log.startPage! + rawPages - 1).clamp(1, 604);
+          newPagesRead = newEnd - log.startPage! + 1;
           updateData['startPage'] = log.startPage;
           updateData['endPage'] = newEnd;
+        } else {
+          newPagesRead = rawPages;
         }
+        updateData['pagesRead'] = newPagesRead;
         break;
 
       case LogMethod.pages:
         final s = int.tryParse(_startCtrl.text) ?? 0;
         final e = int.tryParse(_endCtrl.text) ?? 0;
-        if (s <= 0 || e <= 0 || s > e || e > 604) return;
+        if (s <= 0) { _showError('Başlangıç sayfası geçerli değil.'); return; }
+        if (e <= 0) { _showError('Bitiş sayfası geçerli değil.'); return; }
+        if (e > 604) { _showError('Bitiş sayfası 604\'ten büyük olamaz.'); return; }
+        if (s > e) { _showError('Başlangıç sayfası bitiş sayfasından büyük olamaz.'); return; }
         newPagesRead = e - s + 1;
         updateData['startPage'] = s;
         updateData['endPage'] = e;
@@ -139,14 +154,71 @@ class _LogEditSheetState extends State<LogEditSheet> {
 
       await batch.commit();
 
+      bool justCompleted = false;
       if (log.hatimId != null) {
-        await HatimCalculator.recalculate(widget.uid, log.hatimId!);
+        justCompleted = await HatimCalculator.recalculate(widget.uid, log.hatimId!);
       }
       await SeriCalculator.recalculate(widget.uid);
 
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      final overlayCtx = Navigator.of(context, rootNavigator: true).context;
+      Navigator.pop(context);
+
+      if (justCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showDialog<void>(
+            context: overlayCtx,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🎉', style: TextStyle(fontSize: 48)),
+                  const SizedBox(height: 12),
+                  const Text('Hatim Tamamlandı',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
+                    style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Âmin',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kaydetme hatası: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
     }
   }
 
@@ -208,9 +280,15 @@ class _LogEditSheetState extends State<LogEditSheet> {
                     size: 14, color: AppColors.textLight),
                 const SizedBox(width: 6),
                 Text(
-                  '$typeLabel · $_methodLabel',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textMid),
+                  () {
+                    if (log.method == LogMethod.hatim && log.startPage != null) {
+                      final originalEnd =
+                          (log.startPage! + log.pagesRead - 1).clamp(1, 604);
+                      return '$typeLabel · Sayfa ${log.startPage}–$originalEnd';
+                    }
+                    return '$typeLabel · $_methodLabel';
+                  }(),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMid),
                 ),
               ],
             ),
@@ -332,6 +410,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
         return DropdownSearch<SurahInfo>(
           items: (filter, _) => QuranData.surahlar,
           itemAsString: (s) => '${s.id}. ${s.name}',
+          filterFn: (s, filter) => turkishContains('${s.id}. ${s.name}', filter),
           compareFn: (a, b) => a.id == b.id,
           selectedItem: _selectedSurah,
           onSelected: (s) => setState(() => _selectedSurah = s),

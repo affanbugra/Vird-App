@@ -8,11 +8,11 @@ import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../models/reading_log_model.dart';
 import '../data/quran_cuz.dart';
+import '../utils/text_utils.dart';
 import '../data/tilavet_secde.dart';
 import '../utils/hatim_calculator.dart';
 import '../utils/seri_calculator.dart';
 import 'log_history_sheet.dart';
-import '../services/notification_service.dart';
 import '../screens/streak_animation_screen.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
@@ -159,6 +159,14 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     });
   }
 
+  // ── Yardımcı ───────────────────────────────────────────────────────
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.errorRed),
+    );
+  }
+
   // ── Kaydet ─────────────────────────────────────────────────────────
 
   Future<void> _saveLog() async {
@@ -177,9 +185,15 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     switch (_tabController.index) {
       case 0: // Devam
-        if (_devamHatim == null) return;
+        if (_devamHatim == null) {
+          _showError('Lütfen bir hatim seçin.');
+          return;
+        }
         final entered = int.tryParse(_devamPagesCtrl.text) ?? 0;
-        if (entered <= 0) return;
+        if (entered <= 0) {
+          _showError('Kaç sayfa okuduğunu gir.');
+          return;
+        }
         method = LogMethod.hatim;
         type = _devamHatim!.type;
         startPage = _devamHatim!.lastReadPage >= 604
@@ -194,7 +208,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       case 1: // Sayfa
         final s = int.tryParse(_startPageCtrl.text) ?? 0;
         final e = int.tryParse(_endPageCtrl.text) ?? 0;
-        if (s <= 0 || e <= 0 || s > e || e > 604) return;
+        if (s <= 0) { _showError('Başlangıç sayfasını gir.'); return; }
+        if (e <= 0) { _showError('Bitiş sayfasını gir.'); return; }
+        if (e > 604) { _showError('Bitiş sayfası 604\'ten büyük olamaz.'); return; }
+        if (s > e) { _showError('Başlangıç sayfası bitiş sayfasından büyük olamaz.'); return; }
         method = LogMethod.pages;
         type = _sayfaHatim?.type ?? _globalType;
         startPage = s;
@@ -204,7 +221,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         linkedHatim = _sayfaHatim;
 
       case 2: // Cüz
-        if (_selectedCuz == null) return;
+        if (_selectedCuz == null) { _showError('Lütfen bir cüz seç.'); return; }
         method = LogMethod.cuz;
         type = _cuzHatim?.type ?? _globalType;
         startPage = _selectedCuz!.startPage;
@@ -214,7 +231,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         linkedHatim = _cuzHatim;
 
       default: // Sure
-        if (_selectedSurah == null) return;
+        if (_selectedSurah == null) { _showError('Lütfen bir sure seç.'); return; }
         method = LogMethod.surah;
         type = _globalType;
         surahId = _selectedSurah!.id;
@@ -351,7 +368,6 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       }
 
       await batch.commit();
-      NotificationService.cancelForToday();
 
       // lastLogDate null iken dünkü log bulunduysa — gerçek seri uzunluğunu hesapla
       if (needsSeriRecalculate) {
@@ -364,8 +380,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       }
 
       // ── Tilavet Secdesi kontrolü ─────────────────────────────────────
-      if (mounted && startPage != null && endPage != null) {
-        final secdePages = TilavetSecdeData.secdesInRange(startPage!, endPage!);
+      if (mounted) {
+        final secdePages = TilavetSecdeData.secdesInRange(startPage, endPage);
         for (final sPage in secdePages) {
           if (!mounted) break;
           await _showSecdePrompt(user.uid, hatimId, sPage);
@@ -405,14 +421,15 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       Navigator.pop(context, justCompleted);
 
       if (shouldShowAnimation && weekData != null) {
+        final wd = weekData; // closure içi type promotion için non-nullable alias
         WidgetsBinding.instance.addPostFrameCallback((_) {
           StreakAnimationScreen.show(
             overlayCtx,
             count: newSeri,
-            prevCount: displayedSeri,  // Bug 1: gerçek görüntülenen değer
-            filled: weekData!.filled,
-            dayLabels: weekData!.labels,
-            todayIndex: 6,             // Bug 5: bugün daima son pozisyon
+            prevCount: displayedSeri,
+            filled: wd.filled,
+            dayLabels: wd.labels,
+            todayIndex: 6,
           );
         });
       }
@@ -878,6 +895,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           DropdownSearch<SurahInfo>(
             items: (filter, _) => QuranData.surahlar,
             itemAsString: (s) => '${s.id}. ${s.name}',
+            filterFn: (s, filter) => turkishContains('${s.id}. ${s.name}', filter),
             compareFn: (a, b) => a.id == b.id,
             onSelected: (s) => setState(() => _selectedSurah = s),
             popupProps: const PopupProps.menu(

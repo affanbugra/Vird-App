@@ -33,15 +33,58 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
   bool _deleting = false;
 
   Future<void> _deleteAllLogs(String uid) async {
+    // Mevcut seriyi önceden oku — uyarıda göstermek için
+    int currentSeri = 0;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).get();
+      final stored = (userDoc.data()?['seri'] as int?) ?? 0;
+      final lastLogTs = userDoc.data()?['lastLogDate'] as Timestamp?;
+      currentSeri = seriDisplayState(stored, lastLogTs).value;
+    } catch (_) {}
+
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Tüm kayıtları sil',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-          'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
-          style: TextStyle(color: AppColors.textMid),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentSeri > 0) ...[
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                      color: AppColors.textMid, fontSize: 14),
+                  children: [
+                    const TextSpan(text: '🔥 Seriniz '),
+                    TextSpan(
+                      text: '$currentSeri gün',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark),
+                    ),
+                    const TextSpan(text: '\'den '),
+                    const TextSpan(
+                      text: '0 güne',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.errorRed),
+                    ),
+                    const TextSpan(text: ' sıfırlanacak.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            const Text(
+              'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
+              style: TextStyle(color: AppColors.textMid),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -183,6 +226,10 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                       );
                     }
                     final logs = docs
+                        .where((d) {
+                          final t = (d.data() as Map<String, dynamic>)['type'] as String?;
+                          return t == 'arapca' || t == 'meal';
+                        })
                         .map((d) => ReadingLog.fromFirestore(d))
                         .toList();
                     return ListView.separated(
@@ -300,15 +347,79 @@ class _LogTile extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context) async {
+    // Seri etkisini önceden hesapla
+    int currentSeri = 0;
+    int? newSeri;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).get();
+      final stored = (userDoc.data()?['seri'] as int?) ?? 0;
+      final lastLogTs = userDoc.data()?['lastLogDate'] as Timestamp?;
+      currentSeri = seriDisplayState(stored, lastLogTs).value;
+      if (currentSeri > 0) {
+        newSeri = await SeriCalculator.simulateWithoutLog(uid, log.id);
+      }
+    } catch (_) {}
+
+    final seriDrops = newSeri != null && newSeri < currentSeri;
+    if (!context.mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Kaydı sil',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(
-          '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
-          style: const TextStyle(color: AppColors.textMid),
+        title: Text(
+          seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (seriDrops) ...[
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                      color: AppColors.textMid, fontSize: 14),
+                  children: [
+                    const TextSpan(text: 'Seriniz '),
+                    TextSpan(
+                      text: '$currentSeri gün',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark),
+                    ),
+                    const TextSpan(text: '\'den '),
+                    TextSpan(
+                      text: '$newSeri gün',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: newSeri == 0
+                            ? AppColors.errorRed
+                            : AppColors.orange,
+                      ),
+                    ),
+                    const TextSpan(text: '\'e düşecek.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Text(
+              '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
+              style: const TextStyle(color: AppColors.textMid),
+            ),
+            if (seriDrops) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Bu işlem geri alınamaz.',
+                style: TextStyle(
+                    color: AppColors.errorRed,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -323,34 +434,40 @@ class _LogTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sil',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(
+              seriDrops ? 'Yine de Sil' : 'Sil',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
 
-    final batch = FirebaseFirestore.instance.batch();
-    batch.delete(FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('logs')
-        .doc(log.id));
-    batch.update(
-      FirebaseFirestore.instance.collection('users').doc(uid),
-      {
-        'hasanat': FieldValue.increment(-(log.pagesRead * 10)),
-        'totalPages': FieldValue.increment(-log.pagesRead),
-      },
-    );
-    await batch.commit();
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      batch.delete(FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .doc(log.id));
+      batch.update(
+        FirebaseFirestore.instance.collection('users').doc(uid),
+        {
+          'hasanat': FieldValue.increment(-(log.pagesRead * 10)),
+          'totalPages': FieldValue.increment(-log.pagesRead),
+        },
+      );
+      await batch.commit();
 
-    if (log.hatimId != null) {
-      await HatimCalculator.recalculate(uid, log.hatimId!);
+      if (log.hatimId != null) {
+        await HatimCalculator.recalculate(uid, log.hatimId!);
+      }
+      await SeriCalculator.recalculate(uid);
+    } catch (e) {
+      debugPrint('Log sil hatası: $e');
     }
-    await SeriCalculator.recalculate(uid);
   }
 
   @override
