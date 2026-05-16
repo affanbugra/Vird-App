@@ -26,6 +26,7 @@
 1. `README/STATUS.md` oku — dosya haritası, Firestore şemaları, teknik kararlar burada
 2. UI işi varsa `README/vird_tasarim.md` oku — renkler, spacing, bileşenler, yazı tonu
 3. Hata veya kritik adım varsa `README/DERSLER.md` oku — geçmiş tuzaklar ve çözümleri
+4. Kullanıcıya sor: **"Bugün ne yapacağız? Yeni bir branch açayım mı, adı ne olsun?"** — branch, hata durumunda geri dönüşü sağlar
 
 ---
 
@@ -44,6 +45,10 @@ Kullanıcı söylemese de kontrol et. **Her değişiklik belgelenmez — sadece 
 **`README/vird_tasarim.md`:** Tasarım sistemine yeni kural veya bileşen eklendi.
 
 Rutin fix, bilinen bileşen güncellemesi, küçük UI ayarı → belgeleme.
+
+Güncellemeler bittikten sonra kullanıcıya sor: **"Değişiklikleri commitleyip pushlayayım mı?"**
+
+Commit/push bittikten sonra kullanıcıya sor: **"Web için son sürümü derleyip yayınlayayım mı?"**
 
 ---
 
