@@ -21,6 +21,7 @@ class _MemberEntry {
   final int periodHasanat;
   final int rawSeri;
   final Timestamp? lastLogTs;
+  final bool isHafiz;
 
   const _MemberEntry({
     required this.uid,
@@ -30,6 +31,7 @@ class _MemberEntry {
     required this.periodHasanat,
     required this.rawSeri,
     this.lastLogTs,
+    this.isHafiz = false,
   });
 }
 
@@ -282,6 +284,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           periodHasanat: periodHasanat,
           rawSeri: (data['seri'] as int?) ?? 0,
           lastLogTs: data['lastLogDate'] as Timestamp?,
+          isHafiz: (data['isHafiz'] as bool?) ?? false,
         ));
       }
 
@@ -1171,6 +1174,7 @@ class _PenaltyCard extends StatelessWidget {
 // ─── Liderboard Bölümü ─────────────────────────────────────────────────────────
 
 enum _SortMode { puan, seri }
+enum _HafizFilter { none, hafizOnly, nonHafiz }
 
 class _LeaderboardSection extends StatefulWidget {
   final List<_MemberEntry> leaderboard;
@@ -1196,6 +1200,7 @@ class _LeaderboardSection extends StatefulWidget {
 class _LeaderboardSectionState extends State<_LeaderboardSection> {
   _SortMode _sortMode = _SortMode.puan;
   bool _showLow = false;
+  _HafizFilter _hafizFilter = _HafizFilter.none;
 
   String _fmtDuration(Duration d) {
     if (d.inDays > 0) {
@@ -1243,19 +1248,25 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
   }
 
   List<_MemberEntry> get _displayed {
-    final s = _sorted;
-    if (!_showLow) return s;
-    return s.where((e) => e.periodHasanat < 100).toList();
+    var s = _sorted;
+    if (_hafizFilter == _HafizFilter.hafizOnly) {
+      s = s.where((e) => e.isHafiz).toList();
+    } else if (_hafizFilter == _HafizFilter.nonHafiz) {
+      s = s.where((e) => !e.isHafiz).toList();
+    }
+    if (_showLow) return s.where((e) => e.periodHasanat < 100).toList();
+    return s;
   }
 
   @override
   Widget build(BuildContext context) {
     final total = widget.leaderboard.length;
-    final shown = _showLow ? _displayed.length : total;
+    final displayed = _displayed;
+    final filtered = _hafizFilter != _HafizFilter.none || _showLow;
     final memberCount = widget.loading
         ? ''
-        : _showLow
-            ? ' · $shown / $total kişi'
+        : filtered
+            ? ' · ${displayed.length} / $total kişi'
             : ' · $total üye';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1311,6 +1322,23 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
               label: '🔥 Seri',
               selected: _sortMode == _SortMode.seri,
               onTap: () => setState(() => _sortMode = _SortMode.seri),
+            ),
+            const SizedBox(width: 8),
+            _SortChip(
+              label: _hafizFilter == _HafizFilter.hafizOnly
+                  ? '📖 Sadece Hafız'
+                  : _hafizFilter == _HafizFilter.nonHafiz
+                      ? '📖 Hafız Hariç'
+                      : '📖 Hafız',
+              selected: _hafizFilter != _HafizFilter.none,
+              selectedColor: AppColors.emeraldGreen,
+              onTap: () => setState(() {
+                _hafizFilter = switch (_hafizFilter) {
+                  _HafizFilter.none      => _HafizFilter.hafizOnly,
+                  _HafizFilter.hafizOnly => _HafizFilter.nonHafiz,
+                  _HafizFilter.nonHafiz  => _HafizFilter.none,
+                };
+              }),
             ),
             const Spacer(),
             _SortChip(
@@ -1505,6 +1533,7 @@ class _LeaderboardRow extends StatelessWidget {
   }
 
   Color get _borderColor {
+    if (isMe) return AppColors.teal;
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.85);
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
@@ -1513,6 +1542,8 @@ class _LeaderboardRow extends StatelessWidget {
     return AppColors.borderGrey;
   }
 
+  double get _borderWidth => isMe ? 2.0 : 1.0;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1520,7 +1551,7 @@ class _LeaderboardRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: _bgColor,
-        border: Border.all(color: _borderColor),
+        border: Border.all(color: _borderColor, width: _borderWidth),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1545,25 +1576,34 @@ class _LeaderboardRow extends StatelessWidget {
                   ),
           ),
           const SizedBox(width: 8),
-          // Avatar
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.tealLight,
-            backgroundImage: entry.avatarSeed != null
-                ? NetworkImage(
-                    'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
-                  )
-                : null,
-            child: entry.avatarSeed == null
-                ? Text(
-                    nameInitials(entry.name),
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.teal,
-                    ),
-                  )
-                : null,
+          // Avatar (hafız halkası)
+          Container(
+            padding: entry.isHafiz ? const EdgeInsets.all(2) : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: entry.isHafiz
+                  ? Border.all(color: AppColors.emeraldGreen, width: 2)
+                  : null,
+            ),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.tealLight,
+              backgroundImage: entry.avatarSeed != null
+                  ? NetworkImage(
+                      'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
+                    )
+                  : null,
+              child: entry.avatarSeed == null
+                  ? Text(
+                      nameInitials(entry.name),
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.teal,
+                      ),
+                    )
+                  : null,
+            ),
           ),
           const SizedBox(width: 10),
           // İsim

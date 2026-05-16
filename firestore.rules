@@ -86,5 +86,15 @@ service cloud.firestore {
     match /pending_requests/{requestId} {
       allow read, write: if isAuth();
     }
+
+    // ── Hafız doğrulama başvuruları ────────────────────────────────────
+    // Oluşturma: yalnızca kendi uid'i için (uid = doc key)
+    // Okuma/güncelleme: isAuth() — developer panelinin cross-user erişimi için
+    match /hafiz_requests/{uid} {
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow read:   if isAuth();
+      allow update: if isAuth();
+      allow delete: if false;
+    }
   }
 }

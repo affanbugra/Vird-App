@@ -9,17 +9,17 @@ Adından anlaşılmayan veya kritik detay içeren dosyalar:
 | Dosya | Not |
 |---|---|
 | `lib/screens/ekip_profil_screen.dart` | Ekip profili + haftalık liderboard (client-side `periodStart`) |
-| `lib/screens/profil_screen.dart` | Kendi profili — Kuran haritası bu ekranda |
+| `lib/screens/profil_screen.dart` | Kendi profili — Kuran haritası + `_HafizSheet` (doğrulama başvurusu) bu ekranda |
 | `lib/screens/kullanici_profil_screen.dart` | Başka kullanıcı profili — read-only |
-| `lib/screens/dev_panel_screen.dart` | DevPanel — bug/plan/fikir/feedback yönetimi (sadece developer görür) |
+| `lib/screens/dev_panel_screen.dart` | DevPanel — bug/plan/fikir/feedback + Hafız başvuruları yönetimi (sadece developer görür) |
 | `lib/screens/vird_screen.dart` | Vird sekmesi — yol haritası + öneri formu |
 | `lib/widgets/log_entry_bottom_sheet.dart` | Log girişi — 4 tab, kilitleme modu, seri animasyon tetikleyici |
 | `lib/widgets/duolingo_button.dart` | Primary buton bileşeni (3D depth) — adı yanıltıcı, aslında AppButton |
-| `lib/utils/seri_calculator.dart` | Seri hesabı — anchor-day algoritması, `seriDisplayState()` |
+| `lib/utils/seri_calculator.dart` | Seri hesabı — anchor-day algoritması, `seriDisplayState()`. `atRisk` yalnızca saat 18:00+ aktif |
 | `lib/utils/hatim_calculator.dart` | Hatim tamamlanma — `Set<int>` yaklaşımı, `Future<bool>` döndürür |
 | `lib/data/quran_cuz.dart` | Kuran veri sistemi — tüm modüllerde kullanılır, dokunmadan önce oku |
 | `lib/data/tilavet_secde.dart` | 14 tilavet secdesi sayfa verisi |
-| `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds` — global developer state |
+| `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds`, `isHafiz` — global developer/hafız state |
 
 ---
 
@@ -37,6 +37,7 @@ teamJoinedAt:     Timestamp? (retroaktif liderboard katılımını önler)
 isPro:            bool? (Console'dan elle atanır, in-app değiştirilemez)
 isDeveloper:      bool (Console'dan elle — DEV badge + çoklu ekip desteği)
 developerTeamIds: List<String> (developer birden fazla ekibin liderboardunda görünür)
+isHafiz:          bool? (Console veya DevPanel'den onaylanınca true — HAFIZ badge)
 username:         string
 avatarSeed:       string? (20 önceden belirlenmiş DiceBear seed — Storage maliyeti yok)
 name:             string
@@ -111,6 +112,22 @@ requestedAt: Timestamp
 ```
 ⚠️ `orderBy` YOK — serverTimestamp pending write'da null döner → crash.
 
+### `hafiz_requests/{uid}` (uid = doc key — kullanıcı başına 1 başvuru)
+```
+uid:         string
+name:        string        (formdan girilen ad soyad)
+username:    string
+avatarSeed:  string?
+driveLink:   string        (onay sonrası FieldValue.delete() ile siliniyor — gizlilik)
+status:      'pending' | 'approved' | 'rejected'
+note:        string?       (red mesajı — kullanıcıya gösterilir)
+consentGiven: bool
+consentAt:   Timestamp
+requestedAt: Timestamp
+reviewedAt:  Timestamp?
+```
+**Not:** Onaylanınca `users/{uid}.isHafiz = true` set edilir. Tekrar başvuruda doküman üzerine yazılır.
+
 ### `feedback_labels/{labelId}`
 ```
 name:     string
@@ -160,3 +177,6 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 - **Firestore rules — logs okuma:** Liderboard cross-user okuma gerektirir → `isAuth()` yeterli, `isOwner()` değil.
 - **Firestore rules — teamId güncelleme:** Başka kullanıcı sadece `teamId` alanını güncelleyebilmeli → `affectedKeys().hasOnly(['teamId'])`.
 - **Feedback inbox:** `folderId == null || folderId.isEmpty` = Gelen Kutusu. Klasöre taşınınca Gelen Kutusu'ndan kalkar.
+- **isHafiz atanma:** DevPanel → Hafız Başvuruları → Onayla butonu `users/{uid}.isHafiz = true` set eder. Console'dan da elle atanabilir. In-app değiştirilemez.
+- **Hafız doğrulama gizlilik:** Onay verilince `hafiz_requests/{uid}.driveLink` alanı `FieldValue.delete()` ile silinir. Belge verisi sistemde tutulmaz (KVKK uyumu).
+- **seriDisplayState `atRisk`:** Yalnızca günün son 6 saatinde (`now.hour >= 18`) true döner. Sabah erken saatlerde "tehlikede" göstermek kullanıcı deneyimini bozduğu için bu eşik seçildi.

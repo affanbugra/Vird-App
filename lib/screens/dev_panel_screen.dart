@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../app_colors.dart';
@@ -177,7 +178,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback }
+enum _PanelView { home, backlog, feedback, hafiz }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -219,6 +220,7 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('home'),
             onBacklogTap:  () => setState(() => _view = _PanelView.backlog),
             onFeedbackTap: () => setState(() => _view = _PanelView.feedback),
+            onHafizTap:    () => setState(() => _view = _PanelView.hafiz),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -226,6 +228,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
           ),
         _PanelView.feedback => _FeedbackView(
             key: const ValueKey('feedback'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
+        _PanelView.hafiz    => _HafizView(
+            key: const ValueKey('hafiz'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
       },
@@ -238,7 +244,8 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
 class _HomeView extends StatelessWidget {
   final VoidCallback onBacklogTap;
   final VoidCallback onFeedbackTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap});
+  final VoidCallback onHafizTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap});
 
   @override
   Widget build(BuildContext context) {
@@ -374,6 +381,24 @@ class _HomeView extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('hafiz_requests')
+                        .where('status', isEqualTo: 'pending')
+                        .snapshots(),
+                    builder: (context, snap) {
+                      final pending = snap.data?.docs.length ?? 0;
+                      return _PanelCard(
+                        icon: Icons.menu_book_outlined,
+                        title: 'Hafız Başvuruları',
+                        subtitle: 'Doğrulama istekleri',
+                        active: true,
+                        badgeCount: pending,
+                        onTap: onHafizTap,
+                      );
+                    },
                   ),
                 ],
               ),
@@ -3282,6 +3307,305 @@ class _CatRowState extends State<_CatRow> {
               onPressed: widget.onDelete,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Hafız Başvuruları View ───────────────────────────────────────────────────
+
+class _HafizView extends StatelessWidget {
+  final VoidCallback onBack;
+  const _HafizView({super.key, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(4, 20, 12, 22),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: onBack,
+                  icon: Icon(Icons.arrow_back_rounded, color: Colors.white.withValues(alpha: 0.7)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldGreen.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.4)),
+                  ),
+                  child: const Text(
+                    'HAFIZ',
+                    style: TextStyle(color: AppColors.emeraldGreen, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Hafız Başvuruları',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('hafiz_requests')
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snap.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Bekleyen başvuru yok',
+                          style: TextStyle(color: AppColors.textMid, fontSize: 15),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) => _HafizRequestCard(doc: docs[i]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HafizRequestCard extends StatefulWidget {
+  final QueryDocumentSnapshot doc;
+  const _HafizRequestCard({required this.doc});
+
+  @override
+  State<_HafizRequestCard> createState() => _HafizRequestCardState();
+}
+
+class _HafizRequestCardState extends State<_HafizRequestCard> {
+  bool _loading = false;
+
+  Future<void> _approve() async {
+    setState(() => _loading = true);
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final uid = data['uid'] as String;
+    final batch = FirebaseFirestore.instance.batch();
+    batch.update(
+      FirebaseFirestore.instance.collection('users').doc(uid),
+      {'isHafiz': true},
+    );
+    // Onay sonrası drive linki gizlilik için siliniyor
+    batch.update(widget.doc.reference, {
+      'status': 'approved',
+      'driveLink': FieldValue.delete(),
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _reject() async {
+    final noteCtrl = TextEditingController();
+    final note = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Red Notu'),
+        content: TextField(
+          controller: noteCtrl,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Kullanıcıya gösterilecek mesaj (opsiyonel)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            child: const Text('Reddet', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (note == null) return;
+    setState(() => _loading = true);
+    await widget.doc.reference.update({
+      'status': 'rejected',
+      'note': note.isEmpty ? null : note,
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final name = data['name'] as String? ?? '';
+    final username = data['username'] as String? ?? '';
+    final avatarSeed = data['avatarSeed'] as String?;
+    final driveLink = data['driveLink'] as String? ?? '';
+    final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderGrey),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundImage: avatarSeed != null
+                    ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
+                    : null,
+                backgroundColor: AppColors.lightGrey,
+                child: avatarSeed == null
+                    ? const Icon(Icons.person, size: 18, color: AppColors.textMid)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark),
+                    ),
+                    if (username.isNotEmpty)
+                      Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                  ],
+                ),
+              ),
+              if (requestedAt != null)
+                Text(
+                  _relativeTime(requestedAt),
+                  style: const TextStyle(fontSize: 11, color: AppColors.textLight),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: driveLink));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Link kopyalandı'), duration: Duration(seconds: 2)),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.link_rounded, size: 16, color: AppColors.teal),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      driveLink,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.teal,
+                        decoration: TextDecoration.underline,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.copy_rounded, size: 14, color: AppColors.textLight),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Center(
+              child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _reject,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.errorRed),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text(
+                      'Reddet',
+                      style: TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _approve,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.emeraldGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Onayla',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

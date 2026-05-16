@@ -46,9 +46,9 @@ Kullanıcı söylemese de kontrol et. **Her değişiklik belgelenmez — sadece 
 
 Rutin fix, bilinen bileşen güncellemesi, küçük UI ayarı → belgeleme.
 
-Güncellemeler bittikten sonra kullanıcıya sor: **"Değişiklikleri commitleyip pushlayayım mı?"**
+**Commit/push zamanı:** Her işlemden sonra sorma. Kullanıcı sohbeti kapatmadan önce "bitti" sinyali verdiğinde (örn. "başka bir şey yok", "tamam", vb.) sor: **"Değişiklikleri commitleyip pushlayayım mı?"**
 
-Commit/push bittikten sonra kullanıcıya sor: **"Web için son sürümü derleyip yayınlayayım mı?"**
+Commit/push bittikten sonra sor: **"Web için son sürümü derleyip yayınlayayım mı?"**
 
 ---
 
