@@ -3415,21 +3415,31 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
 
   Future<void> _approve() async {
     setState(() => _loading = true);
-    final data = widget.doc.data() as Map<String, dynamic>;
-    final uid = data['uid'] as String;
-    final batch = FirebaseFirestore.instance.batch();
-    batch.update(
-      FirebaseFirestore.instance.collection('users').doc(uid),
-      {'isHafiz': true},
-    );
-    // Onay sonrası drive linki gizlilik için siliniyor
-    batch.update(widget.doc.reference, {
-      'status': 'approved',
-      'driveLink': FieldValue.delete(),
-      'reviewedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
-    if (mounted) setState(() => _loading = false);
+    try {
+      final data = widget.doc.data() as Map<String, dynamic>;
+      final uid = data['uid'] as String?;
+      if (uid == null || uid.isEmpty) throw Exception('uid eksik');
+      final batch = FirebaseFirestore.instance.batch();
+      batch.update(
+        FirebaseFirestore.instance.collection('users').doc(uid),
+        {'isHafiz': true},
+      );
+      // Onay sonrası drive linki gizlilik için siliniyor
+      batch.update(widget.doc.reference, {
+        'status': 'approved',
+        'driveLink': FieldValue.delete(),
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Onay hatası: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _reject() async {
@@ -3530,41 +3540,61 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
             ],
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: driveLink));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Link kopyalandı'), duration: Duration(seconds: 2)),
-              );
-            },
-            child: Container(
+          if (driveLink.isEmpty)
+            Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.lightGrey,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.link_rounded, size: 16, color: AppColors.teal),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      driveLink,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.teal,
-                        decoration: TextDecoration.underline,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Icon(Icons.notes_rounded, size: 16, color: AppColors.textLight),
+                  SizedBox(width: 6),
+                  Text(
+                    'Belge veya not paylaşılmadı',
+                    style: TextStyle(fontSize: 12, color: AppColors.textLight, fontStyle: FontStyle.italic),
                   ),
-                  const Icon(Icons.copy_rounded, size: 14, color: AppColors.textLight),
                 ],
               ),
+            )
+          else
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: driveLink));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Kopyalandı'), duration: Duration(seconds: 2)),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGrey,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.link_rounded, size: 16, color: AppColors.teal),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        driveLink,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.teal,
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(Icons.copy_rounded, size: 14, color: AppColors.textLight),
+                  ],
+                ),
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           if (_loading)
             const Center(

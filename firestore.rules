@@ -19,7 +19,9 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
                     || (isAuth() && request.resource.data.diff(resource.data)
-                        .affectedKeys().hasOnly(['teamId']));
+                        .affectedKeys().hasOnly(['teamId']))
+                    || (isAuth() && request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['isHafiz']));
       allow delete: if false;
 
       // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir

@@ -1091,6 +1091,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1703,6 +1704,7 @@ class _HafizSheetState extends State<_HafizSheet> {
     }
     setState(() => _loading = true);
     try {
+      final link = _linkCtrl.text.trim();
       await FirebaseFirestore.instance
           .collection('hafiz_requests')
           .doc(widget.uid)
@@ -1711,7 +1713,7 @@ class _HafizSheetState extends State<_HafizSheet> {
         'name': _nameCtrl.text.trim(),
         'username': widget.username,
         'avatarSeed': widget.avatarSeed,
-        'driveLink': _linkCtrl.text.trim(),
+        if (link.isNotEmpty) 'driveLink': link,
         'status': 'pending',
         'note': null,
         'requestedAt': FieldValue.serverTimestamp(),
@@ -1733,9 +1735,13 @@ class _HafizSheetState extends State<_HafizSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
