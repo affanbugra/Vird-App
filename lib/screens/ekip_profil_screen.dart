@@ -180,12 +180,12 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
         final targetDayStr = "${targetWeekStart.year}-${targetWeekStart.month.toString().padLeft(2, '0')}-${targetWeekStart.day.toString().padLeft(2, '0')}";
 
+        // Geçen hafta (i==1): arşiv varsa sil ve loglardan yeniden hesapla
+        // Daha eski haftalar: bir kez arşivlendi mi tekrar hesaplanmaz
         final docSnap = await historyRef.doc(targetDayStr).get();
-        if (docSnap.exists) continue; // Arşivlenmişse atla
+        if (docSnap.exists && i > 1) continue;
+        if (docSnap.exists && i == 1) await historyRef.doc(targetDayStr).delete();
 
-        // Arşivlenmemişse o haftanın loglarını hesapla
-        // Liderin veya diğerlerinin takım kurulmadan önceki puanlarını almamak için:
-        // Eğer targetWeekStart (Örn Pazartesi), takımın kurulduğu günden (Örn Çarşamba) önceyse, sorguyu Çarşamba'dan başlat!
         final periodStart = targetWeekStart.isBefore(teamCreatedAtDay) ? teamCreatedAtDay : targetWeekStart;
         final periodEnd = targetWeekStart.add(const Duration(days: 7));
 
@@ -198,27 +198,16 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           final uid = memberDoc.id;
           final data = memberDoc.data();
 
-          // Hızlı yol: log okumadan denormalize değerleri kullan (gerçek snapshot)
-          // weeklyStartDate == target → henüz bu haftaya geçmemiş, weeklyHasanat hâlâ target hafta
-          // prevWeeklyStartDate == target → bu haftaya geçti ama önceki değer prevWeekly*'de saklı
-          int periodHasanat;
-          final memberWeekStr = data['weeklyStartDate'] as String?;
-          final memberPrevWeekStr = data['prevWeeklyStartDate'] as String?;
-
-          if (memberWeekStr == targetDayStr) {
-            periodHasanat = (data['weeklyHasanat'] as int?) ?? 0;
-          } else if (memberPrevWeekStr == targetDayStr) {
-            periodHasanat = (data['prevWeeklyHasanat'] as int?) ?? 0;
-          } else {
-            // Denormalize veri yok — log sorgusuna düş (eski kullanıcılar için fallback)
-            final logsSnap = await db.collection('users').doc(uid).collection('logs')
-                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
-                .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
-                .get();
-            periodHasanat = 0;
-            for (final log in logsSnap.docs) {
-              periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
-            }
+          // Her zaman log sorgusundan hesapla — denormalize weeklyHasanat geçiş döneminde hatalı olabilir
+          final logsSnap = await db.collection('users').doc(uid).collection('logs')
+              .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+              .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
+              .get();
+          int periodHasanat = 0;
+          for (final log in logsSnap.docs) {
+            final logType = log.data()['type'] as String?;
+            if (logType != 'arapca' && logType != 'meal') continue;
+            periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
           }
 
           return _MemberEntry(
