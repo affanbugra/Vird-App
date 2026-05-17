@@ -183,6 +183,29 @@ final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
 
 ---
 
+### Liderboard & Denormalize Veri
+
+**Denormalize field + arşiv birlikte varsa geçiş haftası verileri bozulur**
+`weeklyHasanat` field'ı sonradan eklendi. Öncesinde log atan kullanıcıların `weeklyStartDate`'i yoktu (`null`). Yeni log girilince `else` branch çalıştı → `weeklyHasanat` o haftanın toplamı değil sadece yeni logun puanına SET edildi. Liderboard fast path bu değeri doğrudan okuyunca geçmiş loglar yok sayıldı.
+
+Ayrıca arşiv: `if (docSnap.exists) continue` koruması yanlış skorla oluşturulmuş arşivi sonraki açılışlarda atladı → kalıcı hatalı arşiv.
+
+```
+Semptom:  Liderboard'da o haftaki eski loglar görünmüyor, sadece son log puanı geliyor.
+Root cause: weeklyHasanat ilk set edilişinde mevcut loglar sorgulanmadı.
+Düzeltme: (1) ilk set edilişte bu haftanın loglarını sorgula ve topla;
+           (2) liderboard mevcut hafta için her zaman log sorgusunu kullan;
+           (3) arşiv oluştururken fast path değil log sorgusu kullan;
+           (4) geçen hafta arşivi her açılışta silinip log sorgusundan yeniden oluşturulsun.
+```
+
+**Denormalize field eklerken kontrol listesi:**
+- Yeni field'ı olmayan mevcut kullanıcılar için migration branch yaz (null → log sorgusundan hesapla)
+- Arşiv/cache'ler varsa bunlar da log sorgusuyla oluşturulsun; fast path'e güvenme
+- Önce liderboard görüntüleme doğruluğunu log sorgusundan onayla, sonra fast path ekle
+
+---
+
 ### Mimari
 
 **`initialHatim` ile açılan bottom sheet**
