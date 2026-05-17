@@ -255,7 +255,6 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
     try {
       final weekStart = _getPeriodStart();
-      final weekStartStr = '${weekStart.year}-${weekStart.month.toString().padLeft(2, '0')}-${weekStart.day.toString().padLeft(2, '0')}';
       final db = FirebaseFirestore.instance;
 
       // Regular members (teamId) + developer members (developerTeamIds)
@@ -269,31 +268,9 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       for (final doc in results[0].docs) { memberMap[doc.id] = doc; }
       for (final doc in results[1].docs) { memberMap[doc.id] = doc; }
 
-      // Hızlı yol: weeklyStartDate bu haftaysa weeklyHasanat'ı direkt oku
-      // Yavaş yol: weeklyStartDate yoksa veya eskiyse log sorgusuna düş (eski kullanıcılar)
-      final fastEntries = <_MemberEntry>[];
-      final slowDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-      for (final memberDoc in memberMap.values) {
-        final data = memberDoc.data();
-        if ((data['weeklyStartDate'] as String?) == weekStartStr) {
-          fastEntries.add(_MemberEntry(
-            uid: memberDoc.id,
-            name: data['name'] as String? ?? 'İsimsiz',
-            username: data['username'] as String? ?? '',
-            avatarSeed: data['avatarSeed'] as String?,
-            periodHasanat: (data['weeklyHasanat'] as int?) ?? 0,
-            rawSeri: (data['seri'] as int?) ?? 0,
-            lastLogTs: data['lastLogDate'] as Timestamp?,
-            isHafiz: (data['isHafiz'] as bool?) ?? false,
-          ));
-        } else {
-          slowDocs.add(memberDoc);
-        }
-      }
-
-      // Yavaş yol: log sorguları artık paralel
-      final slowEntries = await Future.wait(slowDocs.map((memberDoc) async {
+      // Geçiş dönemi: weeklyHasanat geçmiş logları içermeyebilir.
+      // Mevcut hafta için her üyenin loglarını doğrudan sorgula.
+      final entries = await Future.wait(memberMap.values.map((memberDoc) async {
         final uid = memberDoc.id;
         final data = memberDoc.data();
         final logsSnap = await db
@@ -304,6 +281,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             .get();
         int periodHasanat = 0;
         for (final log in logsSnap.docs) {
+          final logType = log.data()['type'] as String?;
+          if (logType != 'arapca' && logType != 'meal') continue;
           periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
         }
         return _MemberEntry(
@@ -317,8 +296,6 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           isHafiz: (data['isHafiz'] as bool?) ?? false,
         );
       }));
-
-      final entries = [...fastEntries, ...slowEntries];
       entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
       if (mounted) {

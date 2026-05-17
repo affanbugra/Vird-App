@@ -358,13 +358,29 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           'weeklyHasanat': FieldValue.increment(pagesRead * 10),
           'weeklyStartDate': weekStartStr,
         };
+      } else if (existingWeekStr == null) {
+        // Migration: weeklyStartDate hiç set edilmemiş — bu haftaki mevcut logları topla
+        final weekStartTs = Timestamp.fromDate(weekMonday);
+        final existingSnap = await userRef.collection('logs')
+            .where('createdAt', isGreaterThanOrEqualTo: weekStartTs)
+            .get();
+        int existingWeekPages = 0;
+        for (final doc in existingSnap.docs) {
+          final logType = doc.data()['type'] as String?;
+          if (logType != 'arapca' && logType != 'meal') continue;
+          existingWeekPages += (doc.data()['pagesRead'] as int?) ?? 0;
+        }
+        weeklyUpdate = {
+          'weeklyHasanat': (existingWeekPages + pagesRead) * 10,
+          'weeklyStartDate': weekStartStr,
+        };
       } else {
         // Yeni hafta — önceki haftanın değerini arşiv için prevWeekly* alanlarına taşı
         weeklyUpdate = {
           'weeklyHasanat': pagesRead * 10,
           'weeklyStartDate': weekStartStr,
-          if (existingWeekStr != null) 'prevWeeklyStartDate': existingWeekStr,
-          if (existingWeekStr != null) 'prevWeeklyHasanat': (userData?['weeklyHasanat'] as int?) ?? 0,
+          'prevWeeklyStartDate': existingWeekStr,
+          'prevWeeklyHasanat': (userData?['weeklyHasanat'] as int?) ?? 0,
         };
       }
 
