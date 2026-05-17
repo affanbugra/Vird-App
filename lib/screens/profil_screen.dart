@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
 import '../constants/app_constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../data/quran_cuz.dart';
 import '../utils/name_utils.dart';
@@ -18,6 +19,7 @@ import 'vird_screen.dart';
 import 'dev_panel_screen.dart';
 import '../utils/seri_calculator.dart';
 import '../utils/text_utils.dart';
+import '../providers/user_provider.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -46,6 +48,24 @@ class _ProfilScreenState extends State<ProfilScreen> {
   HeatTypeFilter _typeFilter = HeatTypeFilter.arapca;
   HeatTimeFilter _timeFilter = HeatTimeFilter.all;
   int? _selectedPage;
+
+  void _showHafizSheetDirectly(BuildContext context, Map<String, dynamic> userData, User user) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _HafizSheet(
+        uid: user.uid,
+        isHafiz: (userData['isHafiz'] as bool?) ?? false,
+        name: (userData['name'] as String?) ?? '',
+        username: (userData['username'] as String?) ?? '',
+        avatarSeed: userData['avatarSeed'] as String?,
+      ),
+    );
+  }
 
   void _showSettings(BuildContext context, Map<String, dynamic> userData, User user) {
     final auth = context.read<AuthProvider>();
@@ -156,6 +176,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     isHafiz: isHafiz,
                     isDeveloper: isDeveloper,
                     onSettingsTap: () => _showSettings(context, data ?? {}, user),
+                    onHafizTap: isHafiz ? () => _showHafizSheetDirectly(context, data ?? {}, user) : null,
                     onDevTap: isDeveloper ? () => DevPanelScreen.show(context) : null,
                     onVirdTap: () => showModalBottomSheet(
                       context: context,
@@ -246,6 +267,7 @@ class _ProfileHeader extends StatelessWidget {
   final bool isDeveloper;
   final VoidCallback onSettingsTap;
   final VoidCallback onVirdTap;
+  final VoidCallback? onHafizTap;
   final VoidCallback? onDevTap;
 
   const _ProfileHeader({
@@ -259,6 +281,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.isDeveloper,
     required this.onSettingsTap,
     required this.onVirdTap,
+    this.onHafizTap,
     this.onDevTap,
   });
 
@@ -330,7 +353,7 @@ class _ProfileHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isHafiz ? AppColors.gold : Colors.white,
+                    color: isHafiz ? AppColors.emeraldGreen : Colors.white,
                     width: 3,
                   ),
                   boxShadow: [
@@ -412,6 +435,38 @@ class _ProfileHeader extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                        ],
+                        if (isHafiz) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: onHafizTap,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.emeraldGreen.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppColors.emeraldGreen.withValues(alpha: 0.35),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.menu_book_rounded, size: 9, color: AppColors.emeraldGreen),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'HAFIZ',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.emeraldGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -1045,7 +1100,7 @@ class _SettingsSheet extends StatefulWidget {
 }
 
 class _SettingsSheetState extends State<_SettingsSheet> {
-  void _showEditProfile(BuildContext context) {
+  void _showProfileAccountSheet(BuildContext context) {
     Navigator.pop(context);
     showModalBottomSheet(
       context: context,
@@ -1053,20 +1108,30 @@ class _SettingsSheetState extends State<_SettingsSheet> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _EditProfileSheet(userData: widget.userData, user: widget.user),
+      builder: (_) => _ProfileAccountSheet(userData: widget.userData, user: widget.user),
     );
   }
 
-  void _showPasswordSheet(BuildContext context) {
+  void _showHafizSheet(BuildContext context) {
+    final navContext = context;
     Navigator.pop(context);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _PasswordSheet(user: widget.user),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showModalBottomSheet(
+        context: navContext,
+        isScrollControlled: true,
+        useSafeArea: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (_) => _HafizSheet(
+          uid: widget.user.uid,
+          isHafiz: (widget.userData['isHafiz'] as bool?) ?? false,
+          name: (widget.userData['name'] as String?) ?? '',
+          username: (widget.userData['username'] as String?) ?? '',
+          avatarSeed: widget.userData['avatarSeed'] as String?,
+        ),
+      );
+    });
   }
 
   @override
@@ -1103,17 +1168,20 @@ class _SettingsSheetState extends State<_SettingsSheet> {
           ),
           const SizedBox(height: 20),
           _SettingsItem(
-            icon: Icons.person_outline,
-            title: 'Profili Düzenle',
-            onTap: () => _showEditProfile(context),
+            icon: Icons.manage_accounts_outlined,
+            title: 'Profil & Hesap İşlemleri',
+            onTap: () => _showProfileAccountSheet(context),
           ),
-          const SizedBox(height: 12),
-          _SettingsItem(
-            icon: Icons.lock_outline,
-            title: 'Şifre İşlemleri',
-            onTap: () => _showPasswordSheet(context),
+          const SizedBox(height: 20),
+          Text(
+            'Uygulama',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMid,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _SettingsItem(
             icon: Icons.history,
             title: 'Okuma Geçmişi',
@@ -1121,6 +1189,12 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               Navigator.pop(context);
               LogHistorySheet.show(context);
             },
+          ),
+          const SizedBox(height: 12),
+          _SettingsItem(
+            icon: Icons.menu_book_outlined,
+            title: 'Hafız Doğrulaması',
+            onTap: () => _showHafizSheet(context),
           ),
           const SizedBox(height: 20),
           Text(
@@ -1431,46 +1505,99 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 }
 
-// ─── Şifre İşlemleri Sheet ────────────────────────────────────────────────────
+// ─── Profil & Hesap Sheet ─────────────────────────────────────────────────────
 
-class _PasswordSheet extends StatefulWidget {
+class _ProfileAccountSheet extends StatefulWidget {
+  final Map<String, dynamic> userData;
   final User user;
-  const _PasswordSheet({required this.user});
+  const _ProfileAccountSheet({required this.userData, required this.user});
 
   @override
-  State<_PasswordSheet> createState() => _PasswordSheetState();
+  State<_ProfileAccountSheet> createState() => _ProfileAccountSheetState();
 }
 
-class _PasswordSheetState extends State<_PasswordSheet> {
-  final _formKey = GlobalKey<FormState>();
+class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
+  final _profileFormKey = GlobalKey<FormState>();
+  late TextEditingController _nameCtrl;
+  late TextEditingController _usernameCtrl;
+  String? _selectedCity;
+  String? _selectedUniversity;
+  bool _profileLoading = false;
+
+  final _passwordFormKey = GlobalKey<FormState>();
   final _oldPassCtrl = TextEditingController();
   final _newPassCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
-  
-  bool _isLoading = false;
+  bool _passwordLoading = false;
   late bool _hasPassword;
+
+  late final List<String> _sortedCities;
+  late final List<String> _sortedUniversities;
 
   @override
   void initState() {
     super.initState();
+    _nameCtrl = TextEditingController(
+      text: widget.userData['name'] ?? widget.user.displayName ?? '',
+    );
+    _usernameCtrl = TextEditingController(
+      text: widget.userData['username'] ?? '',
+    );
+    final cityRaw = widget.userData['city'] as String?;
+    _selectedCity = (cityRaw == null || cityRaw.isEmpty || cityRaw == 'Şehir belirtilmedi')
+        ? null : cityRaw;
+    final uniRaw = widget.userData['university'] as String?;
+    _selectedUniversity = (uniRaw == null || uniRaw.isEmpty || uniRaw == 'Üniversite belirtilmedi')
+        ? null : uniRaw;
+    _sortedCities = List.from(AppConstants.cities)..sort(_turkishCompare);
+    _sortedUniversities = List.from(AppConstants.universities)..sort(_turkishCompare);
     _hasPassword = widget.user.providerData.any((p) => p.providerId == 'password');
   }
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
+    _usernameCtrl.dispose();
     _oldPassCtrl.dispose();
     _newPassCtrl.dispose();
     _confirmPassCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+  int _turkishCompare(String a, String b) {
+    String norm(String t) => t.toLowerCase()
+        .replaceAll('ç', 'cz').replaceAll('ğ', 'gz').replaceAll('ı', 'hz')
+        .replaceAll('ö', 'oz').replaceAll('ş', 'sz').replaceAll('ü', 'uz');
+    return norm(a).compareTo(norm(b));
+  }
 
+  Future<void> _saveProfile() async {
+    if (!_profileFormKey.currentState!.validate()) return;
+    setState(() => _profileLoading = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+        'name': _nameCtrl.text.trim(),
+        'username': _usernameCtrl.text.trim(),
+        'city': _selectedCity ?? '',
+        'university': _selectedUniversity ?? '',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil güncellendi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+    } finally {
+      if (mounted) setState(() => _profileLoading = false);
+    }
+  }
+
+  Future<void> _savePassword() async {
+    if (!_passwordFormKey.currentState!.validate()) return;
+    setState(() => _passwordLoading = true);
     try {
       if (_hasPassword) {
-        // Eski şifre ile doğrula ve güncelle
         final cred = EmailAuthProvider.credential(
           email: widget.user.email!,
           password: _oldPassCtrl.text.trim(),
@@ -1478,94 +1605,216 @@ class _PasswordSheetState extends State<_PasswordSheet> {
         await widget.user.reauthenticateWithCredential(cred);
         await widget.user.updatePassword(_newPassCtrl.text.trim());
       } else {
-        // Şifre yoksa (örn: sadece google) doğrudan ekle (link) veya update
         await widget.user.updatePassword(_newPassCtrl.text.trim());
       }
-      
       if (mounted) {
-        Navigator.pop(context);
+        _oldPassCtrl.clear();
+        _newPassCtrl.clear();
+        _confirmPassCtrl.clear();
+        setState(() => _hasPassword = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şifre başarıyla güncellendi')),
+          const SnackBar(content: Text('Şifre güncellendi')),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _passwordLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: Form(
-        key: _formKey,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
               child: Container(
-                width: 40,
-                height: 4,
+                width: 40, height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
-                  borderRadius: BorderRadius.circular(2),
+                  color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
+            Text('Profil & Hesap',
+              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+
+            const SizedBox(height: 24),
+            // ── Profil ──────────────────────────────────────────────
+            Text('Profil Bilgileri',
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+            const SizedBox(height: 12),
+            Form(
+              key: _profileFormKey,
+              child: Column(
+                children: [
+                  _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true),
+                  const SizedBox(height: 12),
+                  _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
+                  const SizedBox(height: 12),
+                  DropdownSearch<String>(
+                    items: (filter, _) => _sortedCities,
+                    filterFn: (item, filter) => turkishContains(item, filter),
+                    selectedItem: _selectedCity,
+                    onSelected: (v) => setState(() => _selectedCity = v),
+                    popupProps: const PopupProps.menu(
+                      showSearchBox: true,
+                      searchFieldProps: TextFieldProps(
+                        decoration: InputDecoration(hintText: 'Şehir ara...', prefixIcon: Icon(Icons.search)),
+                      ),
+                    ),
+                    decoratorProps: DropDownDecoratorProps(
+                      decoration: InputDecoration(
+                        labelText: 'Şehir (Opsiyonel)',
+                        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                        prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownSearch<String>(
+                    items: (filter, _) => _sortedUniversities,
+                    filterFn: (item, filter) => turkishContains(item, filter),
+                    selectedItem: _selectedUniversity,
+                    onSelected: (v) => setState(() => _selectedUniversity = v),
+                    popupProps: const PopupProps.menu(
+                      showSearchBox: true,
+                      searchFieldProps: TextFieldProps(
+                        decoration: InputDecoration(hintText: 'Üniversite ara...', prefixIcon: Icon(Icons.search)),
+                      ),
+                    ),
+                    decoratorProps: DropDownDecoratorProps(
+                      decoration: InputDecoration(
+                        labelText: 'Üniversite (Opsiyonel)',
+                        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                        prefixIcon: const Icon(Icons.school, color: AppColors.teal),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity, height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal, bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey, isLoading: _profileLoading,
+                onPressed: _profileLoading ? null : _saveProfile,
+                child: Text('PROFİLİ KAYDET',
+                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ),
+
+            const SizedBox(height: 28),
+            const Divider(),
+            const SizedBox(height: 20),
+
+            // ── Hesap ────────────────────────────────────────────────
+            Text('Hesap Ayarları',
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+            const SizedBox(height: 12),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.email_outlined, color: AppColors.textLight, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(widget.user.email ?? '—',
+                      style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid)),
+                  ),
+                  Text('e-posta',
+                    style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
             Text(
               _hasPassword ? 'Şifre Değiştir' : 'Şifre Belirle',
-              style: GoogleFonts.nunito(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid),
+            ),
+            if (!_hasPassword) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Google ile giriş yaptığın için henüz bir şifren yok. Belirleyerek e-posta & şifreyle de giriş yapabilirsin.',
+                style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, height: 1.4),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Form(
+              key: _passwordFormKey,
+              child: Column(
+                children: [
+                  if (_hasPassword) ...[
+                    _buildPassField(_oldPassCtrl, 'Mevcut Şifre'),
+                    const SizedBox(height: 12),
+                  ],
+                  _buildPassField(_newPassCtrl, 'Yeni Şifre'),
+                  const SizedBox(height: 12),
+                  _buildPassField(_confirmPassCtrl, 'Yeni Şifreyi Onayla', isConfirm: true),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            if (!_hasPassword)
-              Text(
-                'Google ile giriş yaptığınız için henüz bir şifreniz yok. Şifre belirleyerek e-posta ve şifre ile de giriş yapabilirsiniz.',
-                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
-              ),
             const SizedBox(height: 16),
-            if (_hasPassword) ...[
-              _buildField(_oldPassCtrl, 'Mevcut Şifre'),
-              const SizedBox(height: 12),
-            ],
-            _buildField(_newPassCtrl, 'Yeni Şifre'),
-            const SizedBox(height: 12),
-            _buildField(_confirmPassCtrl, 'Yeni Şifreyi Onayla', isConfirm: true),
-            const SizedBox(height: 24),
             SizedBox(
-              width: double.infinity,
-              height: 50,
+              width: double.infinity, height: 50,
               child: DuolingoButton(
-                color: AppColors.teal,
-                bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey,
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _submit,
+                color: AppColors.teal, bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey, isLoading: _passwordLoading,
+                onPressed: _passwordLoading ? null : _savePassword,
                 child: Text(
                   _hasPassword ? 'ŞİFREYİ DEĞİŞTİR' : 'ŞİFRE BELİRLE',
-                  style: GoogleFonts.nunito(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
+                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
               ),
+            ),
+
+            const SizedBox(height: 16),
+            Row(children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('veya', style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight)),
+              ),
+              const Expanded(child: Divider()),
+            ]),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  builder: (_) => _MagicLinkSheet(email: widget.user.email ?? ''),
+                );
+              },
+              icon: const Icon(Icons.link_rounded, size: 18, color: AppColors.teal),
+              label: Text('Başka cihazdan giriş linki gönder',
+                style: GoogleFonts.nunito(fontSize: 14, color: AppColors.teal, fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -1573,9 +1822,27 @@ class _PasswordSheetState extends State<_PasswordSheet> {
     );
   }
 
-  Widget _buildField(TextEditingController controller, String label, {bool isConfirm = false}) {
+  Widget _buildTextField(TextEditingController ctrl, String label, {bool isRequired = false}) {
     return TextFormField(
-      controller: controller,
+      controller: ctrl,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+        ),
+      ),
+      validator: isRequired
+          ? (v) => (v == null || v.trim().isEmpty) ? 'Bu alan zorunludur' : null
+          : null,
+    );
+  }
+
+  Widget _buildPassField(TextEditingController ctrl, String label, {bool isConfirm = false}) {
+    return TextFormField(
+      controller: ctrl,
       obscureText: true,
       decoration: InputDecoration(
         labelText: label,
@@ -1589,11 +1856,880 @@ class _PasswordSheetState extends State<_PasswordSheet> {
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Bu alan zorunludur';
         if (v.trim().length < 6) return 'En az 6 karakter olmalıdır';
-        if (isConfirm && v.trim() != _newPassCtrl.text.trim()) {
-          return 'Şifreler eşleşmiyor';
-        }
+        if (isConfirm && v.trim() != _newPassCtrl.text.trim()) return 'Şifreler eşleşmiyor';
         return null;
       },
+    );
+  }
+}
+
+// ─── Hafız Doğrulama Sheet ────────────────────────────────────────────────────
+
+class _HafizSheet extends StatefulWidget {
+  final String uid;
+  final bool isHafiz;
+  final String name;
+  final String username;
+  final String? avatarSeed;
+
+  const _HafizSheet({
+    required this.uid,
+    required this.isHafiz,
+    required this.name,
+    required this.username,
+    this.avatarSeed,
+  });
+
+  @override
+  State<_HafizSheet> createState() => _HafizSheetState();
+}
+
+class _HafizSheetState extends State<_HafizSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameCtrl;
+  final _linkCtrl = TextEditingController();
+  bool _consentGiven = false;
+  bool _loading = false;
+  bool _resubmitting = false;
+  late final Stream<DocumentSnapshot> _requestStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.name);
+    _requestStream = FirebaseFirestore.instance
+        .collection('hafiz_requests')
+        .doc(widget.uid)
+        .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _linkCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_consentGiven) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen onay kutusunu işaretleyin.')),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final link = _linkCtrl.text.trim();
+      await FirebaseFirestore.instance
+          .collection('hafiz_requests')
+          .doc(widget.uid)
+          .set({
+        'uid': widget.uid,
+        'name': _nameCtrl.text.trim(),
+        'username': widget.username,
+        'avatarSeed': widget.avatarSeed,
+        'type': 'verify',
+        if (link.isNotEmpty) 'driveLink': link,
+        'status': 'pending',
+        'note': null,
+        'requestedAt': FieldValue.serverTimestamp(),
+        'reviewedAt': null,
+        'consentGiven': true,
+        'consentAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() { _loading = false; _resubmitting = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final msg = e.toString().contains('permission-denied')
+          ? 'Yetki hatası oluştu. Uygulamayı güncelleyip tekrar deneyin.'
+          : 'Bağlantı hatası oluştu, tekrar deneyin.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  Future<void> _submitRevokeRequest() async {
+    final noteCtrl = TextEditingController();
+    final String? userNote;
+    try {
+      userNote = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Hafız Statüsünü Kaldır', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Yönetici inceledikten sonra rozetiniz kaldırılacaktır.',
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+              ),
+              const SizedBox(height: 14),
+              Text('Açıklama (opsiyonel)',
+                  style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: noteCtrl,
+                maxLines: 3,
+                autofocus: false,
+                decoration: InputDecoration(
+                  hintText: 'Neden iptal etmek istediğinizi yazabilirsiniz…',
+                  hintStyle: GoogleFonts.nunito(color: AppColors.textLight, fontSize: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.teal, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed, elevation: 0),
+              child: const Text('Başvuru Gönder', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      noteCtrl.dispose();
+    }
+    if (userNote == null) return;
+    setState(() => _loading = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('hafiz_requests')
+          .doc(widget.uid)
+          .set({
+        'uid': widget.uid,
+        'name': widget.name,
+        'username': widget.username,
+        'avatarSeed': widget.avatarSeed,
+        'type': 'revoke',
+        'status': 'pending',
+        if (userNote.isNotEmpty) 'userNote': userNote,
+        'note': null,
+        'requestedAt': FieldValue.serverTimestamp(),
+        'reviewedAt': null,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bir hata oluştu, tekrar deneyin.')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Widget _buildRevokePendingState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.hourglass_top_rounded, color: Color(0xFFFFB300), size: 32),
+          const SizedBox(height: 10),
+          Text(
+            'İptal Başvurunuz İnceleniyor',
+            style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Hafız statünüzü kaldırma başvurunuz yönetici tarafından inceleniyor. Rozetiniz bu süreçte aktif kalmaya devam edecektir.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRevokeRejectedState(String? note) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.errorBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.cancel_outlined, color: AppColors.errorRed, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'İptal Başvurunuz Reddedildi',
+                    style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.errorRed),
+                  ),
+                ],
+              ),
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(note, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark, height: 1.5)),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Hafız statünüz korundu.',
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.emeraldGreen, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _loading ? null : _submitRevokeRequest,
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.textLight),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Tekrar Başvur',
+              style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMid),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.menu_book_rounded, color: AppColors.emeraldGreen, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Hafız Doğrulaması',
+                  style: GoogleFonts.nunito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            StreamBuilder<DocumentSnapshot>(
+              stream: _requestStream,
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ));
+                }
+                if (snap.hasError) return _buildStreamError();
+                final data = snap.data?.data() as Map<String, dynamic>?;
+                final type = data?['type'] as String?;
+                final status = data?['status'] as String?;
+                // UserProvider'dan gerçek zamanlı isHafiz — widget.isHafiz stale olabilir
+                final isHafizNow = context.select<UserProvider, bool>((p) => p.isHafiz);
+                if (isHafizNow) {
+                  if (type == 'revoke' && status == 'pending') return _buildRevokePendingState();
+                  if (type == 'revoke' && status == 'rejected') return _buildRevokeRejectedState(data?['note'] as String?);
+                  return _buildApprovedState();
+                }
+                // Hafız değil — sadece verify tipi başvuruları işle
+                final isVerify = type == null || type == 'verify';
+                if (data != null && isVerify && !_resubmitting) {
+                  if (status == 'pending') return _buildPendingState();
+                  if (status == 'rejected') return _buildRejectedState(data['note'] as String?);
+                }
+                return _buildForm();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStreamError() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.errorBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: AppColors.errorRed, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            'Bağlantı hatası oluştu.',
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.errorRed, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Lütfen internet bağlantınızı kontrol edip sayfayı kapatıp tekrar açın.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApprovedState() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.emeraldGreen.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.verified_rounded, color: AppColors.emeraldGreen, size: 36),
+              const SizedBox(height: 10),
+              Text(
+                'Hafızlığınız doğrulandı',
+                style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.emeraldGreen,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Profilinizde HAFIZ rozeti görünmektedir.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Hafızlara özel içerikler için takipte kalın.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  color: AppColors.emeraldGreen.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: _loading ? null : _submitRevokeRequest,
+          child: Text(
+            'Hafız statümü kaldırmak istiyorum',
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              color: AppColors.textLight,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.textLight,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPendingState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.infoBlue.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.infoBlue.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.hourglass_top_rounded, color: AppColors.infoBlue, size: 32),
+          const SizedBox(height: 10),
+          Text(
+            'Başvurunuz İnceleniyor',
+            style: GoogleFonts.nunito(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.infoBlue,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Hafızlık belgeniz incelendikten sonra hesabınıza HAFIZ rozeti eklenecektir.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRejectedState(String? note) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.errorBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.cancel_outlined, color: AppColors.errorRed, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Başvurunuz Reddedildi',
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.errorRed,
+                    ),
+                  ),
+                ],
+              ),
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  note,
+                  style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark, height: 1.5),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => setState(() {
+              _resubmitting = true;
+              _linkCtrl.clear();
+              _consentGiven = false;
+            }),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.emeraldGreen),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Tekrar Başvur',
+              style: GoogleFonts.nunito(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.emeraldGreen,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBenefitRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: AppColors.emeraldGreen),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textDark, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Faydalar
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.emeraldGreen.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hafız rozetinin getirdikleri',
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.emeraldGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildBenefitRow(Icons.verified_rounded, 'Profilinizde yeşil HAFIZ rozeti görünür'),
+                _buildBenefitRow(Icons.radio_button_checked_rounded, 'Profil fotoğrafınız yeşil halkayla çerçevelenir'),
+                _buildBenefitRow(Icons.people_outline_rounded, 'Ekip listesinde Hafız filtresiyle öne çıkarsınız'),
+                _buildBenefitRow(Icons.lock_clock_outlined, 'Hafızlara özel görev ve etkinlikler (yakında)'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Gizlilik bilgilendirmesi
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'Başvurunuzu inceleyebilmemiz için hafızlık belgenizi Google Drive üzerinden paylaşabilir ya da ek bir not bırakabilirsiniz. Bu alan zorunlu değildir.\n\nPaylaştığınız bilgiler yalnızca hafızlık durumunuzu doğrulamak amacıyla kullanılacak; inceleme tamamlandıktan sonra sistemimizden kalıcı olarak silinecektir. Verileriniz herhangi bir üçüncü tarafla paylaşılmayacaktır.',
+              style: GoogleFonts.nunito(
+                fontSize: 12.5,
+                color: AppColors.textMid,
+                height: 1.55,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Ad Soyad',
+            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _nameCtrl,
+            style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+            decoration: InputDecoration(
+              hintText: 'Belgedeki adınız',
+              hintStyle: GoogleFonts.nunito(color: AppColors.textLight),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.teal, width: 2),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Ad soyad zorunludur' : null,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belge veya Not (Opsiyonel)',
+            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Drive linki paylaşıyorsanız "Bağlantıya sahip olan herkes görüntüleyebilir" ayarını seçin.',
+            style: GoogleFonts.nunito(fontSize: 11.5, color: AppColors.textLight),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _linkCtrl,
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark),
+            keyboardType: TextInputType.multiline,
+            maxLines: 3,
+            minLines: 1,
+            decoration: InputDecoration(
+              hintText: 'Drive linki veya iletmek istediğiniz bir not…',
+              hintStyle: GoogleFonts.nunito(color: AppColors.textLight, fontSize: 13),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.teal, width: 2),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => setState(() => _consentGiven = !_consentGiven),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: Checkbox(
+                    value: _consentGiven,
+                    onChanged: (v) => setState(() => _consentGiven = v ?? false),
+                    activeColor: AppColors.teal,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Paylaştığım bilgilerin yalnızca hafızlık doğrulaması amacıyla kullanılacağını ve inceleme sonrasında kalıcı olarak silineceğini anlıyorum.',
+                    style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textMid, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.emeraldGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : Text(
+                      'Başvuruyu Gönder',
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Magic Link Sheet ─────────────────────────────────────────────────────────
+
+class _MagicLinkSheet extends StatefulWidget {
+  final String email;
+  const _MagicLinkSheet({required this.email});
+
+  @override
+  State<_MagicLinkSheet> createState() => _MagicLinkSheetState();
+}
+
+class _MagicLinkSheetState extends State<_MagicLinkSheet> {
+  bool _isLoading = false;
+  bool _sent = false;
+
+  Future<void> _send() async {
+    setState(() => _isLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('emailForSignIn', widget.email);
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://virdapp.com',
+        handleCodeInApp: true,
+        androidPackageName: 'com.example.virdApp',
+        androidInstallApp: false,
+        iOSBundleId: 'com.example.virdApp',
+      );
+      await FirebaseAuth.instance.setLanguageCode('tr');
+      await FirebaseAuth.instance.sendSignInLinkToEmail(
+        email: widget.email,
+        actionCodeSettings: actionCodeSettings,
+      );
+      if (mounted) setState(() { _isLoading = false; _sent = true; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bir hata oluştu. Tekrar dene.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24, right: 24, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: AppColors.borderGrey,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          if (_sent) ...[
+            Container(
+              width: 64, height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.successBg, shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.mark_email_read_outlined,
+                  color: AppColors.successGreen, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text('Link Gönderildi!',
+                style: GoogleFonts.nunito(fontSize: 20,
+                    fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            const SizedBox(height: 8),
+            Text(
+              '${widget.email} adresine giriş linki gönderildi.\nLinke tıkladığında o cihazda otomatik giriş yapılır.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal,
+                bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey,
+                isLoading: false,
+                onPressed: () => Navigator.pop(context),
+                child: Text('TAMAM',
+                    style: GoogleFonts.nunito(fontSize: 16,
+                        fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: const BoxDecoration(
+                      color: AppColors.tealLight, shape: BoxShape.circle),
+                  child: const Icon(Icons.link_rounded,
+                      color: AppColors.teal, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Başka Cihazdan Giriş',
+                          style: GoogleFonts.nunito(fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark)),
+                      Text('Tek tıkla giriş linki al',
+                          style: GoogleFonts.nunito(
+                              fontSize: 13, color: AppColors.textMid)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.mail_outline_rounded,
+                      color: AppColors.textLight, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(widget.email,
+                        style: GoogleFonts.nunito(fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textDark)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Bu adrese bir giriş linki gönderilecek. Linki almak istediğin cihazda e-postanı aç ve linke tıkla — şifre gerekmeden otomatik giriş yapılır.',
+              style: GoogleFonts.nunito(fontSize: 13,
+                  color: AppColors.textMid, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal,
+                bottomColor: AppColors.tealDark,
+                disabledColor: AppColors.borderGrey,
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _send,
+                child: Text('GİRİŞ LİNKİ GÖNDER',
+                    style: GoogleFonts.nunito(fontSize: 15,
+                        fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

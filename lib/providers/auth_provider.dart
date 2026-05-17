@@ -4,13 +4,15 @@ import '../services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
-  
+
   User? _user;
   bool _isLoading = true;
+  bool _needsProfileSetup = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
+  bool get needsProfileSetup => _needsProfileSetup;
 
   AuthProvider() {
     _authService.authStateChanges.listen((User? user) {
@@ -21,30 +23,30 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signInWithEmail(String email, String password) async {
-    try {
-      await _authService.signInWithEmail(email, password);
-    } catch (e) {
-      rethrow;
-    }
+    await _authService.signInWithEmail(email, password);
   }
 
   Future<void> registerWithEmail(String email, String password) async {
-    try {
-      await _authService.registerWithEmail(email, password);
-    } catch (e) {
-      rethrow;
-    }
+    await _authService.registerWithEmail(email, password);
   }
 
   Future<void> signInWithGoogle() async {
-    try {
-      await _authService.signInWithGoogle();
-    } catch (e) {
-      rethrow;
+    final cred = await _authService.signInWithGoogle();
+    if (cred?.additionalUserInfo?.isNewUser == true) {
+      _needsProfileSetup = true;
+      notifyListeners();
+    }
+  }
+
+  void completeProfileSetup() {
+    if (_needsProfileSetup) {
+      _needsProfileSetup = false;
+      notifyListeners();
     }
   }
 
   Future<void> signOut() async {
+    _needsProfileSetup = false;
     await _authService.signOut();
   }
 }

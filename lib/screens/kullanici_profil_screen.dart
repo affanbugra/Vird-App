@@ -248,7 +248,7 @@ class _UserHeader extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isHafiz ? AppColors.gold : Colors.white,
+                color: isHafiz ? AppColors.emeraldGreen : Colors.white,
                 width: 3,
               ),
               boxShadow: [
@@ -320,6 +320,35 @@ class _UserHeader extends StatelessWidget {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.gold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (isHafiz) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.emeraldGreen.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppColors.emeraldGreen.withValues(alpha: 0.35),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.menu_book_rounded, size: 9, color: AppColors.emeraldGreen),
+                            const SizedBox(width: 2),
+                            Text(
+                              'HAFIZ',
+                              style: GoogleFonts.nunito(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.emeraldGreen,
                               ),
                             ),
                           ],

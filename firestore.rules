@@ -10,6 +10,10 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isDeveloper == true;
+    }
+
     // ── Kullanıcı profilleri ───────────────────────────────────────────
     match /users/{userId} {
       // Herkes okuyabilir (liderboard, profil görüntüleme)
@@ -19,7 +23,9 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
                     || (isAuth() && request.resource.data.diff(resource.data)
-                        .affectedKeys().hasOnly(['teamId']));
+                        .affectedKeys().hasOnly(['teamId']))
+                    || (isAdmin() && request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['isHafiz']));
       allow delete: if false;
 
       // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir
@@ -85,6 +91,24 @@ service cloud.firestore {
     // ── Ekip katılma istekleri ─────────────────────────────────────────
     match /pending_requests/{requestId} {
       allow read, write: if isAuth();
+    }
+
+    // ── Yol Haritası ──────────────────────────────────────────────────────────
+    // Herkes okuyabilir (published filtrelemesi client-side); sadece admin yazar
+    match /roadmap_entries/{entryId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── Hafız doğrulama başvuruları ────────────────────────────────────
+    // Oluşturma: yalnızca kendi uid'i için (uid = doc key)
+    // Okuma/güncelleme: isAuth() — developer panelinin cross-user erişimi için
+    match /hafiz_requests/{uid} {
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow read:   if isAuth();
+      // Sadece başvuru sahibi veya admin güncelleyebilir
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if false;
     }
   }
 }

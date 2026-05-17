@@ -15,7 +15,7 @@
 - **Cüz:** Kuranın 30 eşit bölümünden biri (her biri ~20 sayfa).
 - **Sure:** Kuranın 114 bölümünden biri.
 - **Log:** Kullanıcının bir okuma kaydı — hangi yöntemle (hatim/sure/sayfa/cüz), kaç sayfa.
-- **DevPanel:** Geliştiriciye özel ekran — bug, plan, fikir ve feedback yönetimi.
+- **DevPanel:** Geliştiriciye özel ekran — bug, plan, fikir, feedback ve yol haritası yönetimi.
 
 **Kullanıcı akışı:** Giriş → Hatim başlat → Günlük okuma logla → Seri/hasanat birik → Ekiple liderboard'da yarış.
 
@@ -46,9 +46,9 @@ Kullanıcı söylemese de kontrol et. **Her değişiklik belgelenmez — sadece 
 
 Rutin fix, bilinen bileşen güncellemesi, küçük UI ayarı → belgeleme.
 
-Güncellemeler bittikten sonra kullanıcıya sor: **"Değişiklikleri commitleyip pushlayayım mı?"**
+**Commit/push zamanı:** Her işlemden sonra sorma. Kullanıcı sohbeti kapatmadan önce "bitti" sinyali verdiğinde (örn. "başka bir şey yok", "tamam", vb.) sor: **"Değişiklikleri commitleyip pushlayayım mı?"**
 
-Commit/push bittikten sonra kullanıcıya sor: **"Web için son sürümü derleyip yayınlayayım mı?"**
+Commit/push bittikten sonra sor: **"Web için son sürümü derleyip yayınlayayım mı?"**
 
 ---
 

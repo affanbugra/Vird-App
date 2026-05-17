@@ -9,17 +9,18 @@ Adından anlaşılmayan veya kritik detay içeren dosyalar:
 | Dosya | Not |
 |---|---|
 | `lib/screens/ekip_profil_screen.dart` | Ekip profili + haftalık liderboard (client-side `periodStart`) |
-| `lib/screens/profil_screen.dart` | Kendi profili — Kuran haritası bu ekranda |
+| `lib/screens/profil_screen.dart` | Kendi profili — Kuran haritası + `_HafizSheet` (doğrulama başvurusu) bu ekranda |
 | `lib/screens/kullanici_profil_screen.dart` | Başka kullanıcı profili — read-only |
-| `lib/screens/dev_panel_screen.dart` | DevPanel — bug/plan/fikir/feedback yönetimi (sadece developer görür) |
-| `lib/screens/vird_screen.dart` | Vird sekmesi — yol haritası + öneri formu |
+| `lib/screens/dev_panel_screen.dart` | DevPanel — bug/plan/fikir/feedback + Hafız başvuruları + Yol Haritası yönetimi (sadece developer görür) |
+| `lib/screens/vird_screen.dart` | Vird sekmesi — yol haritası (Firestore'dan dinamik) + öneri formu |
+| `lib/data/roadmap_entry.dart` | Yol haritası kart modeli — `RoadmapEntry`, `fromDoc`, `toMap`, `copyWith` |
 | `lib/widgets/log_entry_bottom_sheet.dart` | Log girişi — 4 tab, kilitleme modu, seri animasyon tetikleyici |
 | `lib/widgets/duolingo_button.dart` | Primary buton bileşeni (3D depth) — adı yanıltıcı, aslında AppButton |
-| `lib/utils/seri_calculator.dart` | Seri hesabı — anchor-day algoritması, `seriDisplayState()` |
+| `lib/utils/seri_calculator.dart` | Seri hesabı — anchor-day algoritması, `seriDisplayState()`. `atRisk` yalnızca saat 18:00+ aktif |
 | `lib/utils/hatim_calculator.dart` | Hatim tamamlanma — `Set<int>` yaklaşımı, `Future<bool>` döndürür |
 | `lib/data/quran_cuz.dart` | Kuran veri sistemi — tüm modüllerde kullanılır, dokunmadan önce oku |
 | `lib/data/tilavet_secde.dart` | 14 tilavet secdesi sayfa verisi |
-| `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds` — global developer state |
+| `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds`, `isHafiz` — global developer/hafız state |
 
 ---
 
@@ -37,11 +38,16 @@ teamJoinedAt:     Timestamp? (retroaktif liderboard katılımını önler)
 isPro:            bool? (Console'dan elle atanır, in-app değiştirilemez)
 isDeveloper:      bool (Console'dan elle — DEV badge + çoklu ekip desteği)
 developerTeamIds: List<String> (developer birden fazla ekibin liderboardunda görünür)
+isHafiz:          bool? (Console veya DevPanel'den onaylanınca true — HAFIZ badge)
 username:         string
 avatarSeed:       string? (20 önceden belirlenmiş DiceBear seed — Storage maliyeti yok)
 name:             string
 city:             string?
 university:       string?
+weeklyHasanat:     int? (bu haftaki birikmiş hasanat — liderboard hızlandırma için)
+weeklyStartDate:   string? ("YYYY-MM-DD" formatında haftanın Pazartesisi)
+prevWeeklyHasanat: int? (geçen haftanın dondurulmuş hasanatı — arşiv snapshot için)
+prevWeeklyStartDate: string? (geçen haftanın Pazartesisi — arşiv eşleştirme için)
 ```
 
 ### `users/{uid}/hatims/{hatimId}`
@@ -111,6 +117,34 @@ requestedAt: Timestamp
 ```
 ⚠️ `orderBy` YOK — serverTimestamp pending write'da null döner → crash.
 
+### `hafiz_requests/{uid}` (uid = doc key — kullanıcı başına 1 başvuru)
+```
+uid:         string
+name:        string        (formdan girilen ad soyad)
+username:    string
+avatarSeed:  string?
+driveLink:   string        (onay sonrası FieldValue.delete() ile siliniyor — gizlilik)
+status:      'pending' | 'approved' | 'rejected'
+note:        string?       (red mesajı — kullanıcıya gösterilir)
+consentGiven: bool
+consentAt:   Timestamp
+requestedAt: Timestamp
+reviewedAt:  Timestamp?
+```
+**Not:** Onaylanınca `users/{uid}.isHafiz = true` set edilir. Tekrar başvuruda doküman üzerine yazılır.
+
+### `roadmap_entries/{entryId}`
+```
+type:      'released' | 'upcoming'
+title:     string
+version:   string?    // "v1.2"
+date:      string?    // "2026-05-17" (released için)
+eta:       string?    // "Yakında" | "Ramazan 2027" (upcoming için)
+order:     int        // sıralama — batch update ile yönetilir
+bullets:   List<string>
+published: bool       // false = taslak, kullanıcılar göremez
+```
+
 ### `feedback_labels/{labelId}`
 ```
 name:     string
@@ -151,6 +185,7 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 
 - **Seri hesabı:** Anchor-day algoritması — önce en son log gününü bul, oradan geriye say. Bugünden geriye saymak, bugün log yokken seriyi yanlış sıfırlar. `seriDisplayState(rawSeri, lastLogTs)` donmuş Firestore değerini her render'da gerçek zamanlı düzeltir.
 - **Liderboard reset:** Client-side, `periodStart` dinamik hesabı. Cloud Function yok (MVP ölçeği için kabul edilebilir; büyüyünce denormalized field + Cloud Function gerekir).
+- **Liderboard hızlandırma:** `weeklyHasanat` + `weeklyStartDate` user doc'ta tutulur. Log kaydında güncellenir; hafta değişince `prevWeekly*` alanlarına taşınır. Liderboard: bu hafta log girenler için sıfır log sorgusu (fast path), girmeyenler için paralel boş sorgu (slow path). Arşiv de `prevWeeklyHasanat`'tan okur — log manipülasyonundan bağımsız frozen snapshot. Ekip büyüyünce (100+ üye) `teams/{teamId}` doc'una deneşleme + Cloud Function gerekir.
 - **teamJoinedAt:** Ekibe sonradan katılanlar geçmiş haftalara dahil edilmez — bu field olmazsa yeni üye tüm geçmiş puanlarla görünür.
 - **isPro:** Firebase Console'dan elle atanır. In-app değiştirme yok.
 - **isDeveloper:** Console'dan elle. DEV badge + `developerTeamIds` ile birden fazla ekipte görünebilir.
@@ -160,3 +195,9 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 - **Firestore rules — logs okuma:** Liderboard cross-user okuma gerektirir → `isAuth()` yeterli, `isOwner()` değil.
 - **Firestore rules — teamId güncelleme:** Başka kullanıcı sadece `teamId` alanını güncelleyebilmeli → `affectedKeys().hasOnly(['teamId'])`.
 - **Feedback inbox:** `folderId == null || folderId.isEmpty` = Gelen Kutusu. Klasöre taşınınca Gelen Kutusu'ndan kalkar.
+- **isHafiz atanma:** DevPanel → Hafız Başvuruları → Onayla butonu `users/{uid}.isHafiz = true` set eder. Console'dan da elle atanabilir. In-app değiştirilemez.
+- **Yol haritası yönetimi:** `roadmap_entries` koleksiyonu; `published: false` = taslak (kullanıcı görmez). DevPanel → Neler Geldi ekranından CRUD + sürükle-bırak sıralama. VirdScreen sadece `published: true` olanları gösterir (client-side filtre). `order` alanı batch update ile yönetilir.
+- **Dinamik versiyon string:** VirdScreen footer'ındaki versiyon (`YTÜ · İstanbul · 2026 · vX.X`) otomatik hesaplanır: `published == true && type == 'released'` olanlar içinde `order` en yüksek olanın `version` alanından alınır. `version` alanı boş bırakılan kartlar hesaba katılmaz; hiç kart yoksa `v 1.00` fallback.
+- **Yol haritası bottom sheet sekmeler:** "Tüm sürüm geçmişini gör" sheet'i `_RoadmapSheet` stateful widget'ı — Neler Geldi / Neler Geliyor sekmeleri. Yayındakiler en yeniden eskiye (reversed), yakındakiler sırasıyla gösterilir. `order` alanı her iki grupta bağımsız, görüntüleme sırası type'a göre ayrılır.
+- **Hafız doğrulama gizlilik:** Onay verilince `hafiz_requests/{uid}.driveLink` alanı `FieldValue.delete()` ile silinir. Belge verisi sistemde tutulmaz (KVKK uyumu).
+- **seriDisplayState `atRisk`:** Yalnızca günün son 6 saatinde (`now.hour >= 18`) true döner. Sabah erken saatlerde "tehlikede" göstermek kullanıcı deneyimini bozduğu için bu eşik seçildi.

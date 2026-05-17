@@ -1,50 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
 import '../app_assets.dart';
-
-IconData _iconFromName(String name) {
-  switch (name) {
-    case 'notifications': return Icons.notifications_outlined;
-    case 'trophy':        return Icons.emoji_events_outlined;
-    case 'moon':          return Icons.nightlight_round;
-    case 'prayer':        return Icons.self_improvement_outlined;
-    case 'headphones':    return Icons.headphones_outlined;
-    case 'book':          return Icons.menu_book_outlined;
-    case 'calendar':      return Icons.calendar_today_outlined;
-    case 'heart':         return Icons.favorite_outline;
-    case 'people':        return Icons.group_outlined;
-    case 'quote':         return Icons.format_quote;
-    case 'bookmark':      return Icons.bookmark_border;
-    case 'school':        return Icons.school;
-    case 'water_drop':    return Icons.water_drop;
-    default:              return Icons.star_outline;
-  }
-}
-
-const _allUpdates = [
-  _Update(iconName: 'book',       title: 'Kuran Okuma & Hatim Takibi',      desc: 'Günlük okuma alışkanlığı, hatim takibi, Seri, Hasanat ve Kuran Haritası.',                                                                                                                                    eta: 'Yayında ✓',  released: true),
-  _Update(iconName: 'bookmark',   title: 'Tilavet Secdesi Takibi',          desc: 'Hatimini okurken secdelerini daha kolay takip edebilmen ve aksatmaman için hazırlandı.',                                                                                                                        eta: 'Yayında ✓',  released: true),
-  _Update(iconName: 'water_drop', title: 'Namaz ve Alışkanlık Takibi',      desc: '5 Vakit namazını takip et. Alışkanlıklarını ekle ve düzenli olarak takip et.',                                                                                                                                  eta: 'Yayında ✓',  released: true),
-  _Update(iconName: 'trophy',     title: 'Seri ve Ekip Güncellemeleri',     desc: 'Seri hataları giderildi. Haftalık ekip sıralamasında herkesin serisi görünür hale geldi ve seriye göre filtreleme özelliği eklendi. Üyeler bir önceki haftanın sıralamasını, admin tüm geçmiş sıralamaları görebilir.', eta: 'Yayında ✓',  released: true),
-  _Update(iconName: 'people',     title: 'Arkadaşlarınla Takipleş',         desc: 'Arkadaşlarını ekle, okuma aktivitelerini takip et, birlikte ilerle.',                                                                                                                                           eta: 'Yakında'),
-  _Update(iconName: 'quote',      title: 'Ayet & Hadisler',                 desc: 'Günlük bildirimler, favori ayet ve hadisleri seç ve kategorize et.',                                                                                                                                            eta: 'Yakında'),
-  _Update(iconName: 'bookmark',   title: 'Tefsir Takibi',                   desc: 'Tefsir okumak isteyenler için ayrı takip ve ilerleme sistemi.',                                                                                                                                                 eta: 'Yakında'),
-  _Update(iconName: 'book',       title: 'Uygulama İçi Okuma',              desc: 'Kur\'an-ı Kerim, meal ve tefsirleri doğrudan uygulama içinden rahatça oku.',                                                                                                                                    eta: 'Yakında'),
-  _Update(iconName: 'school',     title: 'İslami Kulüpler',                 desc: 'Üniversite İslami kulüplerini takip et, etkinliklerden haberdar ol.',                                                                                                                                           eta: 'Yakında'),
-  _Update(iconName: 'moon',       title: 'Ramazan Güncellemesi',            desc: 'Oruç takibi, teravih cami hedefleri, üniversite iftarları ve daha fazlası.',                                                                                                                                    eta: 'Ramazan 2027'),
-];
-
-class _Update {
-  final String iconName;
-  final String title;
-  final String desc;
-  final String eta;
-  final bool released;
-  const _Update({required this.iconName, required this.title, required this.desc, required this.eta, this.released = false});
-}
+import '../data/roadmap_entry.dart';
 
 // ─── Ana ekran ─────────────────────────────────────────────────────────────
 class VirdScreen extends StatefulWidget {
@@ -59,10 +20,37 @@ class _VirdScreenState extends State<VirdScreen> {
   bool _sent = false;
   String? _submitError;
 
+  List<RoadmapEntry> _entries = [];
+  StreamSubscription<QuerySnapshot>? _entrySub;
+
+  @override
+  void initState() {
+    super.initState();
+    _entrySub = FirebaseFirestore.instance
+        .collection('roadmap_entries')
+        .orderBy('order')
+        .snapshots()
+        .listen((s) {
+      if (!mounted) return;
+      setState(() {
+        _entries = s.docs.map(RoadmapEntry.fromDoc).toList();
+      });
+    });
+  }
+
   @override
   void dispose() {
     _controller.dispose();
+    _entrySub?.cancel();
     super.dispose();
+  }
+
+  String _currentVersion() {
+    final latest = _entries
+        .where((e) => e.published && e.type == 'released' && e.version != null)
+        .fold<RoadmapEntry?>(null, (prev, e) => prev == null || e.order > prev.order ? e : prev);
+    final v = latest?.version ?? 'v 1.00';
+    return 'YTÜ · İstanbul · 2026 · $v';
   }
 
   Future<void> _submit() async {
@@ -107,53 +95,45 @@ class _VirdScreenState extends State<VirdScreen> {
 
   // ─── Header ──────────────────────────────────────────────────────────────
   Widget _buildHeader() {
-    return Column(
-      children: [
-        // Hadis — teal zemin
-        Container(
-          color: AppColors.teal,
-          width: double.infinity,
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 28,
-            bottom: 36, left: 24, right: 24,
+    return Container(
+      color: AppColors.teal,
+      width: double.infinity,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 28,
+        bottom: 36, left: 24, right: 24,
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Hz. Âişe\'den rivayet edildiğine göre, Resûlullah\'a (sav),\n"Allah katında amellerin en sevimlisi hangisidir?" diye soruldu.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 14, height: 1.6, color: Colors.white.withValues(alpha: 0.92), fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
           ),
-          child: Column(
-            children: [
-              Text(
-                'Hz. Âişe\'den rivayet edildiğine göre, Resûlullah\'a (sav),\n"Allah katında amellerin en sevimlisi hangisidir?" diye soruldu.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 14, height: 1.6, color: Colors.white.withValues(alpha: 0.92), fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '"Az da olsa devamlı olanıdır." buyurdu.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 15, height: 1.6, color: Colors.white, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'M1828 Müslim, Müsâfirîn, 216',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w600, letterSpacing: 0.3),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            '"Az da olsa devamlı olanıdır." buyurdu.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 15, height: 1.6, color: Colors.white, fontWeight: FontWeight.w700),
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          Text(
+            'M1828 Müslim, Müsâfirîn, 216',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w600, letterSpacing: 0.3),
+          ),
+        ],
+      ),
     );
   }
 
-  // ─── Yakında geliyor ─────────────────────────────────────────────────────
+  // ─── Yol haritası ────────────────────────────────────────────────────────
   Widget _buildComingSection() {
-    final released = _allUpdates.where((u) => u.released).toList();
-    final upcoming = _allUpdates.where((u) => !u.released).toList();
-    // En son 2 yayında olan
-    final shownReleased = released.length >= 2
-        ? released.sublist(released.length - 2)
-        : released;
-    // İlk 3 yakında gelen — giderek solar
+    final published = _entries.where((e) => e.published).toList();
+    final released  = published.where((e) => e.type == 'released').toList();
+    final upcoming  = published.where((e) => e.type == 'upcoming').toList();
+
+    final shownReleased = released.length >= 2 ? released.sublist(released.length - 2) : released;
     final shownUpcoming = upcoming.take(3).toList();
-    const upcomingOpacities = [1.0, 0.55, 0.20];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
@@ -161,116 +141,47 @@ class _VirdScreenState extends State<VirdScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHead(kicker: 'Yol Haritası', title: 'Neler geldi, neler geliyor'),
-          for (final item in shownReleased)
+          if (_entries.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _UpdateCard(update: item),
+              child: Text('Yükleniyor...', style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textLight)),
             ),
-          for (int i = 0; i < shownUpcoming.length; i++)
-            Opacity(
-              opacity: upcomingOpacities[i],
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _UpdateCard(update: shownUpcoming[i]),
-              ),
+          for (final item in shownReleased)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _RoadmapCard(entry: item),
+            ),
+          for (final item in shownUpcoming)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _RoadmapCard(entry: item),
             ),
           const SizedBox(height: 4),
-          Center(
-            child: GestureDetector(
-              onTap: () => _showRoadmapSheet(context),
-              child: Text(
-                'Tüm sürüm geçmişini gör →',
-                style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.4),
+          if (published.isNotEmpty)
+            Center(
+              child: GestureDetector(
+                onTap: () => _showRoadmapSheet(context, published),
+                child: Text(
+                  'Tüm sürüm geçmişini gör →',
+                  style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.4),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  void _showRoadmapSheet(BuildContext context) {
+  void _showRoadmapSheet(BuildContext context, List<RoadmapEntry> allEntries) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (_, controller) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 4),
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.borderGrey,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                child: Text('Yol Haritası',
-                  style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-              ),
-              Expanded(
-                child: Stack(
-                  children: [
-                    ListView.builder(
-                      controller: controller,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                      itemCount: _allUpdates.length,
-                      itemBuilder: (_, i) {
-                        // Son 5 kartta (index 5+) giderek şeffaflaşır; son kart (Ramazan) neredeyse beyaz
-                        final op = i < 5 ? 1.0 : (1.0 - (i - 4) * 0.22).clamp(0.08, 1.0);
-                        return Opacity(
-                          opacity: op,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _UpdateCard(update: _allUpdates[i]),
-                          ),
-                        );
-                      },
-                    ),
-                    // Sonsuzluk hissi — alta doğru beyaz gradient
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: IgnorePointer(
-                        child: Container(
-                          height: 140,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                AppColors.white.withValues(alpha: 0),
-                                AppColors.white,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (_) => _RoadmapSheet(allEntries: allEntries),
     );
   }
 
-  // ─── Bir özellik öner ─────────────────────────────────────────────────────
+  // ─── Bir özellik öner ────────────────────────────────────────────────────
   Widget _buildFeatureRequest() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 28, 16, 8),
@@ -319,8 +230,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 ),
                 if (_submitError != null) ...[
                   const SizedBox(height: 6),
-                  Text(_submitError!,
-                    style: GoogleFonts.nunito(fontSize: 13, color: AppColors.errorRed)),
+                  Text(_submitError!, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.errorRed)),
                 ],
                 const SizedBox(height: 4),
                 _PrimaryButton(
@@ -386,7 +296,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 Image.asset(AppAssets.logo, height: 96, fit: BoxFit.contain),
                 const SizedBox(height: 16),
                 Text(
-                  'YTÜ · İstanbul · 2026 · v 1.00',
+                  _currentVersion(),
                   style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.3),
                 ),
               ],
@@ -423,26 +333,28 @@ class _SectionHead extends StatelessWidget {
   }
 }
 
-class _UpdateCard extends StatelessWidget {
-  final _Update update;
-  const _UpdateCard({required this.update});
+// ─── Kompakt yol haritası kartı ──────────────────────────────────────────────
+class _RoadmapCard extends StatelessWidget {
+  final RoadmapEntry entry;
+  const _RoadmapCard({required this.entry});
 
-  static const _green = Color(0xFF58CC02);
+  static const _green   = Color(0xFF58CC02);
   static const _greenBg = Color(0xFFD7FFB8);
 
   @override
   Widget build(BuildContext context) {
-    final barColor  = update.released ? _green        : AppColors.teal;
-    final iconBg    = update.released ? _greenBg      : AppColors.tealLight;
-    final iconColor = update.released ? _green        : AppColors.teal;
-    final badgeBg   = update.released ? _greenBg      : AppColors.tealLight;
-    final badgeFg   = update.released ? _green        : AppColors.teal;
+    final isReleased = entry.type == 'released';
+    final barColor  = isReleased ? _green        : AppColors.teal;
+    final badgeBg   = isReleased ? _greenBg      : AppColors.tealLight;
+    final badgeFg   = isReleased ? _green        : AppColors.teal;
+
+    final badgeLabel = isReleased ? 'Yayında ✓' : (entry.eta ?? 'Yakında');
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.lightGrey,
         border: Border.all(color: AppColors.borderGrey),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -452,48 +364,65 @@ class _UpdateCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: barColor,
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  bottomLeft: Radius.circular(15),
+                  topLeft: Radius.circular(13),
+                  bottomLeft: Radius.circular(13),
                 ),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-                      child: Icon(_iconFromName(update.iconName), color: iconColor, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(update.title,
-                                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(999)),
-                                child: Text(update.eta,
-                                  style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w700, color: badgeFg, letterSpacing: 0.5)),
-                              ),
-                            ],
+                    // Başlık satırı
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (entry.version != null) ...[
+                          Text(
+                            entry.version!,
+                            style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textLight, letterSpacing: 0.3),
                           ),
-                          const SizedBox(height: 4),
-                          Text(update.desc,
-                            style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textMid, height: 1.4)),
+                          const SizedBox(width: 6),
                         ],
-                      ),
+                        Expanded(
+                          child: Text(
+                            entry.title,
+                            style: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(999)),
+                          child: Text(
+                            badgeLabel,
+                            style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w700, color: badgeFg, letterSpacing: 0.3),
+                          ),
+                        ),
+                      ],
                     ),
+                    // Tarih (released ise)
+                    if (isReleased && entry.date != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        _formatDate(entry.date!),
+                        style: GoogleFonts.nunito(fontSize: 10.5, color: AppColors.textLight, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                    // Bullet listesi
+                    if (entry.bullets.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      for (final b in entry.bullets)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Text(
+                            '· $b',
+                            style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid, height: 1.35),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -502,6 +431,18 @@ class _UpdateCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDate(String iso) {
+    try {
+      final p = iso.split('-');
+      if (p.length != 3) return iso;
+      const months = ['', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+      final m = int.tryParse(p[1]) ?? 0;
+      return '${p[2]} ${months[m]} ${p[0]}';
+    } catch (_) {
+      return iso;
+    }
   }
 }
 
@@ -521,9 +462,9 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = widget.disabled ? AppColors.borderGrey : AppColors.teal;
-    final shadow = widget.disabled ? Colors.transparent : AppColors.tealDark;
-    final textColor = widget.disabled ? AppColors.textLight : AppColors.white;
+    final bg      = widget.disabled ? AppColors.borderGrey : AppColors.teal;
+    final shadow  = widget.disabled ? Colors.transparent   : AppColors.tealDark;
+    final textColor = widget.disabled ? AppColors.textLight  : AppColors.white;
 
     return GestureDetector(
       onTapDown: (_) { if (!widget.disabled) setState(() => _pressed = true); },
@@ -543,6 +484,144 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
             : Text(widget.label,
                 style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: textColor, letterSpacing: 1.2)),
+      ),
+    );
+  }
+}
+
+// ─── Yol haritası bottom sheet ────────────────────────────────────────────────
+class _RoadmapSheet extends StatefulWidget {
+  final List<RoadmapEntry> allEntries;
+  const _RoadmapSheet({required this.allEntries});
+
+  @override
+  State<_RoadmapSheet> createState() => _RoadmapSheetState();
+}
+
+class _RoadmapSheetState extends State<_RoadmapSheet> {
+  String _tab = 'released';
+
+  @override
+  Widget build(BuildContext context) {
+    final released = widget.allEntries.where((e) => e.type == 'released').toList().reversed.toList();
+    final upcoming = widget.allEntries.where((e) => e.type == 'upcoming').toList();
+    final items    = _tab == 'released' ? released : upcoming;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+              child: Text('Yol Haritası',
+                style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+            ),
+            // Sekmeler
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                height: 38,
+                decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    _SheetTab(
+                      label: 'Neler Geldi',
+                      count: released.length,
+                      active: _tab == 'released',
+                      onTap: () => setState(() => _tab = 'released'),
+                    ),
+                    _SheetTab(
+                      label: 'Neler Geliyor',
+                      count: upcoming.length,
+                      active: _tab == 'upcoming',
+                      onTap: () => setState(() => _tab = 'upcoming'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Liste
+            Expanded(
+              child: Stack(
+                children: [
+                  ListView.builder(
+                    controller: controller,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _RoadmapCard(entry: items[i]),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0, left: 0, right: 0,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [AppColors.white.withValues(alpha: 0), AppColors.white],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetTab extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool active;
+  final VoidCallback onTap;
+  const _SheetTab({required this.label, required this.count, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: active ? AppColors.teal : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            count > 0 ? '$label ($count)' : label,
+            style: GoogleFonts.nunito(
+              color: active ? Colors.white : AppColors.textMid,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }

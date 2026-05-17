@@ -118,6 +118,15 @@ Sheet kapandıktan sonra dialog için: `showModalBottomSheet<bool>` await et, `c
 
 ### Firestore
 
+**Rules deploy edilmeden test → optimistik yazma yanıltır**
+Firestore rules yeni bir koleksiyona izin vermeden önce `.set()` çağrısı lokalde başarılı görünür (SDK optimistik cache yazması). UI anında güncellenir, kullanıcı "işlem tamam" sanır. Sunucu birkaç saniye içinde `permission-denied` döndürünce SDK cache'i geri alır (rollback) → UI eski haline döner. Hata mesajı da gecikmeli gelir.
+```
+Semptom: pending state göründü → hata → form tekrar çıktı
+Teşhis:  firestore.rules'ta koleksiyon kuralı eksik
+Çözüm:   firebase deploy --only firestore:rules
+Önlem:   snap.hasError kontrolü + permission-denied'ı ayrıca yakala
+```
+
 **Composite index tuzağı — sessiz boş sonuç**
 `where('field1').orderBy('field2')` farklı alanlarda → index gerekir. Index yoksa **query sessizce boş döner, hata yazmaz.** Teşhis: veri var ama liste boş.
 ```dart

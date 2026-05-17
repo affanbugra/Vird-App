@@ -14,7 +14,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
   final ld = lastLogTs.toDate().toLocal();
   final lastDay = DateTime(ld.year, ld.month, ld.day);
   if (!lastDay.isBefore(today)) return (value: stored, atRisk: false);  // bugün ok
-  if (lastDay == yesterday) return (value: stored, atRisk: true);        // dün ok, tehlikede
+  if (lastDay == yesterday) return (value: stored, atRisk: now.hour >= 18); // son 6 saat: tehlikede
   return (value: 0, atRisk: false);                                      // eski, kırıldı
 }
 

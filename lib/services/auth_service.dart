@@ -68,6 +68,28 @@ class AuthService {
     }
   }
 
+  Future<void> sendSignInLinkToEmail(String email) async {
+    final actionCodeSettings = ActionCodeSettings(
+      url: 'https://virdapp.com',
+      handleCodeInApp: true,
+      androidPackageName: 'com.example.virdApp',
+      androidInstallApp: false,
+      iOSBundleId: 'com.example.virdApp',
+    );
+    await _auth.setLanguageCode('tr');
+    await _auth.sendSignInLinkToEmail(
+      email: email,
+      actionCodeSettings: actionCodeSettings,
+    );
+  }
+
+  Future<void> signInWithEmailLink(String email, String link) async {
+    await _auth.signInWithEmailLink(email: email, emailLink: link);
+  }
+
+  bool isSignInWithEmailLink(String link) =>
+      _auth.isSignInWithEmailLink(link);
+
   // Sign out
   Future<void> signOut() async {
     await _auth.signOut();

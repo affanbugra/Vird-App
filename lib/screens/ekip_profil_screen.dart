@@ -21,6 +21,7 @@ class _MemberEntry {
   final int periodHasanat;
   final int rawSeri;
   final Timestamp? lastLogTs;
+  final bool isHafiz;
 
   const _MemberEntry({
     required this.uid,
@@ -30,6 +31,7 @@ class _MemberEntry {
     required this.periodHasanat,
     required this.rawSeri,
     this.lastLogTs,
+    this.isHafiz = false,
   });
 }
 
@@ -187,36 +189,47 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         final periodStart = targetWeekStart.isBefore(teamCreatedAtDay) ? teamCreatedAtDay : targetWeekStart;
         final periodEnd = targetWeekStart.add(const Duration(days: 7));
 
-        final entries = <_MemberEntry>[];
+        final eligibleDocs = membersSnap.docs.where((memberDoc) {
+          final joinedAt = (memberDoc.data()['teamJoinedAt'] as Timestamp?)?.toDate();
+          return joinedAt == null || !joinedAt.isAfter(targetWeekEnd);
+        }).toList();
 
-        for (final memberDoc in membersSnap.docs) {
+        final entries = await Future.wait(eligibleDocs.map((memberDoc) async {
           final uid = memberDoc.id;
           final data = memberDoc.data();
 
-          // Bu haftadan sonra katıldıysa o haftanın arşivine dahil etme
-          final joinedAt = (data['teamJoinedAt'] as Timestamp?)?.toDate();
-          if (joinedAt != null && joinedAt.isAfter(targetWeekEnd)) continue;
+          // Hızlı yol: log okumadan denormalize değerleri kullan (gerçek snapshot)
+          // weeklyStartDate == target → henüz bu haftaya geçmemiş, weeklyHasanat hâlâ target hafta
+          // prevWeeklyStartDate == target → bu haftaya geçti ama önceki değer prevWeekly*'de saklı
+          int periodHasanat;
+          final memberWeekStr = data['weeklyStartDate'] as String?;
+          final memberPrevWeekStr = data['prevWeeklyStartDate'] as String?;
 
-          final logsSnap = await db.collection('users').doc(uid).collection('logs')
-              .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
-              .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
-              .get();
-
-          int periodHasanat = 0;
-          for (final log in logsSnap.docs) {
-            periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
+          if (memberWeekStr == targetDayStr) {
+            periodHasanat = (data['weeklyHasanat'] as int?) ?? 0;
+          } else if (memberPrevWeekStr == targetDayStr) {
+            periodHasanat = (data['prevWeeklyHasanat'] as int?) ?? 0;
+          } else {
+            // Denormalize veri yok — log sorgusuna düş (eski kullanıcılar için fallback)
+            final logsSnap = await db.collection('users').doc(uid).collection('logs')
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+                .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
+                .get();
+            periodHasanat = 0;
+            for (final log in logsSnap.docs) {
+              periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
+            }
           }
 
-          // Puanı 0 olsa bile listeye ekle ki yöneticiler kimin okumadığını görebilsin
-          entries.add(_MemberEntry(
+          return _MemberEntry(
             uid: uid,
             name: data['name'] as String? ?? 'İsimsiz',
             username: data['username'] as String? ?? '',
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
             rawSeri: (data['seri'] as int?) ?? 0,
-          ));
-        }
+          );
+        }));
 
         entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
@@ -241,7 +254,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     setState(() => _leaderboardLoading = true);
 
     try {
-      final periodStart = _getPeriodStart();
+      final weekStart = _getPeriodStart();
+      final weekStartStr = '${weekStart.year}-${weekStart.month.toString().padLeft(2, '0')}-${weekStart.day.toString().padLeft(2, '0')}';
       final db = FirebaseFirestore.instance;
 
       // Regular members (teamId) + developer members (developerTeamIds)
@@ -255,26 +269,44 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       for (final doc in results[0].docs) { memberMap[doc.id] = doc; }
       for (final doc in results[1].docs) { memberMap[doc.id] = doc; }
 
-      final entries = <_MemberEntry>[];
+      // Hızlı yol: weeklyStartDate bu haftaysa weeklyHasanat'ı direkt oku
+      // Yavaş yol: weeklyStartDate yoksa veya eskiyse log sorgusuna düş (eski kullanıcılar)
+      final fastEntries = <_MemberEntry>[];
+      final slowDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
       for (final memberDoc in memberMap.values) {
+        final data = memberDoc.data();
+        if ((data['weeklyStartDate'] as String?) == weekStartStr) {
+          fastEntries.add(_MemberEntry(
+            uid: memberDoc.id,
+            name: data['name'] as String? ?? 'İsimsiz',
+            username: data['username'] as String? ?? '',
+            avatarSeed: data['avatarSeed'] as String?,
+            periodHasanat: (data['weeklyHasanat'] as int?) ?? 0,
+            rawSeri: (data['seri'] as int?) ?? 0,
+            lastLogTs: data['lastLogDate'] as Timestamp?,
+            isHafiz: (data['isHafiz'] as bool?) ?? false,
+          ));
+        } else {
+          slowDocs.add(memberDoc);
+        }
+      }
+
+      // Yavaş yol: log sorguları artık paralel
+      final slowEntries = await Future.wait(slowDocs.map((memberDoc) async {
         final uid = memberDoc.id;
         final data = memberDoc.data();
-
         final logsSnap = await db
             .collection('users')
             .doc(uid)
             .collection('logs')
-            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
             .get();
-
         int periodHasanat = 0;
         for (final log in logsSnap.docs) {
-          final logData = log.data();
-          periodHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
+          periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
         }
-
-        entries.add(_MemberEntry(
+        return _MemberEntry(
           uid: uid,
           name: data['name'] as String? ?? 'İsimsiz',
           username: data['username'] as String? ?? '',
@@ -282,9 +314,11 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           periodHasanat: periodHasanat,
           rawSeri: (data['seri'] as int?) ?? 0,
           lastLogTs: data['lastLogDate'] as Timestamp?,
-        ));
-      }
+          isHafiz: (data['isHafiz'] as bool?) ?? false,
+        );
+      }));
 
+      final entries = [...fastEntries, ...slowEntries];
       entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
       if (mounted) {
@@ -1171,6 +1205,7 @@ class _PenaltyCard extends StatelessWidget {
 // ─── Liderboard Bölümü ─────────────────────────────────────────────────────────
 
 enum _SortMode { puan, seri }
+enum _HafizFilter { none, hafizOnly, nonHafiz }
 
 class _LeaderboardSection extends StatefulWidget {
   final List<_MemberEntry> leaderboard;
@@ -1196,6 +1231,7 @@ class _LeaderboardSection extends StatefulWidget {
 class _LeaderboardSectionState extends State<_LeaderboardSection> {
   _SortMode _sortMode = _SortMode.puan;
   bool _showLow = false;
+  _HafizFilter _hafizFilter = _HafizFilter.none;
 
   String _fmtDuration(Duration d) {
     if (d.inDays > 0) {
@@ -1243,19 +1279,25 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
   }
 
   List<_MemberEntry> get _displayed {
-    final s = _sorted;
-    if (!_showLow) return s;
-    return s.where((e) => e.periodHasanat < 100).toList();
+    var s = _sorted;
+    if (_hafizFilter == _HafizFilter.hafizOnly) {
+      s = s.where((e) => e.isHafiz).toList();
+    } else if (_hafizFilter == _HafizFilter.nonHafiz) {
+      s = s.where((e) => !e.isHafiz).toList();
+    }
+    if (_showLow) return s.where((e) => e.periodHasanat < 100).toList();
+    return s;
   }
 
   @override
   Widget build(BuildContext context) {
     final total = widget.leaderboard.length;
-    final shown = _showLow ? _displayed.length : total;
+    final displayed = _displayed;
+    final filtered = _hafizFilter != _HafizFilter.none || _showLow;
     final memberCount = widget.loading
         ? ''
-        : _showLow
-            ? ' · $shown / $total kişi'
+        : filtered
+            ? ' · ${displayed.length} / $total kişi'
             : ' · $total üye';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1311,6 +1353,23 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
               label: '🔥 Seri',
               selected: _sortMode == _SortMode.seri,
               onTap: () => setState(() => _sortMode = _SortMode.seri),
+            ),
+            const SizedBox(width: 8),
+            _SortChip(
+              label: _hafizFilter == _HafizFilter.hafizOnly
+                  ? '📖 Sadece Hafız'
+                  : _hafizFilter == _HafizFilter.nonHafiz
+                      ? '📖 Hafız Hariç'
+                      : '📖 Hafız',
+              selected: _hafizFilter != _HafizFilter.none,
+              selectedColor: AppColors.emeraldGreen,
+              onTap: () => setState(() {
+                _hafizFilter = switch (_hafizFilter) {
+                  _HafizFilter.none      => _HafizFilter.hafizOnly,
+                  _HafizFilter.hafizOnly => _HafizFilter.nonHafiz,
+                  _HafizFilter.nonHafiz  => _HafizFilter.none,
+                };
+              }),
             ),
             const Spacer(),
             _SortChip(
@@ -1505,6 +1564,7 @@ class _LeaderboardRow extends StatelessWidget {
   }
 
   Color get _borderColor {
+    if (isMe) return AppColors.teal;
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.85);
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
@@ -1513,6 +1573,8 @@ class _LeaderboardRow extends StatelessWidget {
     return AppColors.borderGrey;
   }
 
+  double get _borderWidth => isMe ? 2.0 : 1.0;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1520,7 +1582,7 @@ class _LeaderboardRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: _bgColor,
-        border: Border.all(color: _borderColor),
+        border: Border.all(color: _borderColor, width: _borderWidth),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1545,25 +1607,34 @@ class _LeaderboardRow extends StatelessWidget {
                   ),
           ),
           const SizedBox(width: 8),
-          // Avatar
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.tealLight,
-            backgroundImage: entry.avatarSeed != null
-                ? NetworkImage(
-                    'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
-                  )
-                : null,
-            child: entry.avatarSeed == null
-                ? Text(
-                    nameInitials(entry.name),
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.teal,
-                    ),
-                  )
-                : null,
+          // Avatar (hafız halkası)
+          Container(
+            padding: entry.isHafiz ? const EdgeInsets.all(2) : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: entry.isHafiz
+                  ? Border.all(color: AppColors.emeraldGreen, width: 2)
+                  : null,
+            ),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.tealLight,
+              backgroundImage: entry.avatarSeed != null
+                  ? NetworkImage(
+                      'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
+                    )
+                  : null,
+              child: entry.avatarSeed == null
+                  ? Text(
+                      nameInitials(entry.name),
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.teal,
+                      ),
+                    )
+                  : null,
+            ),
           ),
           const SizedBox(width: 10),
           // İsim

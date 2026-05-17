@@ -348,10 +348,31 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         createdAt: DateTime.now(),
       ).toMap());
 
+      // weeklyHasanat: mevcut haftaysa increment, yeni haftaysa prev'e taşı ve sıfırla
+      final weekMonday = today.subtract(Duration(days: today.weekday - 1));
+      final weekStartStr = '${weekMonday.year}-${weekMonday.month.toString().padLeft(2, '0')}-${weekMonday.day.toString().padLeft(2, '0')}';
+      final existingWeekStr = userData?['weeklyStartDate'] as String?;
+      final Map<String, dynamic> weeklyUpdate;
+      if (existingWeekStr == weekStartStr) {
+        weeklyUpdate = {
+          'weeklyHasanat': FieldValue.increment(pagesRead * 10),
+          'weeklyStartDate': weekStartStr,
+        };
+      } else {
+        // Yeni hafta — önceki haftanın değerini arşiv için prevWeekly* alanlarına taşı
+        weeklyUpdate = {
+          'weeklyHasanat': pagesRead * 10,
+          'weeklyStartDate': weekStartStr,
+          if (existingWeekStr != null) 'prevWeeklyStartDate': existingWeekStr,
+          if (existingWeekStr != null) 'prevWeeklyHasanat': (userData?['weeklyHasanat'] as int?) ?? 0,
+        };
+      }
+
       batch.set(userRef, {
         'hasanat': FieldValue.increment(pagesRead * 10),
         'totalPages': FieldValue.increment(pagesRead),
         ...seriUpdate,
+        ...weeklyUpdate,
       }, SetOptions(merge: true));
 
       if (linkedHatim != null && hatimId != null) {
