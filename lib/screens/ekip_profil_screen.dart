@@ -189,36 +189,47 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         final periodStart = targetWeekStart.isBefore(teamCreatedAtDay) ? teamCreatedAtDay : targetWeekStart;
         final periodEnd = targetWeekStart.add(const Duration(days: 7));
 
-        final entries = <_MemberEntry>[];
+        final eligibleDocs = membersSnap.docs.where((memberDoc) {
+          final joinedAt = (memberDoc.data()['teamJoinedAt'] as Timestamp?)?.toDate();
+          return joinedAt == null || !joinedAt.isAfter(targetWeekEnd);
+        }).toList();
 
-        for (final memberDoc in membersSnap.docs) {
+        final entries = await Future.wait(eligibleDocs.map((memberDoc) async {
           final uid = memberDoc.id;
           final data = memberDoc.data();
 
-          // Bu haftadan sonra katıldıysa o haftanın arşivine dahil etme
-          final joinedAt = (data['teamJoinedAt'] as Timestamp?)?.toDate();
-          if (joinedAt != null && joinedAt.isAfter(targetWeekEnd)) continue;
+          // Hızlı yol: log okumadan denormalize değerleri kullan (gerçek snapshot)
+          // weeklyStartDate == target → henüz bu haftaya geçmemiş, weeklyHasanat hâlâ target hafta
+          // prevWeeklyStartDate == target → bu haftaya geçti ama önceki değer prevWeekly*'de saklı
+          int periodHasanat;
+          final memberWeekStr = data['weeklyStartDate'] as String?;
+          final memberPrevWeekStr = data['prevWeeklyStartDate'] as String?;
 
-          final logsSnap = await db.collection('users').doc(uid).collection('logs')
-              .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
-              .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
-              .get();
-
-          int periodHasanat = 0;
-          for (final log in logsSnap.docs) {
-            periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
+          if (memberWeekStr == targetDayStr) {
+            periodHasanat = (data['weeklyHasanat'] as int?) ?? 0;
+          } else if (memberPrevWeekStr == targetDayStr) {
+            periodHasanat = (data['prevWeeklyHasanat'] as int?) ?? 0;
+          } else {
+            // Denormalize veri yok — log sorgusuna düş (eski kullanıcılar için fallback)
+            final logsSnap = await db.collection('users').doc(uid).collection('logs')
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+                .where('createdAt', isLessThan: Timestamp.fromDate(periodEnd))
+                .get();
+            periodHasanat = 0;
+            for (final log in logsSnap.docs) {
+              periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
+            }
           }
 
-          // Puanı 0 olsa bile listeye ekle ki yöneticiler kimin okumadığını görebilsin
-          entries.add(_MemberEntry(
+          return _MemberEntry(
             uid: uid,
             name: data['name'] as String? ?? 'İsimsiz',
             username: data['username'] as String? ?? '',
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
             rawSeri: (data['seri'] as int?) ?? 0,
-          ));
-        }
+          );
+        }));
 
         entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
@@ -243,7 +254,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     setState(() => _leaderboardLoading = true);
 
     try {
-      final periodStart = _getPeriodStart();
+      final weekStart = _getPeriodStart();
+      final weekStartStr = '${weekStart.year}-${weekStart.month.toString().padLeft(2, '0')}-${weekStart.day.toString().padLeft(2, '0')}';
       final db = FirebaseFirestore.instance;
 
       // Regular members (teamId) + developer members (developerTeamIds)
@@ -257,26 +269,44 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       for (final doc in results[0].docs) { memberMap[doc.id] = doc; }
       for (final doc in results[1].docs) { memberMap[doc.id] = doc; }
 
-      final entries = <_MemberEntry>[];
+      // Hızlı yol: weeklyStartDate bu haftaysa weeklyHasanat'ı direkt oku
+      // Yavaş yol: weeklyStartDate yoksa veya eskiyse log sorgusuna düş (eski kullanıcılar)
+      final fastEntries = <_MemberEntry>[];
+      final slowDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
       for (final memberDoc in memberMap.values) {
+        final data = memberDoc.data();
+        if ((data['weeklyStartDate'] as String?) == weekStartStr) {
+          fastEntries.add(_MemberEntry(
+            uid: memberDoc.id,
+            name: data['name'] as String? ?? 'İsimsiz',
+            username: data['username'] as String? ?? '',
+            avatarSeed: data['avatarSeed'] as String?,
+            periodHasanat: (data['weeklyHasanat'] as int?) ?? 0,
+            rawSeri: (data['seri'] as int?) ?? 0,
+            lastLogTs: data['lastLogDate'] as Timestamp?,
+            isHafiz: (data['isHafiz'] as bool?) ?? false,
+          ));
+        } else {
+          slowDocs.add(memberDoc);
+        }
+      }
+
+      // Yavaş yol: log sorguları artık paralel
+      final slowEntries = await Future.wait(slowDocs.map((memberDoc) async {
         final uid = memberDoc.id;
         final data = memberDoc.data();
-
         final logsSnap = await db
             .collection('users')
             .doc(uid)
             .collection('logs')
-            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
             .get();
-
         int periodHasanat = 0;
         for (final log in logsSnap.docs) {
-          final logData = log.data();
-          periodHasanat += ((logData['pagesRead'] as int? ?? 0) * 10);
+          periodHasanat += ((log.data()['pagesRead'] as int? ?? 0) * 10);
         }
-
-        entries.add(_MemberEntry(
+        return _MemberEntry(
           uid: uid,
           name: data['name'] as String? ?? 'İsimsiz',
           username: data['username'] as String? ?? '',
@@ -285,9 +315,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           rawSeri: (data['seri'] as int?) ?? 0,
           lastLogTs: data['lastLogDate'] as Timestamp?,
           isHafiz: (data['isHafiz'] as bool?) ?? false,
-        ));
-      }
+        );
+      }));
 
+      final entries = [...fastEntries, ...slowEntries];
       entries.sort((a, b) => b.periodHasanat.compareTo(a.periodHasanat));
 
       if (mounted) {

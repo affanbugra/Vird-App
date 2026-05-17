@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +13,8 @@ import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/profile_setup_screen.dart';
+import 'screens/auth/magic_link_confirm_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
@@ -29,6 +33,34 @@ void main() async {
   );
 
   final prefs = await SharedPreferences.getInstance();
+
+  // Web'de magic link ile giriş kontrolü
+  String? pendingMagicLink;
+  if (kIsWeb) {
+    final link = Uri.base.toString();
+    if (FirebaseAuth.instance.isSignInWithEmailLink(link)) {
+      final email = prefs.getString('emailForSignIn');
+      if (email != null) {
+        // Aynı cihaz: e-posta localStorage'da mevcut, otomatik giriş
+        try {
+          await FirebaseAuth.instance.signInWithEmailLink(
+            email: email,
+            emailLink: link,
+          );
+        } catch (e) {
+          // Otomatik giriş başarısız — kullanıcıya onay ekranı göster
+          debugPrint('Magic link otomatik giriş hatası: $e');
+          pendingMagicLink = link;
+        } finally {
+          await prefs.remove('emailForSignIn');
+        }
+      } else {
+        // Farklı cihaz: e-postayı kullanıcıdan iste
+        pendingMagicLink = link;
+      }
+    }
+  }
+
   final showHome = prefs.getBool('showHome') ?? false;
 
   runApp(
@@ -43,14 +75,15 @@ void main() async {
           },
         ),
       ],
-      child: VirdApp(showHome: showHome),
+      child: VirdApp(showHome: showHome, pendingMagicLink: pendingMagicLink),
     ),
   );
 }
 
 class VirdApp extends StatelessWidget {
   final bool showHome;
-  const VirdApp({super.key, required this.showHome});
+  final String? pendingMagicLink;
+  const VirdApp({super.key, required this.showHome, this.pendingMagicLink});
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +95,15 @@ class VirdApp extends StatelessWidget {
         textTheme: GoogleFonts.nunitoTextTheme(),
         scaffoldBackgroundColor: AppColors.white,
       ),
-      home: AuthWrapper(initialShowHome: showHome),
+      home: AuthWrapper(initialShowHome: showHome, pendingMagicLink: pendingMagicLink),
     );
   }
 }
 
 class AuthWrapper extends StatefulWidget {
   final bool initialShowHome;
-  const AuthWrapper({super.key, required this.initialShowHome});
+  final String? pendingMagicLink;
+  const AuthWrapper({super.key, required this.initialShowHome, this.pendingMagicLink});
 
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
@@ -91,7 +125,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
         if (auth.isLoading) return const SplashScreen();
-        if (auth.isAuthenticated) return const MainScreen();
+        if (auth.isAuthenticated) {
+          if (auth.needsProfileSetup) {
+            return ProfileSetupScreen(name: auth.user?.displayName ?? '');
+          }
+          return const MainScreen();
+        }
+        // Farklı cihazdan açılan magic link
+        if (widget.pendingMagicLink != null) {
+          return MagicLinkConfirmScreen(link: widget.pendingMagicLink!);
+        }
         return _showHome
             ? const LoginScreen()
             : OnboardingScreen(onCompleted: _completeOnboarding);

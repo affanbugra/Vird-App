@@ -23,9 +23,11 @@ String _parseAuthError(dynamic e) {
       case 'cancelled-by-user':
         return 'Google girişi iptal edildi.';
       case 'unauthorized-domain':
-        return 'Bu alan adı Google girişi için yetkilendirilmemiş. Firebase Console\'dan ekleyin.';
+        return 'Bu alan adı Google girişi için yetkilendirilmemiş.';
       case 'popup-blocked':
-        return 'Açılır pencere engellendi. Tarayıcı ayarlarını kontrol edin.';
+        return 'Açılır pencere engellendi. Tarayıcı ayarlarını kontrol et.';
+      case 'account-exists-with-different-credential':
+        return 'Bu e-posta başka bir giriş yöntemiyle kayıtlı. E-posta ve şifreyle dene.';
       default:
         return 'Bir hata oluştu: ${e.code}. Lütfen tekrar deneyin.';
     }
@@ -79,7 +81,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Auth başarılı — profil yazma hatası kullanıcıyı engellemesin
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -91,6 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'university': '',
           'createdAt': FieldValue.serverTimestamp(),
           'isPro': false,
+          'proExpiresAt': null,
           'hasanat': 0,
           'seri': 0,
           'totalPages': 0,
@@ -194,25 +196,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ? null
                     : () async {
                         setState(() => _isLoading = true);
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           await context.read<AuthProvider>().signInWithGoogle();
-                          // Yönlendirme main.dart tarafından otomatik yapılacak
                         } catch (e) {
-                          if (!context.mounted) return;
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(_parseAuthError(e))),
-                            );
-                          }
+                          messenger.showSnackBar(
+                            SnackBar(content: Text(_parseAuthError(e))),
+                          );
                         } finally {
                           if (mounted) setState(() => _isLoading = false);
                         }
                       },
-                icon: Image.network(
-                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
-                  height: 24,
-                  errorBuilder: (_, _, _) => const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
-                ),
+                icon: Image.asset('assets/images/google_logo.png', height: 22),
                 label: const Text('Google ile Kayıt Ol', style: TextStyle(color: AppColors.textDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -227,3 +222,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+

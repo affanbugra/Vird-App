@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../app_colors.dart';
 import '../providers/user_provider.dart';
+import '../data/roadmap_entry.dart';
 
 // ─── Modeller ─────────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback, hafiz }
+enum _PanelView { home, backlog, feedback, hafiz, roadmap }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -221,6 +222,7 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             onBacklogTap:  () => setState(() => _view = _PanelView.backlog),
             onFeedbackTap: () => setState(() => _view = _PanelView.feedback),
             onHafizTap:    () => setState(() => _view = _PanelView.hafiz),
+            onRoadmapTap:  () => setState(() => _view = _PanelView.roadmap),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -234,6 +236,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('hafiz'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
+        _PanelView.roadmap  => _RoadmapView(
+            key: const ValueKey('roadmap'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
       },
     );
   }
@@ -245,7 +251,8 @@ class _HomeView extends StatelessWidget {
   final VoidCallback onBacklogTap;
   final VoidCallback onFeedbackTap;
   final VoidCallback onHafizTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap});
+  final VoidCallback onRoadmapTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap});
 
   @override
   Widget build(BuildContext context) {
@@ -366,7 +373,8 @@ class _HomeView extends StatelessWidget {
                             icon: Icons.rocket_launch_outlined,
                             title: 'Neler Geldi\nNeler Gelecek',
                             subtitle: 'Yol haritası yönetimi',
-                            active: false,
+                            active: true,
+                            onTap: onRoadmapTap,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -3313,94 +3321,212 @@ class _CatRowState extends State<_CatRow> {
   }
 }
 
-// ─── Hafız Başvuruları View ───────────────────────────────────────────────────
+// ─── Hafız Yönetimi View ──────────────────────────────────────────────────────
 
-class _HafizView extends StatelessWidget {
+class _HafizView extends StatefulWidget {
   final VoidCallback onBack;
   const _HafizView({super.key, required this.onBack});
+
+  @override
+  State<_HafizView> createState() => _HafizViewState();
+}
+
+class _HafizViewState extends State<_HafizView> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  late final Stream<QuerySnapshot> _pendingStream;
+  late final Stream<QuerySnapshot> _hafizUsersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _pendingStream = FirebaseFirestore.instance
+        .collection('hafiz_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
+    _hafizUsersStream = FirebaseFirestore.instance
+        .collection('users')
+        .where('isHafiz', isEqualTo: true)
+        .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.white,
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(4, 20, 12, 22),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-              ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onBack,
-                  icon: Icon(Icons.arrow_back_rounded, color: Colors.white.withValues(alpha: 0.7)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.emeraldGreen.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.4)),
-                  ),
-                  child: const Text(
-                    'HAFIZ',
-                    style: TextStyle(color: AppColors.emeraldGreen, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _pendingStream,
+        builder: (context, snap) {
+          final docs = snap.data?.docs ?? [];
+          final verifyDocs = docs.where((d) {
+            final type = (d.data() as Map<String, dynamic>)['type'] as String?;
+            return type == null || type == 'verify';
+          }).toList();
+          final revokeDocs = docs.where((d) {
+            final type = (d.data() as Map<String, dynamic>)['type'] as String?;
+            return type == 'revoke';
+          }).toList();
+
+          return Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(4, 20, 12, 0),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
                   ),
                 ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Hafız Başvuruları',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('hafiz_requests')
-                  .where('status', isEqualTo: 'pending')
-                  .snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = snap.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
-                        const SizedBox(height: 12),
+                        IconButton(
+                          onPressed: widget.onBack,
+                          icon: Icon(Icons.arrow_back_rounded, color: Colors.white.withValues(alpha: 0.7)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.emeraldGreen.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.4)),
+                          ),
+                          child: const Text(
+                            'HAFIZ',
+                            style: TextStyle(color: AppColors.emeraldGreen, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         const Text(
-                          'Bekleyen başvuru yok',
-                          style: TextStyle(color: AppColors.textMid, fontSize: 15),
+                          'Hafız Yönetimi',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
                         ),
                       ],
                     ),
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => _HafizRequestCard(doc: docs[i]),
-                );
-              },
-            ),
-          ),
-        ],
+                    const SizedBox(height: 8),
+                    TabBar(
+                      controller: _tabController,
+                      indicatorColor: AppColors.emeraldGreen,
+                      labelColor: AppColors.emeraldGreen,
+                      unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
+                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      tabs: [
+                        Tab(text: verifyDocs.isNotEmpty ? 'Doğrulama (${verifyDocs.length})' : 'Doğrulama'),
+                        Tab(text: revokeDocs.isNotEmpty ? 'İptal (${revokeDocs.length})' : 'İptal'),
+                        const Tab(text: 'Hafızlar'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildVerifyTab(verifyDocs, snap.connectionState),
+                    _buildRevokeTab(revokeDocs, snap.connectionState),
+                    _buildHafizUsersTab(),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
+
+  Widget _buildVerifyTab(List<QueryDocumentSnapshot> docs, ConnectionState state) {
+    if (state == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (docs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
+            const SizedBox(height: 12),
+            const Text('Bekleyen doğrulama başvurusu yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+          ],
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: docs.length,
+      separatorBuilder: (context, i) => const SizedBox(height: 12),
+      itemBuilder: (context, i) => _HafizRequestCard(doc: docs[i]),
+    );
+  }
+
+  Widget _buildRevokeTab(List<QueryDocumentSnapshot> docs, ConnectionState state) {
+    if (state == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (docs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
+            const SizedBox(height: 12),
+            const Text('Bekleyen iptal başvurusu yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+          ],
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: docs.length,
+      separatorBuilder: (context, i) => const SizedBox(height: 12),
+      itemBuilder: (context, i) => _HafizRevokeCard(doc: docs[i]),
+    );
+  }
+
+  Widget _buildHafizUsersTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _hafizUsersStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.person_off_outlined, color: AppColors.textLight, size: 48),
+                const SizedBox(height: 12),
+                const Text('Henüz hafız yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+              ],
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          separatorBuilder: (context, i) => const SizedBox(height: 10),
+          itemBuilder: (context, i) => _HafizUserCard(doc: docs[i]),
+        );
+      },
+    );
+  }
 }
+
+// ─── Kart: Doğrulama Başvurusu ────────────────────────────────────────────────
 
 class _HafizRequestCard extends StatefulWidget {
   final QueryDocumentSnapshot doc;
@@ -3412,6 +3538,8 @@ class _HafizRequestCard extends StatefulWidget {
 
 class _HafizRequestCardState extends State<_HafizRequestCard> {
   bool _loading = false;
+  bool _done = false;
+  String? _doneLabel;
 
   Future<void> _approve() async {
     setState(() => _loading = true);
@@ -3424,64 +3552,96 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
         FirebaseFirestore.instance.collection('users').doc(uid),
         {'isHafiz': true},
       );
-      // Onay sonrası drive linki gizlilik için siliniyor
       batch.update(widget.doc.reference, {
         'status': 'approved',
         'driveLink': FieldValue.delete(),
         'reviewedAt': FieldValue.serverTimestamp(),
       });
       await batch.commit();
+      if (mounted) setState(() { _loading = false; _done = true; _doneLabel = 'Onaylandı'; });
     } catch (e) {
       if (mounted) {
+        setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Onay hatası: ${e.toString()}')),
         );
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _reject() async {
     final noteCtrl = TextEditingController();
-    final note = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Red Notu'),
-        content: TextField(
-          controller: noteCtrl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Kullanıcıya gösterilecek mesaj (opsiyonel)',
-            border: OutlineInputBorder(),
+    final String? note;
+    try {
+      note = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Red Notu'),
+          content: TextField(
+            controller: noteCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Kullanıcıya gösterilecek mesaj (opsiyonel)',
+              border: OutlineInputBorder(),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+              child: const Text('Reddet', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
-            child: const Text('Reddet', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      noteCtrl.dispose();
+    }
     if (note == null) return;
     setState(() => _loading = true);
-    await widget.doc.reference.update({
-      'status': 'rejected',
-      'note': note.isEmpty ? null : note,
-      'reviewedAt': FieldValue.serverTimestamp(),
-    });
-    if (mounted) setState(() => _loading = false);
+    try {
+      await widget.doc.reference.update({
+        'status': 'rejected',
+        'note': note.isEmpty ? null : note,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() { _loading = false; _done = true; _doneLabel = 'Reddedildi'; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Red işlemi başarısız: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_done) {
+      final color = _doneLabel == 'Onaylandı' ? AppColors.successGreen : AppColors.errorRed;
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Icon(_doneLabel == 'Onaylandı' ? Icons.check_circle_rounded : Icons.cancel_rounded, color: color, size: 20),
+            const SizedBox(width: 8),
+            Text(_doneLabel!, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
     final data = widget.doc.data() as Map<String, dynamic>;
     final name = data['name'] as String? ?? '';
     final username = data['username'] as String? ?? '';
@@ -3496,11 +3656,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderGrey),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -3514,29 +3670,21 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                     ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
                     : null,
                 backgroundColor: AppColors.lightGrey,
-                child: avatarSeed == null
-                    ? const Icon(Icons.person, size: 18, color: AppColors.textMid)
-                    : null,
+                child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark),
-                    ),
+                    Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
                     if (username.isNotEmpty)
                       Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
                   ],
                 ),
               ),
               if (requestedAt != null)
-                Text(
-                  _relativeTime(requestedAt),
-                  style: const TextStyle(fontSize: 11, color: AppColors.textLight),
-                ),
+                Text(_relativeTime(requestedAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
             ],
           ),
           const SizedBox(height: 12),
@@ -3544,18 +3692,12 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(8)),
               child: const Row(
                 children: [
                   Icon(Icons.notes_rounded, size: 16, color: AppColors.textLight),
                   SizedBox(width: 6),
-                  Text(
-                    'Belge veya not paylaşılmadı',
-                    style: TextStyle(fontSize: 12, color: AppColors.textLight, fontStyle: FontStyle.italic),
-                  ),
+                  Text('Belge veya not paylaşılmadı', style: TextStyle(fontSize: 12, color: AppColors.textLight, fontStyle: FontStyle.italic)),
                 ],
               ),
             )
@@ -3570,10 +3712,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(8)),
                 child: Row(
                   children: [
                     const Icon(Icons.link_rounded, size: 16, color: AppColors.teal),
@@ -3581,11 +3720,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                     Expanded(
                       child: Text(
                         driveLink,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.teal,
-                          decoration: TextDecoration.underline,
-                        ),
+                        style: const TextStyle(fontSize: 12, color: AppColors.teal, decoration: TextDecoration.underline),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -3597,9 +3732,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
             ),
           const SizedBox(height: 12),
           if (_loading)
-            const Center(
-              child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-            )
+            const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
           else
             Row(
               children: [
@@ -3611,10 +3744,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text(
-                      'Reddet',
-                      style: TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w700),
-                    ),
+                    child: const Text('Reddet', style: TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -3628,16 +3758,1035 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Onayla',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                    ),
+                    child: const Text('Onayla', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
             ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Kart: İptal Başvurusu ────────────────────────────────────────────────────
+
+class _HafizRevokeCard extends StatefulWidget {
+  final QueryDocumentSnapshot doc;
+  const _HafizRevokeCard({required this.doc});
+
+  @override
+  State<_HafizRevokeCard> createState() => _HafizRevokeCardState();
+}
+
+class _HafizRevokeCardState extends State<_HafizRevokeCard> {
+  bool _loading = false;
+  bool _done = false;
+  String? _doneLabel;
+
+  Future<void> _approve() async {
+    setState(() => _loading = true);
+    try {
+      final data = widget.doc.data() as Map<String, dynamic>;
+      final uid = data['uid'] as String?;
+      if (uid == null || uid.isEmpty) throw Exception('uid eksik');
+      final batch = FirebaseFirestore.instance.batch();
+      batch.update(
+        FirebaseFirestore.instance.collection('users').doc(uid),
+        {'isHafiz': false},
+      );
+      batch.update(widget.doc.reference, {
+        'status': 'approved',
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      if (mounted) setState(() { _loading = false; _done = true; _doneLabel = 'Onaylandı'; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _reject() async {
+    final noteCtrl = TextEditingController();
+    final String? note;
+    try {
+      note = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Red Notu'),
+          content: TextField(
+            controller: noteCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Kullanıcıya gösterilecek mesaj (opsiyonel)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+              child: const Text('Reddet', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      noteCtrl.dispose();
+    }
+    if (note == null) return;
+    setState(() => _loading = true);
+    try {
+      await widget.doc.reference.update({
+        'status': 'rejected',
+        'note': note.isEmpty ? null : note,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() { _loading = false; _done = true; _doneLabel = 'Reddedildi'; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Red işlemi başarısız: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done) {
+      final color = _doneLabel == 'Onaylandı' ? AppColors.successGreen : AppColors.errorRed;
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Icon(_doneLabel == 'Onaylandı' ? Icons.check_circle_rounded : Icons.cancel_rounded, color: color, size: 20),
+            const SizedBox(width: 8),
+            Text(_doneLabel!, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final name = data['name'] as String? ?? '';
+    final username = data['username'] as String? ?? '';
+    final avatarSeed = data['avatarSeed'] as String?;
+    final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+    final userNote = data['userNote'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundImage: avatarSeed != null
+                        ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
+                        : null,
+                    backgroundColor: AppColors.lightGrey,
+                    child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: const BoxDecoration(color: Color(0xFFFFB300), shape: BoxShape.circle),
+                      child: const Icon(Icons.remove, size: 9, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('İPTAL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFE65100), letterSpacing: 0.8)),
+                        ),
+                      ],
+                    ),
+                    if (username.isNotEmpty)
+                      Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                  ],
+                ),
+              ),
+              if (requestedAt != null)
+                Text(_relativeTime(requestedAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bu kullanıcı hafız statüsünü kaldırmak istiyor.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFE65100)),
+                ),
+                if (userNote != null && userNote.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  const Divider(height: 1, color: Color(0xFFFFE082)),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.format_quote_rounded, size: 13, color: Color(0xFFE65100)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          userNote,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textDark, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _reject,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.errorRed),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Reddet', style: TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _approve,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFB300),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Statüyü Kaldır', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Kart: Mevcut Hafız Kullanıcı ─────────────────────────────────────────────
+
+class _HafizUserCard extends StatefulWidget {
+  final QueryDocumentSnapshot doc;
+  const _HafizUserCard({required this.doc});
+
+  @override
+  State<_HafizUserCard> createState() => _HafizUserCardState();
+}
+
+class _HafizUserCardState extends State<_HafizUserCard> {
+  bool _loading = false;
+  bool _revoked = false;
+
+  Future<void> _revokeManually() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hafız Statüsünü Kaldır'),
+        content: const Text('Bu kullanıcının hafız statüsü kaldırılacak. Emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed, elevation: 0),
+            child: const Text('Kaldır', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _loading = true);
+    try {
+      await widget.doc.reference.update({'isHafiz': false});
+      if (mounted) setState(() { _loading = false; _revoked = true; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_revoked) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+        child: const Row(
+          children: [
+            Icon(Icons.remove_circle_outline_rounded, color: AppColors.textLight, size: 16),
+            SizedBox(width: 6),
+            Text('Statü kaldırıldı', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final name = (data['name'] as String?) ?? '';
+    final username = (data['username'] as String?) ?? '';
+    final avatarSeed = data['avatarSeed'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundImage: avatarSeed != null
+                    ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
+                    : null,
+                backgroundColor: AppColors.lightGrey,
+                child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(color: AppColors.emeraldGreen, shape: BoxShape.circle),
+                  child: const Icon(Icons.check, size: 8, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name.isEmpty ? '(İsimsiz)' : name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
+                if (username.isNotEmpty)
+                  Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+              ],
+            ),
+          ),
+          if (_loading)
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            TextButton(
+              onPressed: _revokeManually,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.errorRed,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Kaldır', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Yol Haritası Yönetimi ────────────────────────────────────────────────────
+
+class _RoadmapView extends StatefulWidget {
+  final VoidCallback onBack;
+  const _RoadmapView({super.key, required this.onBack});
+
+  @override
+  State<_RoadmapView> createState() => _RoadmapViewState();
+}
+
+class _RoadmapViewState extends State<_RoadmapView> {
+  String _tab = 'released';
+  List<RoadmapEntry> _released = [];
+  List<RoadmapEntry> _upcoming = [];
+  StreamSubscription<QuerySnapshot>? _sub;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = FirebaseFirestore.instance
+        .collection('roadmap_entries')
+        .orderBy('order')
+        .snapshots()
+        .listen((s) {
+      final all = s.docs.map(RoadmapEntry.fromDoc).toList();
+      setState(() {
+        _released = all.where((e) => e.type == 'released').toList();
+        _upcoming = all.where((e) => e.type == 'upcoming').toList();
+        _loading = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  List<RoadmapEntry> get _current => _tab == 'released' ? _released : _upcoming;
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final list = List<RoadmapEntry>.from(_current);
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (var i = 0; i < list.length; i++) {
+      batch.update(
+        FirebaseFirestore.instance.collection('roadmap_entries').doc(list[i].id),
+        {'order': i},
+      );
+    }
+    await batch.commit();
+  }
+
+  Future<void> _delete(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sil', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text('Bu kartı silmek istediğinden emin misin?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.errorRed),
+            child: const Text('Sil', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await FirebaseFirestore.instance.collection('roadmap_entries').doc(id).delete();
+    }
+  }
+
+  Future<void> _seedInitialData() async {
+    final col = FirebaseFirestore.instance.collection('roadmap_entries');
+    final batch = FirebaseFirestore.instance.batch();
+    final entries = [
+      {'type': 'released', 'title': 'Kuran Okuma & Hatim Takibi',  'version': null, 'date': null, 'eta': null, 'order': 0, 'published': true,
+       'bullets': ['Günlük okuma alışkanlığı ve hatim takibi', 'Seri ve Hasanat sistemi', 'Kuran Haritası']},
+      {'type': 'released', 'title': 'Tilavet Secdesi Takibi',       'version': null, 'date': null, 'eta': null, 'order': 1, 'published': true,
+       'bullets': ['Hatim okurken secdelerini kolayca takip et', 'Aksatmaman için hatırlatıcı']},
+      {'type': 'released', 'title': 'Namaz ve Alışkanlık Takibi',   'version': null, 'date': null, 'eta': null, 'order': 2, 'published': true,
+       'bullets': ['5 Vakit namaz takibi', 'Kişisel alışkanlık ekle ve takip et']},
+      {'type': 'released', 'title': 'Seri ve Ekip Güncellemeleri',  'version': null, 'date': null, 'eta': null, 'order': 3, 'published': true,
+       'bullets': ['Seri hataları giderildi', 'Haftalık ekip sıralamasında seri görünür hale geldi', 'Seriye göre filtreleme eklendi', 'Üyeler geçen haftayı, admin tüm geçmişi görebilir']},
+      {'type': 'upcoming', 'title': 'Arkadaşlarınla Takipleş',      'version': null, 'date': null, 'eta': 'Yakında', 'order': 4, 'published': true,
+       'bullets': ['Arkadaşlarını ekle', 'Okuma aktivitelerini takip et', 'Birlikte ilerle']},
+      {'type': 'upcoming', 'title': 'Ayet & Hadisler',              'version': null, 'date': null, 'eta': 'Yakında', 'order': 5, 'published': true,
+       'bullets': ['Günlük bildirimler', 'Favori ayet ve hadisleri seç ve kategorize et']},
+      {'type': 'upcoming', 'title': 'Tefsir Takibi',                'version': null, 'date': null, 'eta': 'Yakında', 'order': 6, 'published': true,
+       'bullets': ['Tefsir okumak isteyenler için ayrı takip sistemi']},
+      {'type': 'upcoming', 'title': 'Uygulama İçi Okuma',           'version': null, 'date': null, 'eta': 'Yakında', 'order': 7, 'published': true,
+       'bullets': ['Kuran-ı Kerim, meal ve tefsirleri doğrudan uygulama içinden oku']},
+      {'type': 'upcoming', 'title': 'İslami Kulüpler',              'version': null, 'date': null, 'eta': 'Yakında', 'order': 8, 'published': true,
+       'bullets': ['Üniversite İslami kulüplerini takip et', 'Etkinliklerden haberdar ol']},
+      {'type': 'upcoming', 'title': 'Ramazan Güncellemesi',         'version': null, 'date': null, 'eta': 'Ramazan 2027', 'order': 9, 'published': true,
+       'bullets': ['Oruç takibi', 'Teravih cami hedefleri', 'Üniversite iftarları']},
+    ];
+    for (final e in entries) {
+      batch.set(col.doc(), e);
+    }
+    await batch.commit();
+  }
+
+  void _openForm({RoadmapEntry? entry}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RoadmapForm(
+        initialTab: _tab,
+        entry: entry,
+        nextOrder: _current.length,
+        onSaved: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 18),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white.withValues(alpha: 0.7), size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 10),
+                const Icon(Icons.rocket_launch_outlined, color: AppColors.teal, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('Yol Haritası', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                ),
+                IconButton(
+                  onPressed: _openForm,
+                  icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  _TabBtn(label: 'Yayında', active: _tab == 'released', onTap: () => setState(() => _tab = 'released')),
+                  _TabBtn(label: 'Yakında', active: _tab == 'upcoming', onTap: () => setState(() => _tab = 'upcoming')),
+                ],
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
+                : _current.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.rocket_launch_outlined, size: 40, color: AppColors.borderGrey),
+                            const SizedBox(height: 12),
+                            const Text('Henüz kart yok', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
+                            const SizedBox(height: 6),
+                            TextButton(
+                              onPressed: _openForm,
+                              child: const Text('+ Kart ekle', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700)),
+                            ),
+                            if (_released.isEmpty && _upcoming.isEmpty) ...[
+                              const SizedBox(height: 4),
+                              TextButton(
+                                onPressed: _seedInitialData,
+                                child: const Text('Başlangıç verilerini yükle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : ReorderableListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                        itemCount: _current.length,
+                        onReorder: _reorder,
+                        buildDefaultDragHandles: false,
+                        itemBuilder: (_, i) {
+                          final e = _current[i];
+                          return _RoadmapDevCard(
+                            key: ValueKey(e.id),
+                            entry: e,
+                            index: i,
+                            onEdit: () => _openForm(entry: e),
+                            onDelete: () => _delete(e.id),
+                            onTogglePublished: () => FirebaseFirestore.instance
+                                .collection('roadmap_entries')
+                                .doc(e.id)
+                                .update({'published': !e.published}),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── DevPanel kart satırı ─────────────────────────────────────────────────────
+
+class _RoadmapDevCard extends StatelessWidget {
+  final RoadmapEntry entry;
+  final int index;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onTogglePublished;
+
+  const _RoadmapDevCard({
+    super.key,
+    required this.entry,
+    required this.index,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onTogglePublished,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isReleased = entry.type == 'released';
+    final barColor   = !entry.published
+        ? AppColors.borderGrey
+        : isReleased ? const Color(0xFF58CC02) : AppColors.teal;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        border: Border.all(color: AppColors.borderGrey),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(13),
+                  bottomLeft: Radius.circular(13),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (entry.version != null) ...[
+                          Text(entry.version!, style: const TextStyle(fontSize: 11, color: AppColors.textLight, fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            entry.title,
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: onTogglePublished,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: entry.published ? const Color(0xFFD7FFB8) : AppColors.borderGrey,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              entry.published ? 'Yayında' : 'Taslak',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: entry.published ? const Color(0xFF58CC02) : AppColors.textLight,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (entry.date != null || entry.eta != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        entry.date ?? entry.eta ?? '',
+                        style: const TextStyle(fontSize: 10.5, color: AppColors.textLight, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                    if (entry.bullets.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      for (final b in entry.bullets)
+                        Text('· $b', style: const TextStyle(fontSize: 11.5, color: AppColors.textMid, height: 1.35)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMid),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.errorRed),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  constraints: const BoxConstraints(),
+                ),
+                ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Icon(Icons.drag_handle_rounded, size: 18, color: AppColors.textLight),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Ekle / Düzenle formu ─────────────────────────────────────────────────────
+
+class _RoadmapForm extends StatefulWidget {
+  final String initialTab;
+  final RoadmapEntry? entry;
+  final int nextOrder;
+  final VoidCallback onSaved;
+
+  const _RoadmapForm({
+    required this.initialTab,
+    required this.nextOrder,
+    required this.onSaved,
+    this.entry,
+  });
+
+  @override
+  State<_RoadmapForm> createState() => _RoadmapFormState();
+}
+
+class _RoadmapFormState extends State<_RoadmapForm> {
+  late String _type;
+  late final TextEditingController _title;
+  late final TextEditingController _version;
+  late final TextEditingController _date;
+  late final TextEditingController _eta;
+  late final TextEditingController _bullets;
+  late bool _published;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.entry;
+    _type      = e?.type      ?? widget.initialTab;
+    _title     = TextEditingController(text: e?.title   ?? '');
+    _version   = TextEditingController(text: e?.version ?? '');
+    _date      = TextEditingController(text: e?.date    ?? '');
+    _eta       = TextEditingController(text: e?.eta     ?? '');
+    _bullets   = TextEditingController(text: e?.bullets.join('\n') ?? '');
+    _published = e?.published ?? false;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose(); _version.dispose(); _date.dispose();
+    _eta.dispose(); _bullets.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_title.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+
+    final bullets = _bullets.text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    final data = <String, dynamic>{
+      'type':      _type,
+      'title':     _title.text.trim(),
+      'version':   _version.text.trim().isEmpty ? null : _version.text.trim(),
+      'date':      _date.text.trim().isEmpty    ? null : _date.text.trim(),
+      'eta':       _eta.text.trim().isEmpty     ? null : _eta.text.trim(),
+      'bullets':   bullets,
+      'published': _published,
+    };
+
+    final col = FirebaseFirestore.instance.collection('roadmap_entries');
+    if (widget.entry == null) {
+      data['order'] = widget.nextOrder;
+      await col.add(data);
+    } else {
+      await col.doc(widget.entry!.id).update(data);
+    }
+    widget.onSaved();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.entry != null;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isEdit ? 'Kartı Düzenle' : 'Yeni Kart',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                _TypeChip(label: 'Yayında', selected: _type == 'released', onTap: () => setState(() => _type = 'released')),
+                const SizedBox(width: 8),
+                _TypeChip(label: 'Yakında', selected: _type == 'upcoming', onTap: () => setState(() => _type = 'upcoming')),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            _FormField(label: 'Başlık *', controller: _title, hint: 'Namaz ve Alışkanlık Takibi'),
+            const SizedBox(height: 10),
+            _FormField(label: 'Versiyon', controller: _version, hint: 'v1.2'),
+            const SizedBox(height: 10),
+            if (_type == 'released')
+              _FormField(label: 'Tarih', controller: _date, hint: '2026-05-17'),
+            if (_type == 'upcoming')
+              _FormField(label: 'ETA', controller: _eta, hint: 'Yakında · Ramazan 2027'),
+            const SizedBox(height: 10),
+
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Maddeler (her satır ayrı)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _bullets,
+                  maxLines: 5,
+                  style: const TextStyle(fontSize: 13.5, color: AppColors.textDark),
+                  decoration: InputDecoration(
+                    hintText: 'Seri hataları giderildi\nEkip liderboard güncellendi',
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
+                    filled: true,
+                    fillColor: AppColors.lightGrey,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.borderGrey),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            Row(
+              children: [
+                Switch(
+                  value: _published,
+                  onChanged: (v) => setState(() => _published = v),
+                  activeThumbColor: AppColors.teal,
+                  activeTrackColor: AppColors.tealLight,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _published ? 'Yayında — kullanıcılar görebilir' : 'Taslak — sadece sen görürsün',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _published ? AppColors.teal : AppColors.textLight,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _saving
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(isEdit ? 'Kaydet' : 'Ekle',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TypeChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teal : AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? AppColors.teal : AppColors.borderGrey),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.textMid,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final String label;
+  final String hint;
+  final TextEditingController controller;
+  const _FormField({required this.label, required this.hint, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          style: const TextStyle(fontSize: 13.5, color: AppColors.textDark),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
+            filled: true,
+            fillColor: AppColors.lightGrey,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.borderGrey),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

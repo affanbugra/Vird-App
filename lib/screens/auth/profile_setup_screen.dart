@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:provider/provider.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../../app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/text_utils.dart';
+import '../../providers/auth_provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String name;
@@ -47,11 +49,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _saveProfileInfo() async {
     setState(() => _isLoading = true);
-    
+
+    final authProvider = context.read<AuthProvider>();
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Doc register'da zaten oluşturuldu, sadece şehir/üni güncelle
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': widget.name,
           'email': user.email,
@@ -67,9 +70,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         );
       }
     }
-    
+
     if (mounted) {
       setState(() => _isLoading = false);
+      authProvider.completeProfileSetup();
       Navigator.popUntil(context, (route) => route.isFirst);
     }
   }
@@ -81,10 +85,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                onPressed: () => Navigator.pop(context),
+              )
+            : const SizedBox.shrink(),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -121,11 +127,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
                   ),
                 ),
-                onSelected: (value) {
-                  setState(() {
-                    _selectedCity = value;
-                  });
-                },
+                onSelected: (value) => setState(() => _selectedCity = value),
                 selectedItem: _selectedCity,
               ),
               const SizedBox(height: 16),
@@ -148,11 +150,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     prefixIcon: const Icon(Icons.school, color: AppColors.teal),
                   ),
                 ),
-                onSelected: (value) {
-                  setState(() {
-                    _selectedUniversity = value;
-                  });
-                },
+                onSelected: (value) => setState(() => _selectedUniversity = value),
                 selectedItem: _selectedUniversity,
               ),
               const SizedBox(height: 32),
@@ -170,7 +168,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () async {
-                  // Atla butonuna basılsa bile kullanıcı dokümanı oluştur
+                  final authProvider = context.read<AuthProvider>();
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
                     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -181,6 +179,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       'createdAt': FieldValue.serverTimestamp(),
                     }, SetOptions(merge: true));
                   }
+                  authProvider.completeProfileSetup();
                   if (context.mounted) {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }

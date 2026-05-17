@@ -41,6 +41,19 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <div id="err" style="display:none;position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:16px;z-index:9999;font-family:monospace;font-size:13px;word-break:break-all;white-space:pre-wrap;max-height:50vh;overflow:auto"></div>
+  <script>
+    window.onerror = function(msg, src, line, col, err) {
+      var d = document.getElementById('err');
+      d.style.display = 'block';
+      d.textContent = 'JS HATA: ' + msg + '\n' + src + ':' + line + '\n' + (err && err.stack || '');
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var d = document.getElementById('err');
+      d.style.display = 'block';
+      d.textContent += '\nPromise hatası: ' + (e.reason && (e.reason.stack || e.reason.message || e.reason) || e);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

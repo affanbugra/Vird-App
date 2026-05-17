@@ -15,7 +15,7 @@
 - **Cüz:** Kuranın 30 eşit bölümünden biri (her biri ~20 sayfa).
 - **Sure:** Kuranın 114 bölümünden biri.
 - **Log:** Kullanıcının bir okuma kaydı — hangi yöntemle (hatim/sure/sayfa/cüz), kaç sayfa.
-- **DevPanel:** Geliştiriciye özel ekran — bug, plan, fikir ve feedback yönetimi.
+- **DevPanel:** Geliştiriciye özel ekran — bug, plan, fikir, feedback ve yol haritası yönetimi.
 
 **Kullanıcı akışı:** Giriş → Hatim başlat → Günlük okuma logla → Seri/hasanat birik → Ekiple liderboard'da yarış.
 
