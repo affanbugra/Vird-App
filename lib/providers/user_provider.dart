@@ -6,21 +6,30 @@ class UserProvider extends ChangeNotifier {
   bool _isDeveloper = false;
   bool _isPro = false;
   bool _isHafiz = false;
-  String? _teamId;
-  List<String> _developerTeamIds = const [];
-  /// 'hanim' veya 'bey' — kayıt sırasında seçilir, tüm uygulamada kullanılır
+  // Üye olduğu tüm ekipler (kendi kurduğu DAHİL)
+  List<String> _teamIds = const [];
+  // Lider/kurucu olduğu ekipler (teamIds'in alt kümesi)
+  List<String> _adminTeamIds = const [];
+  // Bekleyen katılım isteği gönderilen ekipler
+  List<String> _pendingTeamIds = const [];
+  // 'hanim' veya 'bey' — kayıt sırasında seçilir
   String? _cinsiyet;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
 
   bool get isDeveloper => _isDeveloper;
   bool get isPro => _isPro;
   bool get isHafiz => _isHafiz;
-  String? get teamId => _teamId;
-  List<String> get developerTeamIds => _developerTeamIds;
+  List<String> get teamIds => _teamIds;
+  List<String> get adminTeamIds => _adminTeamIds;
+  List<String> get pendingTeamIds => _pendingTeamIds;
   String? get cinsiyet => _cinsiyet;
 
-  /// Kullanıcının cinsiyetine göre hitap şeklini döner.
-  /// Örnek: 'Hanımefendi' veya 'Beyefendi'
+  // Sadece üye olduğu (kurmadığı) ekip sayısı — join limiti için
+  int get joinedTeamCount => _teamIds.length - _adminTeamIds.length;
+
+  bool isMemberOf(String teamId) => _teamIds.contains(teamId);
+  bool isAdminOf(String teamId) => _adminTeamIds.contains(teamId);
+
   String get hitap => _cinsiyet == 'hanim' ? 'Hanımefendi' : 'Beyefendi';
 
   void listenToUser(String? uid) {
@@ -29,7 +38,9 @@ class UserProvider extends ChangeNotifier {
       _isDeveloper = false;
       _isPro = false;
       _isHafiz = false;
-      _teamId = null;
+      _teamIds = const [];
+      _adminTeamIds = const [];
+      _pendingTeamIds = const [];
       _cinsiyet = null;
       notifyListeners();
       return;
@@ -43,9 +54,16 @@ class UserProvider extends ChangeNotifier {
       _isDeveloper = (data?['isDeveloper'] as bool?) ?? false;
       _isPro = (data?['isPro'] as bool?) ?? false;
       _isHafiz = (data?['isHafiz'] as bool?) ?? false;
-      _teamId = data?['teamId'] as String?;
       _cinsiyet = data?['cinsiyet'] as String?;
-      _developerTeamIds = ((data?['developerTeamIds']) as List?)
+      _teamIds = ((data?['teamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [];
+      _adminTeamIds = ((data?['adminTeamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [];
+      _pendingTeamIds = ((data?['pendingTeamIds']) as List?)
               ?.map((e) => e.toString())
               .toList() ??
           const [];

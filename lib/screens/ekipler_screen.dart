@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
 import '../app_assets.dart';
+import '../config/team_limits.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'ekip_profil_screen.dart';
@@ -49,36 +50,37 @@ class _EkiplerBody extends StatelessWidget {
   final String uid;
   const _EkiplerBody({required this.uid});
 
-  void _openCreateSheet(BuildContext context, bool isPro, bool isDeveloper, String? currentTeamId) {
-    if (!isPro && !isDeveloper) {
+  void _openCreateSheet(
+    BuildContext context,
+    bool isPro,
+    bool isDeveloper,
+    List<String> adminTeamIds,
+  ) {
+    if (!TeamLimits.canCreate(
+        isPro: isPro, isDev: isDeveloper, adminCount: adminTeamIds.length)) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
-            'Pro Özellik',
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: AppColors.textDark),
+            'Ekip Limiti',
+            style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w800, color: AppColors.textDark),
           ),
           content: Text(
-            'Ekip kurma özelliği Pro kullanıcılara özeldir.',
+            TeamLimits.createLimitMessage(isPro: isPro, isDev: isDeveloper),
             style: GoogleFonts.nunito(color: AppColors.textMid),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: Text('Tamam',
-                  style: GoogleFonts.nunito(color: AppColors.teal, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.nunito(
+                      color: AppColors.teal, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
       );
-      return;
-    }
-    if (!isDeveloper && currentTeamId != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.teal,
-      ));
       return;
     }
     showModalBottomSheet(
@@ -90,6 +92,8 @@ class _EkiplerBody extends StatelessWidget {
       builder: (_) => _CreateTeamSheet(
         uid: uid,
         isDeveloper: isDeveloper,
+        isPro: isPro,
+        adminTeamIds: adminTeamIds,
         onCreated: (teamId) => Navigator.push(
           context,
           MaterialPageRoute(
@@ -99,17 +103,11 @@ class _EkiplerBody extends StatelessWidget {
     );
   }
 
-  void _openInviteCodeSheet(BuildContext context, String? currentTeamId, bool isDeveloper) {
-    if (!isDeveloper && currentTeamId != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Zaten bir ekiptesin. Önce mevcut ekibinden ayrılmalısın.',
-          style: GoogleFonts.nunito(),
-        ),
-        backgroundColor: AppColors.teal,
-      ));
-      return;
-    }
+  void _openInviteCodeSheet(
+    BuildContext context,
+    bool isPro,
+    bool isDeveloper,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -119,6 +117,7 @@ class _EkiplerBody extends StatelessWidget {
       builder: (_) => _InviteCodeSheet(
         uid: uid,
         isDeveloper: isDeveloper,
+        isPro: isPro,
         onTeamFound: (teamId) => Navigator.push(
           context,
           MaterialPageRoute(
@@ -134,10 +133,17 @@ class _EkiplerBody extends StatelessWidget {
       stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
       builder: (context, userSnap) {
         final userData = userSnap.data?.data() as Map<String, dynamic>?;
-        final currentTeamId = userData?['teamId'] as String?;
         final isPro = (userData?['isPro'] as bool?) ?? false;
         final isDeveloper = (userData?['isDeveloper'] as bool?) ?? false;
-        final devTeamIds = ((userData?['developerTeamIds']) as List?)
+        final teamIds = ((userData?['teamIds']) as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const <String>[];
+        final adminTeamIds = ((userData?['adminTeamIds']) as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const <String>[];
+        final pendingTeamIds = ((userData?['pendingTeamIds']) as List?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const <String>[];
@@ -152,11 +158,14 @@ class _EkiplerBody extends StatelessWidget {
                     .map((d) => TeamModel.fromFirestore(d))
                     .toList() ??
                 [];
-            // Gizli grupları filtrele: sadece kendi grubu görünsün
-            final teams =
-                allTeams.where((t) => !t.isPrivate || t.id == currentTeamId || devTeamIds.contains(t.id)).toList();
 
-            if (teamsSnap.connectionState == ConnectionState.waiting && teams.isEmpty) {
+            // Gizli ekipler: üye olanlar, bekleyen isteği olanlar veya açık ekipler görür
+            final teams = allTeams
+                .where((t) => !t.isPrivate || teamIds.contains(t.id) || pendingTeamIds.contains(t.id))
+                .toList();
+
+            if (teamsSnap.connectionState == ConnectionState.waiting &&
+                teams.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -170,11 +179,14 @@ class _EkiplerBody extends StatelessWidget {
                           itemCount: teams.length,
                           itemBuilder: (ctx, i) {
                             final team = teams[i];
-                            final isMyTeam = team.id == currentTeamId ||
-                                devTeamIds.contains(team.id);
+                            final isMyTeam = teamIds.contains(team.id);
+                            final isAdmin = adminTeamIds.contains(team.id);
+                            final isPending = pendingTeamIds.contains(team.id);
                             return _TeamCard(
                               team: team,
                               isMyTeam: isMyTeam,
+                              isAdmin: isAdmin,
+                              isPending: isPending,
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -206,10 +218,11 @@ class _EkiplerBody extends StatelessWidget {
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: () =>
-                                  _openInviteCodeSheet(context, currentTeamId, isDeveloper),
+                                  _openInviteCodeSheet(context, isPro, isDeveloper),
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: AppColors.teal),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12)),
                               ),
@@ -230,10 +243,10 @@ class _EkiplerBody extends StatelessWidget {
                             child: DuolingoButton(
                               color: AppColors.teal,
                               bottomColor: AppColors.tealDark,
-                              onPressed: () =>
-                                  _openCreateSheet(context, isPro, isDeveloper, currentTeamId),
+                              onPressed: () => _openCreateSheet(
+                                  context, isPro, isDeveloper, adminTeamIds),
                               child: Text(
-                                'Yeni Grup Kur',
+                                'Yeni Ekip Kur',
                                 style: GoogleFonts.nunito(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
@@ -269,7 +282,8 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shield_outlined, size: 64, color: AppColors.borderGrey),
+            const Icon(Icons.shield_outlined,
+                size: 64, color: AppColors.borderGrey),
             const SizedBox(height: 16),
             Text(
               'Henüz hiç ekip yok',
@@ -301,11 +315,15 @@ class _EmptyState extends StatelessWidget {
 class _TeamCard extends StatelessWidget {
   final TeamModel team;
   final bool isMyTeam;
+  final bool isAdmin;
+  final bool isPending;
   final VoidCallback onTap;
 
   const _TeamCard({
     required this.team,
     required this.isMyTeam,
+    required this.isAdmin,
+    required this.isPending,
     required this.onTap,
   });
 
@@ -374,12 +392,29 @@ class _TeamCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (isMyTeam)
+                      if (isAdmin)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.teal,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'Liderim',
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      else if (isMyTeam)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -390,8 +425,26 @@ class _TeamCard extends StatelessWidget {
                               color: Colors.white,
                             ),
                           ),
+                        )
+                      else if (isPending)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF8E1),
+                            border: Border.all(color: const Color(0xFFFFE082)),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'Beklemede',
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFF59E0B),
+                            ),
+                          ),
                         ),
-                      if (team.isPrivate && !isMyTeam)
+                      if (team.isPrivate && !isMyTeam && !isPending)
                         const Padding(
                           padding: EdgeInsets.only(left: 4),
                           child: Icon(Icons.lock_outline,
@@ -436,16 +489,20 @@ class _TeamCard extends StatelessWidget {
   }
 }
 
-// ─── Yeni Grup Kur Sheet ──────────────────────────────────────────────────────
+// ─── Yeni Ekip Kur Sheet ──────────────────────────────────────────────────────
 
 class _CreateTeamSheet extends StatefulWidget {
   final String uid;
   final bool isDeveloper;
+  final bool isPro;
+  final List<String> adminTeamIds;
   final void Function(String teamId) onCreated;
 
   const _CreateTeamSheet({
     required this.uid,
     required this.isDeveloper,
+    required this.isPro,
+    required this.adminTeamIds,
     required this.onCreated,
   });
 
@@ -456,7 +513,8 @@ class _CreateTeamSheet extends StatefulWidget {
 class _CreateTeamSheetState extends State<_CreateTeamSheet> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final bool _isPrivate = true;
+  bool? _isPrivate;
+  String? _genderPolicy;
   bool _isLoading = false;
 
   @override
@@ -475,25 +533,52 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
       ));
       return;
     }
+    if (_isPrivate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text('Grubun görünürlüğünü seçin.', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.errorRed,
+      ));
+      return;
+    }
+    if (_genderPolicy == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text('Katılım politikasını seçin.', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.errorRed,
+      ));
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
       final db = FirebaseFirestore.instance;
 
-      if (!widget.isDeveloper) {
-        final userDoc = await db.collection('users').doc(widget.uid).get();
-        if ((userDoc.data() ?? {})['teamId'] != null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Zaten bir ekipteysin.', style: GoogleFonts.nunito()),
-              backgroundColor: AppColors.errorRed,
-            ));
-          }
-          return;
+      // Limit çift kontrol (sheet açıldıktan sonra değişmiş olabilir)
+      final userDoc = await db.collection('users').doc(widget.uid).get();
+      final userData = userDoc.data() ?? {};
+      final latestAdminTeamIds = ((userData['adminTeamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      if (!TeamLimits.canCreate(
+          isPro: widget.isPro,
+          isDev: widget.isDeveloper,
+          adminCount: latestAdminTeamIds.length)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                TeamLimits.createLimitMessage(
+                    isPro: widget.isPro, isDev: widget.isDeveloper),
+                style: GoogleFonts.nunito()),
+            backgroundColor: AppColors.errorRed,
+          ));
         }
+        return;
       }
 
-      final inviteCode = _generateInviteCode();
+      // Açık ekiplerde davet kodu olmaz
+      final inviteCode = (_isPrivate == true) ? _generateInviteCode() : '';
       final teamRef = db.collection('teams').doc();
 
       final batch = db.batch();
@@ -504,19 +589,14 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
         'adminUid': widget.uid,
         'memberCount': 1,
         'isPrivate': _isPrivate,
+        'genderPolicy': _genderPolicy,
         'inviteCode': inviteCode,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      if (widget.isDeveloper) {
-        batch.update(db.collection('users').doc(widget.uid), {
-          'developerTeamIds': FieldValue.arrayUnion([teamRef.id]),
-        });
-      } else {
-        batch.update(db.collection('users').doc(widget.uid), {
-          'teamId': teamRef.id,
-          'teamJoinedAt': FieldValue.serverTimestamp(),
-        });
-      }
+      batch.update(db.collection('users').doc(widget.uid), {
+        'teamIds': FieldValue.arrayUnion([teamRef.id]),
+        'adminTeamIds': FieldValue.arrayUnion([teamRef.id]),
+      });
       await batch.commit();
 
       if (mounted) {
@@ -560,7 +640,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             ),
           ),
           Text(
-            'Yeni Grup Kur',
+            'Yeni Ekip Kur',
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -570,10 +650,14 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           const SizedBox(height: 16),
           TextFormField(
             controller: _nameCtrl,
+            textInputAction: TextInputAction.next,
+            maxLength: 50,
             decoration: InputDecoration(
-              labelText: 'Grup Adı *',
+              labelText: 'Ekip Adı *',
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              counterText: '',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: AppColors.teal, width: 2),
@@ -584,39 +668,65 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           TextFormField(
             controller: _descCtrl,
             maxLines: 3,
+            maxLength: 300,
             decoration: InputDecoration(
               labelText: 'Açıklama (opsiyonel)',
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              counterText: '',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: AppColors.teal, width: 2),
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 20),
+          Text(
+            'Görünürlük',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMid,
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline, size: 18, color: AppColors.textMid),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Tüm gruplar şimdilik gizlidir — sadece davet koduyla bulunabilir',
-                    style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      color: AppColors.textMid,
-                      height: 1.3,
-                    ),
+          ),
+          const SizedBox(height: 8),
+          _PrivacyToggle(
+            secili: _isPrivate,
+            onChanged: (v) => setState(() => _isPrivate = v),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Katılım Politikası',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMid,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _GenderPolicyToggle(
+            secili: _genderPolicy,
+            onChanged: (v) => setState(() => _genderPolicy = v),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline,
+                  size: 11, color: Color(0xFFBBAB00)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Bu ayarlar bir kez belirlenir ve sonradan değiştirilemez. Dikkatle seçin.',
+                  style: GoogleFonts.nunito(
+                    fontSize: 10,
+                    color: const Color(0xFFAA9000),
+                    height: 1.4,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -648,9 +758,15 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
 class _InviteCodeSheet extends StatefulWidget {
   final String uid;
   final bool isDeveloper;
+  final bool isPro;
   final void Function(String teamId) onTeamFound;
 
-  const _InviteCodeSheet({required this.uid, required this.isDeveloper, required this.onTeamFound});
+  const _InviteCodeSheet({
+    required this.uid,
+    required this.isDeveloper,
+    required this.isPro,
+    required this.onTeamFound,
+  });
 
   @override
   State<_InviteCodeSheet> createState() => _InviteCodeSheetState();
@@ -660,6 +776,8 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
   final _codeCtrl = TextEditingController();
   bool _isLoading = false;
   String? _error;
+  bool _requestSent = false;
+  String? _foundTeamId;
 
   @override
   void dispose() {
@@ -682,17 +800,35 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
     try {
       final db = FirebaseFirestore.instance;
 
-      // 1. Önce kullanıcının zaten bir ekipte olup olmadığını kontrol et
+      // 1. Kullanıcı verisini oku
       final userDoc = await db.collection('users').doc(widget.uid).get();
       final userData = userDoc.data() ?? {};
-      if (!widget.isDeveloper && userData['teamId'] != null) {
+      final teamIds = ((userData['teamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final adminTeamIds = ((userData['adminTeamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final joinedCount = teamIds.length - adminTeamIds.length;
+
+      // 2. Join limiti kontrolü
+      if (!TeamLimits.canJoin(
+          isPro: widget.isPro,
+          isDev: widget.isDeveloper,
+          joinedCount: joinedCount)) {
         if (mounted) {
-          setState(() { _error = 'Zaten bir ekiptesin. Önce mevcut ekibinden ayrıl.'; _isLoading = false; });
+          setState(() {
+            _error = TeamLimits.joinLimitMessage(
+                isPro: widget.isPro, isDev: widget.isDeveloper);
+            _isLoading = false;
+          });
         }
         return;
       }
 
-      // 2. Davet koduyla ekibi bul
+      // 3. Ekibi bul
       final snap = await db
           .collection('teams')
           .where('inviteCode', isEqualTo: code)
@@ -700,26 +836,124 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
           .get();
 
       if (snap.docs.isEmpty) {
-        if (mounted) setState(() { _error = 'Geçersiz kod. Tekrar dene.'; _isLoading = false; });
+        if (mounted) {
+          setState(() {
+            _error = 'Geçersiz kod. Tekrar dene.';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
       if (!mounted) return;
 
-      final teamId = snap.docs.first.id;
+      final teamDoc = snap.docs.first;
+      final teamId = teamDoc.id;
+      final teamData = teamDoc.data();
+      final isPrivate = teamData['isPrivate'] as bool? ?? true;
+      final genderPolicy = teamData['genderPolicy'] as String? ?? 'all';
 
-      // 3. Kullanıcıyı ekibe kat (teamId güncelle + memberCount artır)
-      final batch = db.batch();
-      if (widget.isDeveloper) {
-        batch.update(db.collection('users').doc(widget.uid), {
-          'developerTeamIds': FieldValue.arrayUnion([teamId]),
-        });
-      } else {
-        batch.update(db.collection('users').doc(widget.uid), {
-          'teamId': teamId,
-          'teamJoinedAt': FieldValue.serverTimestamp(),
-        });
+      // 4. Zaten bu ekipte mi?
+      if (teamIds.contains(teamId)) {
+        if (mounted) {
+          setState(() {
+            _error = 'Zaten bu ekibin üyesisin.';
+            _isLoading = false;
+          });
+        }
+        return;
       }
+
+      // 5. Cinsiyet politikası kontrolü
+      if (!widget.isDeveloper && genderPolicy != 'all') {
+        final cinsiyet = userData['cinsiyet'] as String? ?? '';
+        if (genderPolicy == 'men' && cinsiyet == 'hanim') {
+          if (mounted) {
+            setState(() {
+              _error = 'Bu ekip yalnızca erkek üyelere açık.';
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+        if (genderPolicy == 'women' && cinsiyet == 'bey') {
+          if (mounted) {
+            setState(() {
+              _error = 'Bu ekip yalnızca hanım üyelere açık.';
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
+
+      // 6a. Gizli ekip (developer dahil herkes) → istek gönder
+      if (isPrivate) {
+        final existingReq = await db
+            .collection('teams')
+            .doc(teamId)
+            .collection('requests')
+            .doc(widget.uid)
+            .get();
+        if (existingReq.exists) {
+          if (mounted) {
+            setState(() {
+              _error = 'Bu ekibe zaten istek attın, lider inceliyor.';
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+
+        await db
+            .collection('teams')
+            .doc(teamId)
+            .collection('requests')
+            .doc(widget.uid)
+            .set({
+          'name': userData['name'] as String? ?? 'İsimsiz',
+          'username': userData['username'] as String? ?? '',
+          'avatarSeed': userData['avatarSeed'] as String?,
+          'city': userData['city'] as String? ?? '',
+          'university': userData['university'] as String? ?? '',
+          'cinsiyet': userData['cinsiyet'] as String? ?? '',
+          'requestedAt': FieldValue.serverTimestamp(),
+        });
+
+        // pendingTeamIds'e ekle
+        await db.collection('users').doc(widget.uid).update({
+          'pendingTeamIds': FieldValue.arrayUnion([teamId]),
+        });
+
+        final adminUid = teamData['adminUid'] as String? ?? '';
+        if (adminUid.isNotEmpty) {
+          final requesterName = userData['name'] as String? ?? 'Biri';
+          final teamName = teamData['name'] as String? ?? 'Ekip';
+          await db
+              .collection('users')
+              .doc(adminUid)
+              .collection('notifications')
+              .add({
+            'type': 'join_request',
+            'title': 'Yeni katılım isteği',
+            'body': '$requesterName "$teamName" ekibine katılmak istiyor.',
+            'teamId': teamId,
+            'requesterUid': widget.uid,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        if (mounted) setState(() { _foundTeamId = teamId; _requestSent = true; _isLoading = false; });
+        return;
+      }
+
+      // 6b. Açık ekip → direkt katıl
+      final batch = db.batch();
+      batch.update(db.collection('users').doc(widget.uid), {
+        'teamIds': FieldValue.arrayUnion([teamId]),
+        'teamJoinedAt.$teamId': FieldValue.serverTimestamp(),
+      });
       batch.update(db.collection('teams').doc(teamId), {
         'memberCount': FieldValue.increment(1),
       });
@@ -728,18 +962,78 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
       if (!mounted) return;
 
       final cb = widget.onTeamFound;
-
-      // Pop sheet önce, sonraki frame'de push yap — aynı frame'de pop+push → navigator crash
       Navigator.pop(context);
       WidgetsBinding.instance.addPostFrameCallback((_) => cb(teamId));
-
     } catch (e) {
-      if (mounted) setState(() { _error = 'Bir hata oluştu. Tekrar dene.'; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _error = 'Bir hata oluştu. Tekrar dene.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_requestSent) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+            24, 24, 24, MediaQuery.of(context).padding.bottom + 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                  color: AppColors.tealLight, shape: BoxShape.circle),
+              child: const Icon(Icons.check_circle_outline,
+                  size: 34, color: AppColors.teal),
+            ),
+            const SizedBox(height: 16),
+            Text('İsteğin Gönderildi!',
+                style: GoogleFonts.nunito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark)),
+            const SizedBox(height: 8),
+            Text(
+                'Ekip lideri isteğini inceleyecek.\nKabul edilirse bildirim alacaksın.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                    fontSize: 13, color: AppColors.textMid, height: 1.5)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DuolingoButton(
+                color: AppColors.teal,
+                bottomColor: AppColors.tealDark,
+                onPressed: () {
+                  final teamId = _foundTeamId;
+                  Navigator.pop(context);
+                  if (teamId != null) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => widget.onTeamFound(teamId),
+                    );
+                  }
+                },
+                child: Text(
+                  'Ekibi Görüntüle',
+                  style: GoogleFonts.nunito(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
@@ -772,7 +1066,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Admin tarafından verilen 6 haneli kodu gir.',
+            'Lider tarafından verilen 6 haneli kodu gir.',
             style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
           ),
           const SizedBox(height: 16),
@@ -780,6 +1074,8 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
             controller: _codeCtrl,
             textCapitalization: TextCapitalization.characters,
             maxLength: 6,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _isLoading ? null : _submit(),
             style: GoogleFonts.nunito(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -795,7 +1091,9 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
               ),
               counterText: '',
               errorText: _error,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              errorMaxLines: 3,
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: AppColors.teal, width: 2),
@@ -823,6 +1121,190 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Görünürlük Toggle ────────────────────────────────────────────────────────
+
+class _PrivacyToggle extends StatelessWidget {
+  final bool? secili;
+  final ValueChanged<bool> onChanged;
+
+  const _PrivacyToggle({required this.secili, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPublic = secili == false;
+    final isPrivate = secili == true;
+
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Stack(
+        children: [
+          if (secili != null)
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOut,
+              alignment:
+                  isPublic ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(false),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isPublic ? FontWeight.w700 : FontWeight.w500,
+                        color: isPublic
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('🌐  Herkese Açık'),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(true),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isPrivate ? FontWeight.w700 : FontWeight.w500,
+                        color: isPrivate
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('🔒  Sadece Davet'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Katılım Politikası Toggle (3 seçenek) ───────────────────────────────────
+
+class _GenderPolicyToggle extends StatelessWidget {
+  final String? secili;
+  final ValueChanged<String> onChanged;
+
+  const _GenderPolicyToggle({required this.secili, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const options = [
+      ('all', '👥  Herkese'),
+      ('men', 'Sadece Beyler'),
+      ('women', 'Sadece Hanımlar'),
+    ];
+
+    int? selectedIdx;
+    for (int i = 0; i < options.length; i++) {
+      if (options[i].$1 == secili) {
+        selectedIdx = i;
+        break;
+      }
+    }
+
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Stack(
+        children: [
+          if (selectedIdx != null)
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOut,
+              alignment: Alignment(
+                  selectedIdx == 0 ? -1 : selectedIdx == 1 ? 0 : 1, 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            children: options.map((opt) {
+              final isSelected = secili == opt.$1;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(opt.$1),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: Text(opt.$2),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

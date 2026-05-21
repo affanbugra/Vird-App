@@ -22,12 +22,12 @@ service cloud.firestore {
     match /users/{userId} {
       // Herkes okuyabilir (liderboard, profil görüntüleme)
       allow read: if isAuth();
-      // Sadece kendi dokümanını yazabilir; teamId alanını herhangi bir
-      // giriş yapmış kullanıcı değiştirebilir (admin üye ekleme/silme için)
       allow create: if isOwner(userId);
+      // Kendi dokümanı tam erişim; ekip join/leave/kick için teamIds,
+      // adminTeamIds, teamJoinedAt alanları diğer auth kullanıcılar tarafından güncellenebilir
       allow update: if isOwner(userId)
                     || (isAuth() && request.resource.data.diff(resource.data)
-                        .affectedKeys().hasOnly(['teamId']))
+                        .affectedKeys().hasOnly(['teamIds', 'adminTeamIds', 'teamJoinedAt', 'pendingTeamIds']))
                     // Geliştirici: sadece cinsiyet alanını tüm kullanıcılarda güncelleyebilir
                     || (isDeveloper() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['cinsiyet']))
@@ -50,6 +50,13 @@ service cloud.firestore {
       match /daily_prayers/{dateStr} {
         allow read, write: if isOwner(userId);
       }
+
+      // Bildirimler — okuma/silme/güncelleme sadece sahibine; oluşturma auth kullanıcılara açık
+      // (lider, isteği kabul/ret ettiğinde karşı kullanıcının bildirimlerine yazar)
+      match /notifications/{notifId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isAuth();
+      }
     }
 
     // ── Ekipler ────────────────────────────────────────────────────────
@@ -58,19 +65,24 @@ service cloud.firestore {
       allow read: if isAuth();
       // Ekip kurma: adminUid kendi uid'i olmalı
       allow create: if isAuth() && request.auth.uid == request.resource.data.adminUid;
-      // Güncelleme: herhangi bir giriş yapmış kullanıcı (katılma/ayrılma için)
-      allow update: if isAuth();
-      // Silme: sadece admin
+      // Güncelleme: admin her şeyi; diğerleri sadece memberCount
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.adminUid
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount'])
+      );
+      // Silme: sadece ekip kurucusu
       allow delete: if isAuth() && request.auth.uid == resource.data.adminUid;
 
-      // Katılma istekleri alt koleksiyonu
+      // Katılma istekleri — tüm auth kullanıcılar okuyabilir/yazabilir
+      // (admin onay/red, kullanıcı kendi isteğini iptal, ekip silinince toplu silme)
       match /requests/{requestId} {
         allow read, write: if isAuth();
       }
 
-      // Geçmiş sıralamalar alt koleksiyonu
+      // Geçmiş sıralamalar — herkes okuyabilir, admin + üyeler yazabilir
       match /history/{historyId} {
-        allow read, write: if isAuth();
+        allow read: if isAuth();
+        allow write: if isAuth();
       }
     }
 

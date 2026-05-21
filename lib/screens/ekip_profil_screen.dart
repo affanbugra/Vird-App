@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
+import '../config/team_limits.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'kullanici_profil_screen.dart';
@@ -62,22 +63,31 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   bool _isJoinLoading = false;
   Timer? _countdownTimer;
   Duration _untilEnd = Duration.zero;
+  StreamSubscription<DocumentSnapshot>? _pendingSub;
 
-  // Bug 9: Arşivleme her sayfa açılışında çalışmasın — oturum başına bir kez
   static final _archivedThisSession = <String>{};
-
 
   @override
   void initState() {
     super.initState();
     _loadLeaderboard();
     _startCountdown();
-    _checkPendingStatus();
     _archivePastPeriodsIfNeeded();
+    // Bekleyen istek durumunu stream ile takip et — ekran açıkken güncel kalsın
+    _pendingSub = FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.teamId)
+        .collection('requests')
+        .doc(widget.currentUid)
+        .snapshots()
+        .listen((snap) {
+      if (mounted) setState(() => _isPending = snap.exists);
+    });
   }
 
   @override
   void dispose() {
+    _pendingSub?.cancel();
     _countdownTimer?.cancel();
     super.dispose();
   }
@@ -116,18 +126,6 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     if (mounted) setState(() => _untilEnd = periodEnd.difference(now));
   }
 
-  Future<void> _checkPendingStatus() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('teams')
-          .doc(widget.teamId)
-          .collection('requests')
-          .doc(widget.currentUid)
-          .get();
-      if (mounted) setState(() => _isPending = doc.exists);
-    } catch (_) {}
-  }
-
   Future<void> _archivePastPeriodsIfNeeded() async {
     if (!mounted) return;
     if (_periodMode != _LeaderboardPeriod.weekly) return;
@@ -164,7 +162,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         }
       }
 
-      final membersSnap = await db.collection('users').where('teamId', isEqualTo: widget.teamId).get();
+      final membersSnap = await db.collection('users').where('teamIds', arrayContains: widget.teamId).get();
 
       final now = DateTime.now();
       final currentDaysSinceMonday = now.weekday - DateTime.monday;
@@ -190,7 +188,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         final periodEnd = targetWeekStart.add(const Duration(days: 7));
 
         final eligibleDocs = membersSnap.docs.where((memberDoc) {
-          final joinedAt = (memberDoc.data()['teamJoinedAt'] as Timestamp?)?.toDate();
+          final joinedAtRaw = memberDoc.data()['teamJoinedAt'];
+          DateTime? joinedAt;
+          if (joinedAtRaw is Timestamp) {
+            joinedAt = joinedAtRaw.toDate();
+          } else if (joinedAtRaw is Map) {
+            final ts = joinedAtRaw[widget.teamId];
+            if (ts is Timestamp) joinedAt = ts.toDate();
+          }
           return joinedAt == null || !joinedAt.isAfter(targetWeekEnd);
         }).toList();
 
@@ -217,6 +222,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
             rawSeri: (data['seri'] as int?) ?? 0,
+            isHafiz: (data['isHafiz'] as bool?) ?? false,
           );
         }));
 
@@ -230,6 +236,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             'username': e.username,
             'avatarSeed': e.avatarSeed,
             'periodHasanat': e.periodHasanat,
+            'isHafiz': e.isHafiz,
           }).toList(),
         });
       }
@@ -246,20 +253,9 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       final weekStart = _getPeriodStart();
       final db = FirebaseFirestore.instance;
 
-      // Regular members (teamId) + developer members (developerTeamIds)
-      final results = await Future.wait([
-        db.collection('users').where('teamId', isEqualTo: widget.teamId).get(),
-        db.collection('users').where('developerTeamIds', arrayContains: widget.teamId).get(),
-      ]);
+      final membersSnap = await db.collection('users').where('teamIds', arrayContains: widget.teamId).get();
 
-      // Deduplicate by UID — developer's record takes priority if in both
-      final memberMap = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
-      for (final doc in results[0].docs) { memberMap[doc.id] = doc; }
-      for (final doc in results[1].docs) { memberMap[doc.id] = doc; }
-
-      // Geçiş dönemi: weeklyHasanat geçmiş logları içermeyebilir.
-      // Mevcut hafta için her üyenin loglarını doğrudan sorgula.
-      final entries = await Future.wait(memberMap.values.map((memberDoc) async {
+      final entries = await Future.wait(membersSnap.docs.map((memberDoc) async {
         final uid = memberDoc.id;
         final data = memberDoc.data();
         final logsSnap = await db
@@ -300,7 +296,13 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
   // ── Üyelik aksiyonları ────────────────────────────────────────────────────────
 
-  Future<void> _sendJoinRequest() async {
+  // isPrivate ve genderPolicy ekran build'inden geçirilir — fazla Firestore okuma önlenir
+  Future<void> _sendJoinRequest({
+    required bool isPrivate,
+    required String genderPolicy,
+    required String teamName,
+    required String adminUid,
+  }) async {
     if (_isJoinLoading) return;
     if (mounted) setState(() => _isJoinLoading = true);
     try {
@@ -308,22 +310,67 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       final userDoc = await db.collection('users').doc(widget.currentUid).get();
       final userData = userDoc.data() ?? {};
       final isDeveloper = (userData['isDeveloper'] as bool?) ?? false;
+      final isPro = (userData['isPro'] as bool?) ?? false;
+      final teamIds = ((userData['teamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final adminTeamIds = ((userData['adminTeamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
 
-      if (!isDeveloper && userData['teamId'] != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Zaten bir ekiptesin.', style: GoogleFonts.nunito()),
-            backgroundColor: AppColors.teal,
-          ));
+      // Zaten bu ekipte mi?
+      if (teamIds.contains(widget.teamId)) return;
+
+      // Join limiti kontrolü (developer hariç)
+      if (!isDeveloper) {
+        final joinedCount = teamIds.length - adminTeamIds.length;
+        if (!TeamLimits.canJoin(
+            isPro: isPro, isDev: false, joinedCount: joinedCount)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  TeamLimits.joinLimitMessage(isPro: isPro, isDev: false),
+                  style: GoogleFonts.nunito()),
+              backgroundColor: AppColors.errorRed,
+            ));
+          }
+          return;
         }
-        return;
+
+        // Cinsiyet politikası kontrolü
+        if (genderPolicy != 'all') {
+          final cinsiyet = userData['cinsiyet'] as String? ?? '';
+          if (genderPolicy == 'men' && cinsiyet == 'hanim') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Bu ekip yalnızca erkek üyelere açık.',
+                    style: GoogleFonts.nunito()),
+                backgroundColor: AppColors.errorRed,
+              ));
+            }
+            return;
+          }
+          if (genderPolicy == 'women' && cinsiyet == 'bey') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Bu ekip yalnızca hanım üyelere açık.',
+                    style: GoogleFonts.nunito()),
+                backgroundColor: AppColors.errorRed,
+              ));
+            }
+            return;
+          }
+        }
       }
 
-      if (isDeveloper) {
-        // Developer: direkt katıl, istek süreci yok
+      if (!isPrivate) {
+        // Açık ekip → direkt katıl
         final batch = db.batch();
         batch.update(db.collection('users').doc(widget.currentUid), {
-          'developerTeamIds': FieldValue.arrayUnion([widget.teamId]),
+          'teamIds': FieldValue.arrayUnion([widget.teamId]),
+          'teamJoinedAt.${widget.teamId}': FieldValue.serverTimestamp(),
         });
         batch.update(db.collection('teams').doc(widget.teamId), {
           'memberCount': FieldValue.increment(1),
@@ -331,6 +378,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         await batch.commit();
         _loadLeaderboard();
       } else {
+        // Gizli ekip (developer dahil herkes) → istek oluştur
         await db
             .collection('teams')
             .doc(widget.teamId)
@@ -340,9 +388,35 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           'name': userData['name'] as String? ?? 'İsimsiz',
           'username': userData['username'] as String? ?? '',
           'avatarSeed': userData['avatarSeed'] as String?,
+          'city': userData['city'] as String? ?? '',
+          'university': userData['university'] as String? ?? '',
+          'cinsiyet': userData['cinsiyet'] as String? ?? '',
           'requestedAt': FieldValue.serverTimestamp(),
         });
-        if (mounted) setState(() => _isPending = true);
+
+        // pendingTeamIds'e ekle
+        await db.collection('users').doc(widget.currentUid).update({
+          'pendingTeamIds': FieldValue.arrayUnion([widget.teamId]),
+        });
+
+        // Lider'e bildirim gönder
+        if (adminUid.isNotEmpty) {
+          final requesterName = userData['name'] as String? ?? 'Biri';
+          await db
+              .collection('users')
+              .doc(adminUid)
+              .collection('notifications')
+              .add({
+            'type': 'join_request',
+            'title': 'Yeni katılım isteği',
+            'body': '$requesterName "$teamName" ekibine katılmak istiyor.',
+            'teamId': widget.teamId,
+            'requesterUid': widget.currentUid,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        // _isPending stream üzerinden otomatik güncellenir
       }
     } catch (e) {
       if (mounted) {
@@ -358,12 +432,15 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
   Future<void> _cancelRequest() async {
     try {
-      await FirebaseFirestore.instance
-          .collection('teams')
-          .doc(widget.teamId)
-          .collection('requests')
-          .doc(widget.currentUid)
-          .delete();
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      batch.delete(
+        db.collection('teams').doc(widget.teamId).collection('requests').doc(widget.currentUid),
+      );
+      batch.update(db.collection('users').doc(widget.currentUid), {
+        'pendingTeamIds': FieldValue.arrayRemove([widget.teamId]),
+      });
+      await batch.commit();
       if (mounted) setState(() => _isPending = false);
     } catch (e) {
       if (mounted) {
@@ -402,19 +479,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     if (confirmed != true) return;
 
     final db = FirebaseFirestore.instance;
-    final userDoc = await db.collection('users').doc(widget.currentUid).get();
-    final isDeveloper = (userDoc.data()?['isDeveloper'] as bool?) ?? false;
-
     final batch = db.batch();
-    if (isDeveloper) {
-      batch.update(db.collection('users').doc(widget.currentUid), {
-        'developerTeamIds': FieldValue.arrayRemove([widget.teamId]),
-      });
-    } else {
-      batch.update(db.collection('users').doc(widget.currentUid), {
-        'teamId': FieldValue.delete(),
-      });
-    }
+    batch.update(db.collection('users').doc(widget.currentUid), {
+      'teamIds': FieldValue.arrayRemove([widget.teamId]),
+    });
     batch.update(db.collection('teams').doc(widget.teamId), {
       'memberCount': FieldValue.increment(-1),
     });
@@ -422,25 +490,121 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     _loadLeaderboard();
   }
 
-  // ── Admin aksiyonları ─────────────────────────────────────────────────────────
+  Future<bool> _kickMember(String memberUid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Üyeyi Çıkar',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text('Bu üyeyi ekipten çıkarmak istediğine emin misin?',
+            style: GoogleFonts.nunito()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('İptal',
+                style: GoogleFonts.nunito(color: AppColors.textMid)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Çıkar',
+                style: GoogleFonts.nunito(
+                    color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      batch.update(db.collection('users').doc(memberUid), {
+        'teamIds': FieldValue.arrayRemove([widget.teamId]),
+      });
+      batch.update(db.collection('teams').doc(widget.teamId), {
+        'memberCount': FieldValue.increment(-1),
+      });
+      await batch.commit();
+      _loadLeaderboard();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+      return false;
+    }
+  }
+
+  // ── Lider aksiyonları ─────────────────────────────────────────────────────────
 
   Future<void> _approveRequest(String requesterUid) async {
     try {
       final db = FirebaseFirestore.instance;
+
+      // Race condition koruması: kullanıcı zaten üye veya limiti dolmuş olabilir
+      final requesterDoc = await db.collection('users').doc(requesterUid).get();
+      final requesterData = requesterDoc.data() ?? {};
+      final reqTeamIds = ((requesterData['teamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final reqAdminTeamIds = ((requesterData['adminTeamIds']) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final isPro = (requesterData['isPro'] as bool?) ?? false;
+      final isDev = (requesterData['isDeveloper'] as bool?) ?? false;
+
+      // Zaten üye mi?
+      if (reqTeamIds.contains(widget.teamId)) {
+        await db.collection('teams').doc(widget.teamId)
+            .collection('requests').doc(requesterUid).delete();
+        return;
+      }
+
+      // Limit aşıldı mı?
+      final joinedCount = reqTeamIds.length - reqAdminTeamIds.length;
+      if (!isDev && !TeamLimits.canJoin(isPro: isPro, isDev: false, joinedCount: joinedCount)) {
+        await db.collection('teams').doc(widget.teamId)
+            .collection('requests').doc(requesterUid).delete();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Kullanıcının ekip limiti doldu, istek silindi.', style: GoogleFonts.nunito()),
+            backgroundColor: AppColors.errorRed,
+          ));
+        }
+        return;
+      }
+
       final batch = db.batch();
-      batch.delete(db
-          .collection('teams')
-          .doc(widget.teamId)
-          .collection('requests')
-          .doc(requesterUid));
+      batch.delete(db.collection('teams').doc(widget.teamId)
+          .collection('requests').doc(requesterUid));
       batch.update(db.collection('users').doc(requesterUid), {
-        'teamId': widget.teamId,
-        'teamJoinedAt': FieldValue.serverTimestamp(),
+        'teamIds': FieldValue.arrayUnion([widget.teamId]),
+        'pendingTeamIds': FieldValue.arrayRemove([widget.teamId]),
+        'teamJoinedAt.${widget.teamId}': FieldValue.serverTimestamp(),
       });
       batch.update(db.collection('teams').doc(widget.teamId), {
         'memberCount': FieldValue.increment(1),
       });
       await batch.commit();
+
+      // Kullanıcıya kabul bildirimi
+      final teamDoc = await db.collection('teams').doc(widget.teamId).get();
+      final teamName = (teamDoc.data()?['name'] as String?) ?? 'Ekip';
+      await db.collection('users').doc(requesterUid).collection('notifications').add({
+        'type': 'join_approved',
+        'title': 'İsteğin kabul edildi!',
+        'body': '$teamName ekibine katıldın.',
+        'teamId': widget.teamId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       _loadLeaderboard();
     } catch (e) {
       if (mounted) {
@@ -454,12 +618,30 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
   Future<void> _rejectRequest(String requesterUid) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('teams')
-          .doc(widget.teamId)
-          .collection('requests')
-          .doc(requesterUid)
-          .delete();
+      final db = FirebaseFirestore.instance;
+
+      final batch = db.batch();
+      // İsteği sil
+      batch.delete(
+        db.collection('teams').doc(widget.teamId).collection('requests').doc(requesterUid),
+      );
+      // Kullanıcının pendingTeamIds'inden çıkar
+      batch.update(db.collection('users').doc(requesterUid), {
+        'pendingTeamIds': FieldValue.arrayRemove([widget.teamId]),
+      });
+      await batch.commit();
+
+      // Kullanıcıya ret bildirimi
+      final teamDoc = await db.collection('teams').doc(widget.teamId).get();
+      final teamName = (teamDoc.data()?['name'] as String?) ?? 'Ekip';
+      await db.collection('users').doc(requesterUid).collection('notifications').add({
+        'type': 'join_rejected',
+        'title': 'İsteğin reddedildi',
+        'body': '$teamName ekibine katılma isteğin onaylanmadı.',
+        'teamId': widget.teamId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -499,12 +681,16 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     try {
       final db = FirebaseFirestore.instance;
       final membersSnap = await db.collection('users')
-          .where('teamId', isEqualTo: widget.teamId)
+          .where('teamIds', arrayContains: widget.teamId)
           .get();
 
       final batch = db.batch();
       for (final doc in membersSnap.docs) {
-        batch.update(doc.reference, {'teamId': FieldValue.delete()});
+        batch.update(doc.reference, {
+          'teamIds': FieldValue.arrayRemove([widget.teamId]),
+          if (doc.id == widget.currentUid)
+            'adminTeamIds': FieldValue.arrayRemove([widget.teamId]),
+        });
       }
 
       final requestsSnap = await db.collection('teams')
@@ -512,6 +698,17 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           .collection('requests')
           .get();
       for (final doc in requestsSnap.docs) {
+        batch.delete(doc.reference);
+        batch.update(db.collection('users').doc(doc.id), {
+          'pendingTeamIds': FieldValue.arrayRemove([widget.teamId]),
+        });
+      }
+
+      final historySnap = await db.collection('teams')
+          .doc(widget.teamId)
+          .collection('history')
+          .get();
+      for (final doc in historySnap.docs) {
         batch.delete(doc.reference);
       }
 
@@ -525,6 +722,28 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         backgroundColor: AppColors.errorRed,
       ));
     }
+  }
+
+  void _showTeamSettingsSheet(BuildContext context, TeamModel team) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TeamSettingsSheet(team: team),
+    );
+  }
+
+  void _showManageMembersSheet(BuildContext context, String leaderUid) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ManageMembersSheet(
+        members: _leaderboard,
+        leaderUid: leaderUid,
+        onKick: _kickMember,
+      ),
+    );
   }
 
   void _showEditSheet(BuildContext context, TeamModel team, String field) {
@@ -548,7 +767,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
 
   // ── Üyelik widget'ı ──────────────────────────────────────────────────────────
 
-  Widget _buildMembershipWidget(bool isAdmin, bool isMember) {
+  Widget _buildMembershipWidget({
+    required bool isAdmin,
+    required bool isMember,
+    required bool isPrivate,
+    required String genderPolicy,
+    required String teamName,
+    required String adminUid,
+  }) {
     if (isAdmin) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -558,7 +784,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
         ),
         child: Text(
-          'Admin',
+          'Lider',
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w700,
@@ -626,11 +852,18 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
         bottomColor: AppColors.tealDark,
         height: 36,
         isLoading: _isJoinLoading,
-        onPressed: _isJoinLoading ? null : _sendJoinRequest,
+        onPressed: _isJoinLoading
+            ? null
+            : () => _sendJoinRequest(
+                  isPrivate: isPrivate,
+                  genderPolicy: genderPolicy,
+                  teamName: teamName,
+                  adminUid: adminUid,
+                ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            'Katıl',
+            isPrivate ? 'İstek Gönder' : 'Katıl',
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -674,14 +907,12 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
               }
               final userData =
                   userSnap.data?.data() as Map<String, dynamic>?;
-              final devTeamIds =
-                  ((userData?['developerTeamIds']) as List?)
+              final userTeamIds =
+                  ((userData?['teamIds']) as List?)
                       ?.map((e) => e.toString())
                       .toList() ??
                   const <String>[];
-              final currentTeamId = userData?['teamId'] as String?;
-              final isMember = currentTeamId == widget.teamId ||
-                  devTeamIds.contains(widget.teamId);
+              final isMember = userTeamIds.contains(widget.teamId);
 
               return CustomScrollView(
                 slivers: [
@@ -700,6 +931,10 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               _deleteTeam(context);
                             } else if (v == 'history') {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => EkipGecmisScreen(teamId: widget.teamId, teamName: team.name, isAdmin: isAdmin)));
+                            } else if (v == 'teamSettings') {
+                              _showTeamSettingsSheet(context, team);
+                            } else if (v == 'manageMembers') {
+                              _showManageMembersSheet(context, team.adminUid);
                             } else {
                               _showEditSheet(context, team, v);
                             }
@@ -719,6 +954,26 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               if (isAdmin) const PopupMenuDivider(),
                             ],
                             if (isAdmin) ...[
+                              PopupMenuItem(
+                                value: 'teamSettings',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.tune_outlined, color: AppColors.textDark, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('Takım Ayarları', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'manageMembers',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.manage_accounts_outlined, color: AppColors.textDark, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('Üyeleri Yönet', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                                  ],
+                                ),
+                              ),
                               PopupMenuItem(
                                 value: 'description',
                                 child: Text('Açıklamayı Düzenle',
@@ -792,7 +1047,14 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               ),
                             ),
                             const Spacer(),
-                            _buildMembershipWidget(isAdmin, isMember),
+                            _buildMembershipWidget(
+                              isAdmin: isAdmin,
+                              isMember: isMember,
+                              isPrivate: team.isPrivate,
+                              genderPolicy: team.genderPolicy,
+                              teamName: team.name,
+                              adminUid: team.adminUid,
+                            ),
                           ],
                         ),
 
@@ -828,23 +1090,18 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   ...docs.map((doc) {
-                                    final data =
-                                        doc.data() as Map<String, dynamic>;
+                                    final data = doc.data() as Map<String, dynamic>;
                                     final requesterUid = doc.id;
-                                    final name =
-                                        data['name'] as String? ?? 'İsimsiz';
-                                    final username =
-                                        data['username'] as String? ?? '';
-                                    final avatarSeed =
-                                        data['avatarSeed'] as String?;
                                     return _RequestRow(
-                                      name: name,
-                                      username: username,
-                                      avatarSeed: avatarSeed,
-                                      onApprove: () =>
-                                          _approveRequest(requesterUid),
-                                      onReject: () =>
-                                          _rejectRequest(requesterUid),
+                                      name: data['name'] as String? ?? 'İsimsiz',
+                                      username: data['username'] as String? ?? '',
+                                      avatarSeed: data['avatarSeed'] as String?,
+                                      city: data['city'] as String? ?? '',
+                                      university: data['university'] as String? ?? '',
+                                      cinsiyet: data['cinsiyet'] as String? ?? '',
+                                      requestedAt: data['requestedAt'] as Timestamp?,
+                                      onApprove: () => _approveRequest(requesterUid),
+                                      onReject: () => _rejectRequest(requesterUid),
                                     );
                                   }),
                                 ],
@@ -875,6 +1132,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                           loading: _leaderboardLoading,
                           untilMidnight: _untilEnd,
                           currentUid: widget.currentUid,
+                          leaderUid: team.adminUid,
                           onRefresh: _loadLeaderboard,
                           onMemberTap: (uid) => Navigator.push(
                             context,
@@ -972,6 +1230,10 @@ class _RequestRow extends StatelessWidget {
   final String name;
   final String username;
   final String? avatarSeed;
+  final String city;
+  final String university;
+  final String cinsiyet;
+  final Timestamp? requestedAt;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -979,12 +1241,31 @@ class _RequestRow extends StatelessWidget {
     required this.name,
     required this.username,
     required this.avatarSeed,
+    required this.city,
+    required this.university,
+    required this.cinsiyet,
+    required this.requestedAt,
     required this.onApprove,
     required this.onReject,
   });
 
+  String _timeAgo() {
+    if (requestedAt == null) return '';
+    final diff = DateTime.now().difference(requestedAt!.toDate());
+    if (diff.inMinutes < 1) return 'Az önce';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    return '${diff.inDays} gün önce';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cinsiyetLabel = cinsiyet == 'hanim' ? 'Hanım' : cinsiyet == 'bey' ? 'Bey' : '';
+    final detailParts = [
+      if (city.isNotEmpty) city,
+      if (university.isNotEmpty) university,
+    ];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -992,86 +1273,104 @@ class _RequestRow extends StatelessWidget {
         color: AppColors.lightGrey,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.tealLight,
-            backgroundImage: avatarSeed != null
-                ? NetworkImage(
-                    'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
-                  )
-                : null,
-            child: avatarSeed == null
-                ? Text(
-                    nameInitials(name),
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.teal,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.tealLight,
+                backgroundImage: avatarSeed != null
+                    ? NetworkImage(
+                        'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
+                      )
+                    : null,
+                child: avatarSeed == null
+                    ? Text(nameInitials(name),
+                        style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.teal))
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(name,
+                              style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                        ),
+                        if (cinsiyetLabel.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cinsiyet == 'hanim'
+                                  ? const Color(0xFFFCE4EC)
+                                  : const Color(0xFFE3F2FD),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(cinsiyetLabel,
+                                style: GoogleFonts.nunito(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: cinsiyet == 'hanim' ? const Color(0xFFE91E63) : const Color(0xFF1976D2),
+                                )),
+                          ),
+                      ],
                     ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
+                    if (username.isNotEmpty)
+                      Text('@$username', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                  ],
                 ),
-                if (username.isNotEmpty)
-                  Text(
-                    '@$username',
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textLight),
+              ),
+            ],
+          ),
+          if (detailParts.isNotEmpty || requestedAt != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                if (detailParts.isNotEmpty)
+                  Expanded(
+                    child: Text(detailParts.join(' · '),
+                        style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMid),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
+                Text(_timeAgo(), style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
               ],
             ),
-          ),
-          TextButton(
-            onPressed: onReject,
-            style: TextButton.styleFrom(
-              minimumSize: Size.zero,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              'Reddet',
-              style: GoogleFonts.nunito(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.errorRed,
+          ],
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: onReject,
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text('Reddet',
+                    style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.errorRed)),
               ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          SizedBox(
-            height: 32,
-            child: DuolingoButton(
-              color: AppColors.teal,
-              bottomColor: AppColors.tealDark,
-              height: 32,
-              onPressed: onApprove,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'Onayla',
-                  style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+              const SizedBox(width: 6),
+              SizedBox(
+                height: 32,
+                child: DuolingoButton(
+                  color: AppColors.teal,
+                  bottomColor: AppColors.tealDark,
+                  height: 32,
+                  onPressed: onApprove,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('Onayla',
+                        style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1178,6 +1477,7 @@ class _LeaderboardSection extends StatefulWidget {
   final bool loading;
   final Duration untilMidnight;
   final String currentUid;
+  final String leaderUid;
   final VoidCallback onRefresh;
   final void Function(String uid) onMemberTap;
 
@@ -1186,6 +1486,7 @@ class _LeaderboardSection extends StatefulWidget {
     required this.loading,
     required this.untilMidnight,
     required this.currentUid,
+    required this.leaderUid,
     required this.onRefresh,
     required this.onMemberTap,
   });
@@ -1437,6 +1738,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
             isRed: isRed,
             isDeepRed: isDeepRed,
             isMe: isMe,
+            isTeamLeader: entry.uid == widget.leaderUid,
             fmtHasanat: _fmtHasanat,
           ),
         );
@@ -1495,6 +1797,7 @@ class _LeaderboardRow extends StatelessWidget {
   final bool isRed;
   final bool isDeepRed;
   final bool isMe;
+  final bool isTeamLeader;
   final String Function(int) fmtHasanat;
 
   const _LeaderboardRow({
@@ -1504,6 +1807,7 @@ class _LeaderboardRow extends StatelessWidget {
     required this.isRed,
     this.isDeepRed = false,
     required this.isMe,
+    this.isTeamLeader = false,
     required this.fmtHasanat,
   });
 
@@ -1629,6 +1933,25 @@ class _LeaderboardRow extends StatelessWidget {
                           fontSize: 11,
                           color: AppColors.teal,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    if (isTeamLeader) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.tealLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Ekip Lideri',
+                          style: GoogleFonts.nunito(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.teal,
+                          ),
                         ),
                       ),
                     ],
@@ -1779,9 +2102,11 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
           TextFormField(
             controller: _ctrl,
             maxLines: 4,
+            maxLength: 300,
             decoration: InputDecoration(
               labelText: widget.label,
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              counterText: '',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
@@ -1809,6 +2134,267 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Üye Yönetimi Sheet ────────────────────────────────────────────────────────
+
+class _ManageMembersSheet extends StatefulWidget {
+  final List<_MemberEntry> members;
+  final String leaderUid;
+  final Future<bool> Function(String uid) onKick;
+
+  const _ManageMembersSheet({
+    required this.members,
+    required this.leaderUid,
+    required this.onKick,
+  });
+
+  @override
+  State<_ManageMembersSheet> createState() => _ManageMembersSheetState();
+}
+
+class _ManageMembersSheetState extends State<_ManageMembersSheet> {
+  String? _kickingUid;
+
+  Future<void> _doKick(_MemberEntry member) async {
+    if (_kickingUid != null) return;
+    setState(() => _kickingUid = member.uid);
+    final kicked = await widget.onKick(member.uid);
+    if (!mounted) return;
+    if (kicked) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _kickingUid = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kickable =
+        widget.members.where((m) => m.uid != widget.leaderUid).toList();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, 32 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Üye Yönetimi',
+                style: GoogleFonts.nunito(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          Text(
+            'Ekipten çıkarmak istediğiniz üyeye dokunun.',
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+          ),
+          const SizedBox(height: 16),
+          if (kickable.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'Çıkarılabilecek başka üye yok.',
+                  style: GoogleFonts.nunito(
+                      fontSize: 13, color: AppColors.textLight),
+                ),
+              ),
+            )
+          else
+            ...kickable.map((m) => _buildMemberRow(m)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberRow(_MemberEntry member) {
+    final isKicking = _kickingUid == member.uid;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.tealLight,
+            backgroundImage: member.avatarSeed != null
+                ? NetworkImage(
+                    'https://api.dicebear.com/7.x/micah/png?seed=${member.avatarSeed}&backgroundColor=transparent',
+                  )
+                : null,
+            child: member.avatarSeed == null
+                ? Text(
+                    nameInitials(member.name),
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.teal,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member.name,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                if (member.username.isNotEmpty)
+                  Text(
+                    '@${member.username}',
+                    style: GoogleFonts.nunito(
+                        fontSize: 11, color: AppColors.textLight),
+                  ),
+              ],
+            ),
+          ),
+          if (isKicking)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.errorRed),
+            )
+          else
+            TextButton(
+              onPressed: () => _doKick(member),
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Çıkar',
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.errorRed,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Takım Ayarları Sheet ─────────────────────────────────────────────────────
+
+class _TeamSettingsSheet extends StatelessWidget {
+  final TeamModel team;
+  const _TeamSettingsSheet({required this.team});
+
+  @override
+  Widget build(BuildContext context) {
+    final privacyLabel = team.isPrivate ? 'Sadece Davet' : 'Herkese Açık';
+    final privacyIcon = team.isPrivate ? Icons.lock_outline : Icons.public_outlined;
+
+    final genderLabel = switch (team.genderPolicy) {
+      'men'   => 'Sadece Beyler',
+      'women' => 'Sadece Hanımlar',
+      _       => 'Herkese Açık',
+    };
+    final genderIcon = switch (team.genderPolicy) {
+      'men'   => Icons.male_outlined,
+      'women' => Icons.female_outlined,
+      _       => Icons.groups_outlined,
+    };
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).padding.bottom + 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Takım Ayarları',
+            style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Bu ayarlar ekip kurulurken belirlenir ve değiştirilemez.',
+            style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
+          ),
+          const SizedBox(height: 20),
+          _SettingRow(icon: privacyIcon, label: 'Görünürlük', value: privacyLabel),
+          const SizedBox(height: 12),
+          _SettingRow(icon: genderIcon, label: 'Katılım Politikası', value: genderLabel),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _SettingRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, size: 20, color: AppColors.teal),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(label, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+          ),
+          Text(value, style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid)),
         ],
       ),
     );
