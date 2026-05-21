@@ -600,9 +600,13 @@ class _NewHatimSheetState extends State<_NewHatimSheet> {
             TextField(
               controller: _nameCtrl,
               autofocus: true,
+              textInputAction: TextInputAction.done,
+              maxLength: 50,
+              onSubmitted: (_) => (_selectedType == null || _loading) ? null : _confirm(),
               decoration: InputDecoration(
                 labelText: 'Hatim adı (opsiyonel)',
                 hintText: _defaultName(_selectedType!),
+                counterText: '',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

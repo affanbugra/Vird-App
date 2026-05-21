@@ -1400,9 +1400,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true),
+              _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true, textInputAction: TextInputAction.next),
               const SizedBox(height: 12),
-              _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
+              _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)', textInputAction: TextInputAction.done, onSubmitted: _save),
               const SizedBox(height: 12),
               DropdownSearch<String>(
                 items: (filter, _) => _sortedCities,
@@ -1486,12 +1486,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool isRequired = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, {bool isRequired = false, TextInputAction? textInputAction, VoidCallback? onSubmitted, int maxLength = 80}) {
     return TextFormField(
       controller: controller,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onSubmitted != null ? (_) => onSubmitted() : null,
+      maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1654,9 +1658,9 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               key: _profileFormKey,
               child: Column(
                 children: [
-                  _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true),
+                  _buildTextField(_nameCtrl, 'Ad Soyad', isRequired: true, textInputAction: TextInputAction.next),
                   const SizedBox(height: 12),
-                  _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)'),
+                  _buildTextField(_usernameCtrl, 'Kullanıcı Adı (Opsiyonel)', textInputAction: TextInputAction.done, onSubmitted: _saveProfile),
                   const SizedBox(height: 12),
                   DropdownSearch<String>(
                     items: (filter, _) => _sortedCities,
@@ -1847,12 +1851,16 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
     );
   }
 
-  Widget _buildTextField(TextEditingController ctrl, String label, {bool isRequired = false}) {
+  Widget _buildTextField(TextEditingController ctrl, String label, {bool isRequired = false, TextInputAction? textInputAction, VoidCallback? onSubmitted, int maxLength = 80}) {
     return TextFormField(
       controller: ctrl,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onSubmitted != null ? (_) => onSubmitted() : null,
+      maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1869,9 +1877,11 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
     return TextFormField(
       controller: ctrl,
       obscureText: true,
+      maxLength: 64,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

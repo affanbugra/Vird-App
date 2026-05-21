@@ -570,9 +570,12 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           const SizedBox(height: 16),
           TextFormField(
             controller: _nameCtrl,
+            textInputAction: TextInputAction.next,
+            maxLength: 50,
             decoration: InputDecoration(
               labelText: 'Grup Adı *',
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              counterText: '',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -584,9 +587,11 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           TextFormField(
             controller: _descCtrl,
             maxLines: 3,
+            maxLength: 300,
             decoration: InputDecoration(
               labelText: 'Açıklama (opsiyonel)',
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              counterText: '',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -772,7 +777,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Admin tarafından verilen 6 haneli kodu gir.',
+            'Lider tarafından verilen 6 haneli kodu gir.',
             style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
           ),
           const SizedBox(height: 16),
@@ -780,6 +785,8 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
             controller: _codeCtrl,
             textCapitalization: TextCapitalization.characters,
             maxLength: 6,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _isLoading ? null : _submit(),
             style: GoogleFonts.nunito(
               fontSize: 22,
               fontWeight: FontWeight.w800,

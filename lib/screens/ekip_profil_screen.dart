@@ -217,6 +217,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             avatarSeed: data['avatarSeed'] as String?,
             periodHasanat: periodHasanat,
             rawSeri: (data['seri'] as int?) ?? 0,
+            isHafiz: (data['isHafiz'] as bool?) ?? false,
           );
         }));
 
@@ -230,6 +231,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
             'username': e.username,
             'avatarSeed': e.avatarSeed,
             'periodHasanat': e.periodHasanat,
+            'isHafiz': e.isHafiz,
           }).toList(),
         });
       }
@@ -422,7 +424,65 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     _loadLeaderboard();
   }
 
-  // ── Admin aksiyonları ─────────────────────────────────────────────────────────
+  Future<bool> _kickMember(String memberUid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Üyeyi Çıkar',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text('Bu üyeyi ekipten çıkarmak istediğine emin misin?',
+            style: GoogleFonts.nunito()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('İptal',
+                style: GoogleFonts.nunito(color: AppColors.textMid)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Çıkar',
+                style: GoogleFonts.nunito(
+                    color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final memberDoc = await db.collection('users').doc(memberUid).get();
+      final isDev = (memberDoc.data()?['isDeveloper'] as bool?) ?? false;
+
+      final batch = db.batch();
+      if (isDev) {
+        batch.update(db.collection('users').doc(memberUid), {
+          'developerTeamIds': FieldValue.arrayRemove([widget.teamId]),
+        });
+      } else {
+        batch.update(db.collection('users').doc(memberUid), {
+          'teamId': FieldValue.delete(),
+        });
+      }
+      batch.update(db.collection('teams').doc(widget.teamId), {
+        'memberCount': FieldValue.increment(-1),
+      });
+      await batch.commit();
+      _loadLeaderboard();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+      return false;
+    }
+  }
+
+  // ── Lider aksiyonları ─────────────────────────────────────────────────────────
 
   Future<void> _approveRequest(String requesterUid) async {
     try {
@@ -527,6 +587,19 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
     }
   }
 
+  void _showManageMembersSheet(BuildContext context, String leaderUid) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ManageMembersSheet(
+        members: _leaderboard,
+        leaderUid: leaderUid,
+        onKick: _kickMember,
+      ),
+    );
+  }
+
   void _showEditSheet(BuildContext context, TeamModel team, String field) {
     final current =
         field == 'description' ? team.description : team.penaltyNote;
@@ -558,7 +631,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
         ),
         child: Text(
-          'Admin',
+          'Lider',
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w700,
@@ -700,6 +773,8 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               _deleteTeam(context);
                             } else if (v == 'history') {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => EkipGecmisScreen(teamId: widget.teamId, teamName: team.name, isAdmin: isAdmin)));
+                            } else if (v == 'manageMembers') {
+                              _showManageMembersSheet(context, team.adminUid);
                             } else {
                               _showEditSheet(context, team, v);
                             }
@@ -719,6 +794,16 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               if (isAdmin) const PopupMenuDivider(),
                             ],
                             if (isAdmin) ...[
+                              PopupMenuItem(
+                                value: 'manageMembers',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.manage_accounts_outlined, color: AppColors.textDark, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('Üyeleri Yönet', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                                  ],
+                                ),
+                              ),
                               PopupMenuItem(
                                 value: 'description',
                                 child: Text('Açıklamayı Düzenle',
@@ -875,6 +960,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                           loading: _leaderboardLoading,
                           untilMidnight: _untilEnd,
                           currentUid: widget.currentUid,
+                          leaderUid: team.adminUid,
                           onRefresh: _loadLeaderboard,
                           onMemberTap: (uid) => Navigator.push(
                             context,
@@ -1178,6 +1264,7 @@ class _LeaderboardSection extends StatefulWidget {
   final bool loading;
   final Duration untilMidnight;
   final String currentUid;
+  final String leaderUid;
   final VoidCallback onRefresh;
   final void Function(String uid) onMemberTap;
 
@@ -1186,6 +1273,7 @@ class _LeaderboardSection extends StatefulWidget {
     required this.loading,
     required this.untilMidnight,
     required this.currentUid,
+    required this.leaderUid,
     required this.onRefresh,
     required this.onMemberTap,
   });
@@ -1437,6 +1525,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
             isRed: isRed,
             isDeepRed: isDeepRed,
             isMe: isMe,
+            isTeamLeader: entry.uid == widget.leaderUid,
             fmtHasanat: _fmtHasanat,
           ),
         );
@@ -1495,6 +1584,7 @@ class _LeaderboardRow extends StatelessWidget {
   final bool isRed;
   final bool isDeepRed;
   final bool isMe;
+  final bool isTeamLeader;
   final String Function(int) fmtHasanat;
 
   const _LeaderboardRow({
@@ -1504,6 +1594,7 @@ class _LeaderboardRow extends StatelessWidget {
     required this.isRed,
     this.isDeepRed = false,
     required this.isMe,
+    this.isTeamLeader = false,
     required this.fmtHasanat,
   });
 
@@ -1629,6 +1720,25 @@ class _LeaderboardRow extends StatelessWidget {
                           fontSize: 11,
                           color: AppColors.teal,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    if (isTeamLeader) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.tealLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Ekip Lideri',
+                          style: GoogleFonts.nunito(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.teal,
+                          ),
                         ),
                       ),
                     ],
@@ -1779,9 +1889,11 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
           TextFormField(
             controller: _ctrl,
             maxLines: 4,
+            maxLength: 300,
             decoration: InputDecoration(
               labelText: widget.label,
               labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              counterText: '',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
@@ -1809,6 +1921,177 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Üye Yönetimi Sheet ────────────────────────────────────────────────────────
+
+class _ManageMembersSheet extends StatefulWidget {
+  final List<_MemberEntry> members;
+  final String leaderUid;
+  final Future<bool> Function(String uid) onKick;
+
+  const _ManageMembersSheet({
+    required this.members,
+    required this.leaderUid,
+    required this.onKick,
+  });
+
+  @override
+  State<_ManageMembersSheet> createState() => _ManageMembersSheetState();
+}
+
+class _ManageMembersSheetState extends State<_ManageMembersSheet> {
+  String? _kickingUid;
+
+  Future<void> _doKick(_MemberEntry member) async {
+    if (_kickingUid != null) return;
+    setState(() => _kickingUid = member.uid);
+    final kicked = await widget.onKick(member.uid);
+    if (!mounted) return;
+    if (kicked) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _kickingUid = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kickable =
+        widget.members.where((m) => m.uid != widget.leaderUid).toList();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, 32 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Üye Yönetimi',
+                style: GoogleFonts.nunito(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          Text(
+            'Ekipten çıkarmak istediğiniz üyeye dokunun.',
+            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+          ),
+          const SizedBox(height: 16),
+          if (kickable.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'Çıkarılabilecek başka üye yok.',
+                  style: GoogleFonts.nunito(
+                      fontSize: 13, color: AppColors.textLight),
+                ),
+              ),
+            )
+          else
+            ...kickable.map((m) => _buildMemberRow(m)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberRow(_MemberEntry member) {
+    final isKicking = _kickingUid == member.uid;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.tealLight,
+            backgroundImage: member.avatarSeed != null
+                ? NetworkImage(
+                    'https://api.dicebear.com/7.x/micah/png?seed=${member.avatarSeed}&backgroundColor=transparent',
+                  )
+                : null,
+            child: member.avatarSeed == null
+                ? Text(
+                    nameInitials(member.name),
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.teal,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member.name,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                if (member.username.isNotEmpty)
+                  Text(
+                    '@${member.username}',
+                    style: GoogleFonts.nunito(
+                        fontSize: 11, color: AppColors.textLight),
+                  ),
+              ],
+            ),
+          ),
+          if (isKicking)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.errorRed),
+            )
+          else
+            TextButton(
+              onPressed: () => _doKick(member),
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Çıkar',
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.errorRed,
+                ),
+              ),
+            ),
         ],
       ),
     );

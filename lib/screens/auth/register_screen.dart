@@ -152,8 +152,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 32),
               TextField(
                 controller: _nameController,
+                textInputAction: TextInputAction.next,
+                maxLength: 50,
                 decoration: InputDecoration(
                   labelText: 'İsim Soyisim',
+                  counterText: '',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -161,8 +164,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                maxLength: 100,
                 decoration: InputDecoration(
                   labelText: 'E-posta',
+                  counterText: '',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -170,8 +176,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _isLoading ? null : _handleRegister(),
+                maxLength: 64,
                 decoration: InputDecoration(
                   labelText: 'Şifre',
+                  counterText: '',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
