@@ -8,6 +8,8 @@ import '../app_assets.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
 import 'ekip_profil_screen.dart';
+import '../utils/animations.dart';
+import '../widgets/neumorphic_container.dart';
 
 String _generateInviteCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -24,9 +26,9 @@ class EkiplerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.scaffoldBg,
         elevation: 0,
         centerTitle: true,
         title: Text(
@@ -34,7 +36,7 @@ class EkiplerScreen extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.adaptiveTextDark,
           ),
         ),
       ),
@@ -54,6 +56,7 @@ class _EkiplerBody extends StatelessWidget {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
+          backgroundColor: context.cardBg,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'Pro Özellik',
@@ -164,15 +167,18 @@ class _EkiplerBody extends StatelessWidget {
                           itemBuilder: (ctx, i) {
                             final team = teams[i];
                             final isMyTeam = team.id == currentTeamId;
-                            return _TeamCard(
-                              team: team,
-                              isMyTeam: isMyTeam,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EkipProfilScreen(
-                                    teamId: team.id,
-                                    currentUid: uid,
+                            return StaggeredFadeSlide(
+                              index: i,
+                              child: _TeamCard(
+                                team: team,
+                                isMyTeam: isMyTeam,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  SlideUpRoute(
+                                    page: EkipProfilScreen(
+                                      teamId: team.id,
+                                      currentUid: uid,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -183,9 +189,9 @@ class _EkiplerBody extends StatelessWidget {
 
                 // ── Alt aksiyon çubuğu ──────────────────────────────────────
                 Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.white,
-                    border: Border(top: BorderSide(color: AppColors.borderGrey)),
+                  decoration: BoxDecoration(
+                    color: context.scaffoldBg,
+                    border: Border(top: BorderSide(color: context.borderColor)),
                   ),
                   child: SafeArea(
                     top: false,
@@ -268,7 +274,7 @@ class _EmptyState extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.adaptiveTextDark,
               ),
             ),
             const SizedBox(height: 8),
@@ -301,7 +307,7 @@ class _TeamCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Widget _buildLogo() {
+  Widget _buildLogo(BuildContext context) {
     if (team.logoAsset == 'rical_i_fark') {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -319,7 +325,7 @@ class _TeamCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isMyTeam
             ? AppColors.teal.withValues(alpha: 0.15)
-            : AppColors.lightGrey,
+            : context.adaptiveLightGrey,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(
@@ -334,20 +340,13 @@ class _TeamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: NeumorphicContainer(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isMyTeam ? AppColors.tealLight : AppColors.white,
-          border: Border.all(
-            color: isMyTeam ? AppColors.teal : AppColors.borderGrey,
-            width: isMyTeam ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
+        borderRadius: 16,
         child: Row(
           children: [
-            _buildLogo(),
+            _buildLogo(context),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -361,7 +360,7 @@ class _TeamCard extends StatelessWidget {
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.adaptiveTextDark,
                           ),
                         ),
                       ),
@@ -531,7 +530,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -541,7 +540,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.adaptiveTextDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -575,7 +574,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.adaptiveLightGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -726,7 +725,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -736,7 +735,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.adaptiveTextDark,
             ),
           ),
           const SizedBox(height: 6),

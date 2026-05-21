@@ -7,6 +7,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
 import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../data/quran_cuz.dart';
 import '../widgets/duolingo_button.dart';
 import '../widgets/log_history_sheet.dart';
@@ -318,7 +319,7 @@ class _ProfileHeader extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
+                      color: context.adaptiveTextDark,
                     ),
                   ),
                   if (isPro) ...[
@@ -348,7 +349,7 @@ class _ProfileHeader extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textMid,
+                    color: context.adaptiveTextMid,
                   ),
                 ),
               ],
@@ -427,8 +428,8 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.cardBg,
+        border: Border.all(color: context.borderColor),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -487,8 +488,8 @@ class _KuranHaritasiCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.cardBg,
+        border: Border.all(color: context.borderColor),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -515,7 +516,7 @@ class _KuranHaritasiCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.adaptiveTextDark,
                       ),
                     ),
                     Text(
@@ -523,7 +524,7 @@ class _KuranHaritasiCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textMid,
+                        color: context.adaptiveTextMid,
                       ),
                     ),
                   ],
@@ -537,12 +538,12 @@ class _KuranHaritasiCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: !isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: !isMeal ? AppColors.teal : context.adaptiveLightGrey,
                         borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
                       ),
                       child: Text('ARAPÇA', style: GoogleFonts.nunito(
                         fontSize: 10, fontWeight: FontWeight.w700,
-                        color: !isMeal ? Colors.white : AppColors.textMid,
+                        color: !isMeal ? Colors.white : context.adaptiveTextMid,
                       )),
                     ),
                   ),
@@ -551,12 +552,12 @@ class _KuranHaritasiCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: isMeal ? AppColors.teal : context.adaptiveLightGrey,
                         borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
                       ),
                       child: Text('MEAL', style: GoogleFonts.nunito(
                         fontSize: 10, fontWeight: FontWeight.w700,
-                        color: isMeal ? Colors.white : AppColors.textMid,
+                        color: isMeal ? Colors.white : context.adaptiveTextMid,
                       )),
                     ),
                   ),
@@ -623,9 +624,9 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : AppColors.white,
+          color: isSelected ? context.adaptiveTealLight : context.cardBg,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.borderColor,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -635,7 +636,7 @@ class _FilterChip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: isSelected ? AppColors.teal : AppColors.textMid,
+            color: isSelected ? AppColors.teal : context.adaptiveTextMid,
           ),
         ),
       ),
@@ -667,7 +668,7 @@ class _HeatGrid extends StatelessWidget {
     return (squaresArea - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _buildSquare(int page, double sq, double radius, int maxCount) {
+  Widget _buildSquare(BuildContext context, int page, double sq, double radius, int maxCount) {
     final count = readings[page] ?? 0;
     final isSelected = selectedPage == page;
     return GestureDetector(
@@ -679,7 +680,7 @@ class _HeatGrid extends StatelessWidget {
         decoration: BoxDecoration(
           color: QuranData.heatColorRelative(count, maxCount),
           borderRadius: BorderRadius.circular(radius),
-          border: isSelected ? Border.all(color: AppColors.textDark, width: 1) : null,
+          border: isSelected ? Border.all(color: context.adaptiveTextDark, width: 1) : null,
         ),
       ),
     );
@@ -719,7 +720,7 @@ class _HeatGrid extends StatelessWidget {
                     color: QuranData.heatColorRelative(fatihaCount, maxCount),
                     borderRadius: BorderRadius.circular(radius),
                     border: fatihaSelected
-                        ? Border.all(color: AppColors.textDark, width: 1)
+                        ? Border.all(color: context.adaptiveTextDark, width: 1)
                         : null,
                   ),
                 ),
@@ -743,7 +744,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('${cuz.cuzNo}', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(cuz.pageCount, (i) => _buildSquare(cuz.startPage + i, sq, radius, maxCount)),
+                  ...List.generate(cuz.pageCount, (i) => _buildSquare(context, cuz.startPage + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -759,7 +760,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('30', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(20, (i) => _buildSquare(581 + i, sq, radius, maxCount)),
+                  ...List.generate(20, (i) => _buildSquare(context, 581 + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -770,7 +771,7 @@ class _HeatGrid extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(width: _labelW + _labelGap),
-                  ...List.generate(4, (i) => _buildSquare(601 + i, sq, radius, maxCount)),
+                  ...List.generate(4, (i) => _buildSquare(context, 601 + i, sq, radius, maxCount)),
                   const SizedBox(width: 3),
                   Text('İhlâs · Felak · Nâs', style: labelStyle),
                 ],
@@ -805,7 +806,7 @@ class _Legend extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('Az', style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid)),
+              Text('Az', style: GoogleFonts.nunito(fontSize: 10, color: context.adaptiveTextMid)),
               const SizedBox(width: 4),
               ...levels.map(
                 (c) => Container(
@@ -819,7 +820,7 @@ class _Legend extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 1),
-              Text('Çok', style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid)),
+              Text('Çok', style: GoogleFonts.nunito(fontSize: 10, color: context.adaptiveTextMid)),
             ],
           ),
         );
@@ -843,7 +844,7 @@ class _DetailPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.adaptiveLightGrey,
         borderRadius: BorderRadius.circular(8),
       ),
       child: page == null
@@ -881,13 +882,13 @@ class _PageDetail extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.adaptiveTextDark,
                 ),
               ),
               if (surahText.isNotEmpty)
                 Text(
                   surahText,
-                  style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid),
+                  style: GoogleFonts.nunito(fontSize: 10, color: context.adaptiveTextMid),
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -897,8 +898,8 @@ class _PageDetail extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.borderGrey),
+            color: context.cardBg,
+            border: Border.all(color: context.borderColor),
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
@@ -1019,10 +1020,12 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.adaptiveTextDark,
             ),
           ),
           const SizedBox(height: 20),
+          const _ThemeSelector(),
+          const SizedBox(height: 12),
           _SettingsItem(
             icon: Icons.person_outline,
             title: 'Profili Düzenle',
@@ -1058,7 +1061,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.adaptiveTextMid,
             ),
           ),
           const SizedBox(height: 8),
@@ -1066,7 +1069,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.adaptiveLightGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -1125,7 +1128,7 @@ class _SettingsItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.textDark, size: 22),
+            Icon(icon, color: context.adaptiveTextDark, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1136,7 +1139,7 @@ class _SettingsItem extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+                      color: context.adaptiveTextDark,
                     ),
                   ),
                   if (subtitle != null)
@@ -1150,7 +1153,7 @@ class _SettingsItem extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMid),
+            Icon(Icons.chevron_right, color: context.adaptiveTextMid),
           ],
         ),
       ),
@@ -1272,7 +1275,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 style: GoogleFonts.nunito(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.adaptiveTextDark,
                 ),
               ),
               const SizedBox(height: 20),
@@ -1297,7 +1300,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 decoratorProps: DropDownDecoratorProps(
                   decoration: InputDecoration(
                     labelText: 'Şehir (Opsiyonel)',
-                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    labelStyle: GoogleFonts.nunito(color: context.adaptiveTextMid),
                     prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
@@ -1325,7 +1328,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 decoratorProps: DropDownDecoratorProps(
                   decoration: InputDecoration(
                     labelText: 'Üniversite (Opsiyonel)',
-                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    labelStyle: GoogleFonts.nunito(color: context.adaptiveTextMid),
                     prefixIcon: const Icon(Icons.school, color: AppColors.teal),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
@@ -1367,7 +1370,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        labelStyle: GoogleFonts.nunito(color: context.adaptiveTextMid),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1480,14 +1483,14 @@ class _PasswordSheetState extends State<_PasswordSheet> {
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.adaptiveTextDark,
               ),
             ),
             const SizedBox(height: 8),
             if (!_hasPassword)
               Text(
                 'Google ile giriş yaptığınız için henüz bir şifreniz yok. Şifre belirleyerek e-posta ve şifre ile de giriş yapabilirsiniz.',
-                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+                style: GoogleFonts.nunito(fontSize: 13, color: context.adaptiveTextMid),
               ),
             const SizedBox(height: 16),
             if (_hasPassword) ...[
@@ -1529,7 +1532,7 @@ class _PasswordSheetState extends State<_PasswordSheet> {
       obscureText: true,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        labelStyle: GoogleFonts.nunito(color: context.adaptiveTextMid),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1543,6 +1546,60 @@ class _PasswordSheetState extends State<_PasswordSheet> {
           return 'Şifreler eşleşmiyor';
         }
         return null;
+      },
+    );
+  }
+}
+
+class _ThemeSelector extends StatelessWidget {
+  const _ThemeSelector();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        return Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.palette_outlined, color: context.adaptiveTextDark, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Tema Seçimi',
+                  style: GoogleFonts.nunito(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: context.adaptiveTextDark,
+                  ),
+                ),
+              ),
+              DropdownButton<ThemeType>(
+                value: themeProvider.themeType,
+                underline: const SizedBox(),
+                icon: Icon(Icons.keyboard_arrow_down, color: context.adaptiveTextMid),
+                dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: context.adaptiveTextDark,
+                ),
+                onChanged: (ThemeType? newValue) {
+                  if (newValue != null) {
+                    themeProvider.setTheme(newValue);
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(value: ThemeType.light, child: Text('Açık')),
+                  DropdownMenuItem(value: ThemeType.dark, child: Text('Koyu')),
+                ],
+              ),
+            ],
+          ),
+        );
       },
     );
   }

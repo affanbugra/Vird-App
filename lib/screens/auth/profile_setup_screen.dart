@@ -94,7 +94,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.adaptiveTextDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -104,14 +104,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Biraz Kendinden Bahset',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.adaptiveTextDark),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Bu bilgiler ekip eşleşmelerinde ve profilinde görünecek. (İsteğe bağlı)',
-                style: TextStyle(color: AppColors.textMid),
+                style: TextStyle(color: context.adaptiveTextMid),
               ),
               const SizedBox(height: 32),
               DropdownSearch<String>(
@@ -130,7 +130,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   decoration: InputDecoration(
                     labelText: 'Yaşadığın Şehir',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
+                    prefixIcon: Icon(Icons.location_city, color: AppColors.teal),
                   ),
                 ),
                 onSelected: (value) {
@@ -157,7 +157,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   decoration: InputDecoration(
                     labelText: 'Üniversite',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.school, color: AppColors.teal),
+                    prefixIcon: Icon(Icons.school, color: AppColors.teal),
                   ),
                 ),
                 onSelected: (value) {
@@ -177,7 +177,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 child: _isLoading
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                    : const Text('Tamamla ve Başla', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    : Text('Tamamla ve Başla', style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
               const SizedBox(height: 16),
               TextButton(
@@ -197,7 +197,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }
                 },
-                child: const Text('Bu adımı atla', style: TextStyle(color: AppColors.textMid)),
+                child: Text('Bu adımı atla', style: TextStyle(color: context.adaptiveTextMid)),
               ),
             ],
           ),

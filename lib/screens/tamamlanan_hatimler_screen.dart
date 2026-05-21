@@ -38,12 +38,12 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
     if (user == null) return const Scaffold(body: Center(child: Text('Giriş yapınız')));
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.scaffoldBg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.adaptiveTextDark),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -51,7 +51,7 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
           style: GoogleFonts.nunito(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.adaptiveTextDark,
           ),
         ),
       ),
@@ -79,13 +79,13 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.emoji_events_outlined, size: 64, color: AppColors.borderGrey),
+                  Icon(Icons.emoji_events_outlined, size: 64, color: context.borderColor),
                   const SizedBox(height: 16),
                   Text(
                     'Henüz tamamlanan hatim yok.',
                     style: GoogleFonts.nunito(
                       fontSize: 15,
-                      color: AppColors.textMid,
+                      color: context.adaptiveTextMid,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -129,13 +129,13 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
                             style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
                         content: Text(
                           '"${hatim.displayName}" ve tüm okuma kayıtları silinecek.\nHasanat puanı ve okunan sayfalar geri alınır.',
-                          style: GoogleFonts.nunito(color: AppColors.textMid),
+                          style: GoogleFonts.nunito(color: context.adaptiveTextMid),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
                             child: Text('İptal',
-                                style: GoogleFonts.nunito(color: AppColors.textMid)),
+                                style: GoogleFonts.nunito(color: context.adaptiveTextMid)),
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
@@ -198,7 +198,7 @@ class _CompletedHatimCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF38A474).withValues(alpha: 0.4)),
         boxShadow: [
@@ -233,14 +233,14 @@ class _CompletedHatimCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: AppColors.textDark,
+                    color: context.adaptiveTextDark,
                   ),
                 ),
                 Text(
                   '604/604 sayfa${completedDate.isNotEmpty ? ' · $completedDate' : ''}',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
-                    color: AppColors.textMid,
+                    color: context.adaptiveTextMid,
                   ),
                 ),
               ],
@@ -269,7 +269,7 @@ class _CompletedHatimCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: AppColors.tealLight,
+                color: context.adaptiveTealLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.grid_view_rounded, size: 16, color: AppColors.teal),

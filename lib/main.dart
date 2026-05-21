@@ -8,7 +8,10 @@ import 'firebase_options.dart';
 import 'app_colors.dart';
 import 'app_assets.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/notification_service.dart';
+import 'services/home_widget_service.dart';
+import 'utils/app_theme.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -30,18 +33,20 @@ void main() async {
   );
 
   await NotificationService.init();
+  await HomeWidgetService.init();
 
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-      ],
-      child: VirdApp(showHome: showHome),
-    ),
-  );
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ],
+        child: VirdApp(showHome: showHome),
+      ),
+    );
 }
 
 class VirdApp extends StatelessWidget {
@@ -50,15 +55,15 @@ class VirdApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vird',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal),
-        textTheme: GoogleFonts.nunitoTextTheme(),
-        scaffoldBackgroundColor: AppColors.white,
-      ),
-      home: AuthWrapper(initialShowHome: showHome),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Vird',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.getTheme(themeProvider.themeType),
+          home: AuthWrapper(initialShowHome: showHome),
+        );
+      },
     );
   }
 }
@@ -87,7 +92,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
         if (auth.isLoading) return const SplashScreen();
-        if (auth.isAuthenticated) return const MainScreen();
+        if (auth.isAuthenticated) {
+          // Widget verilerini güncelle (uygulama her açılışında)
+          HomeWidgetService.updateWidgetData();
+          return const MainScreen();
+        }
         return _showHome
             ? const LoginScreen()
             : OnboardingScreen(onCompleted: _completeOnboarding);
@@ -119,9 +128,23 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_currentIndex),
+          child: _screens[_currentIndex],
+        ),
       ),
       floatingActionButton: _LogFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -190,7 +213,7 @@ class _MainBottomNav extends StatelessWidget {
     return BottomAppBar(
       notchMargin: 8,
       shape: const CircularNotchedRectangle(),
-      color: AppColors.white,
+      color: Theme.of(context).bottomAppBarTheme.color ?? context.scaffoldBg,
       elevation: 8,
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -275,36 +298,48 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Aktif göstergesi — üstte ince teal çizgi
-            Container(
+            // Aktif göstergesi — animasyonlu üst çizgi
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
               height: 3,
-              width: 24,
+              width: active ? 24 : 0,
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
-                color: active ? AppColors.teal : Colors.transparent,
+                color: AppColors.teal,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            // İkon
+            // İkon — animasyonlu geçiş
             if (isVird)
-              Opacity(
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
                 opacity: active ? 1.0 : 0.4,
-                child: Image.asset(AppAssets.logo, height: 38),
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: active ? 1.1 : 1.0,
+                  child: Image.asset(AppAssets.logo, height: 38),
+                ),
               )
             else ...[
-              Icon(
-                active ? (activeIcon ?? icon) : icon,
-                color: color,
-                size: 24,
+              AnimatedScale(
+                duration: const Duration(milliseconds: 200),
+                scale: active ? 1.15 : 1.0,
+                child: Icon(
+                  active ? (activeIcon ?? icon) : icon,
+                  color: color,
+                  size: 24,
+                ),
               ),
               const SizedBox(height: 3),
-              Text(
-                label,
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                   color: color,
                 ),
+                child: Text(label),
               ),
             ],
           ],

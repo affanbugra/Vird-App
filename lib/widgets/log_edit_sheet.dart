@@ -161,9 +161,9 @@ class _LogEditSheetState extends State<LogEditSheet> {
     final typeLabel = log.type == HatimType.arapca ? 'Arapça' : 'Meal';
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.bottomSheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -174,13 +174,13 @@ class _LogEditSheetState extends State<LogEditSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Kaydı Düzenle',
+              Text('Kaydı Düzenle',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.adaptiveTextDark)),
               IconButton(
-                icon: const Icon(Icons.close),
+                icon: Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -191,18 +191,18 @@ class _LogEditSheetState extends State<LogEditSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.adaptiveLightGrey,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline,
+                Icon(Icons.info_outline,
                     size: 14, color: AppColors.textLight),
                 const SizedBox(width: 6),
                 Text(
                   '$typeLabel · $_methodLabel',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textMid),
+                  style: TextStyle(
+                      fontSize: 12, color: context.adaptiveTextMid),
                 ),
               ],
             ),
@@ -223,7 +223,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
               disabledColor: AppColors.borderGrey,
               onPressed: _loading ? null : _save,
               isLoading: _loading,
-              child: const Text('KAYDET',
+              child: Text('KAYDET',
                   style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -244,7 +244,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
           autofocus: true,
           decoration: InputDecoration(
             labelText: 'Okunan sayfa sayısı',
-            prefixIcon: const Icon(Icons.add),
+            prefixIcon: Icon(Icons.add),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -272,13 +272,13 @@ class _LogEditSheetState extends State<LogEditSheet> {
                 ),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
               child: Text('–',
                   style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textMid)),
+                      color: context.adaptiveTextMid)),
             ),
             Expanded(
               child: TextField(

@@ -123,7 +123,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                       'Seri Takvimi',
                       style: GoogleFonts.nunito(
                         fontSize: 18, fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.adaptiveTextDark,
                       ),
                     ),
                   ),
@@ -153,7 +153,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: _prevMonth,
-                    color: AppColors.textMid,
+                    color: context.adaptiveTextMid,
                   ),
                   Expanded(
                     child: Text(
@@ -161,14 +161,14 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                       textAlign: TextAlign.center,
                       style: GoogleFonts.nunito(
                         fontSize: 15, fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
+                        color: context.adaptiveTextDark,
                       ),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
                     onPressed: _canGoNext ? _nextMonth : null,
-                    color: _canGoNext ? AppColors.textMid : AppColors.borderGrey,
+                    color: _canGoNext ? context.adaptiveTextMid : AppColors.borderGrey,
                   ),
                 ],
               ),
@@ -217,7 +217,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
 
                     Color? bgColor;
                     Border? border;
-                    Color textColor = AppColors.textDark;
+                    Color textColor = context.adaptiveTextDark;
                     FontWeight fontWeight = FontWeight.w500;
 
                     if (isFuture) {
@@ -314,7 +314,7 @@ class _SummaryChip extends StatelessWidget {
             Text(value,
               style: GoogleFonts.nunito(
                 fontSize: 14, fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.adaptiveTextDark,
               ),
             ),
             Text(label,

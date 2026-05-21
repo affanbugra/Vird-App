@@ -72,7 +72,7 @@ class _KullaniciProfilScreenState extends State<KullaniciProfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -289,7 +289,7 @@ class _UserHeader extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
+                          color: context.adaptiveTextDark,
                         ),
                       ),
                     ),
@@ -332,7 +332,7 @@ class _UserHeader extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textMid,
+                      color: context.adaptiveTextMid,
                     ),
                   ),
                 ],
@@ -427,8 +427,8 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.cardBg,
+        border: Border.all(color: context.borderColor),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -487,8 +487,8 @@ class _HeatMapCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.cardBg,
+        border: Border.all(color: context.borderColor),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -514,7 +514,7 @@ class _HeatMapCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.adaptiveTextDark,
                       ),
                     ),
                     Text(
@@ -522,7 +522,7 @@ class _HeatMapCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textMid,
+                        color: context.adaptiveTextMid,
                       ),
                     ),
                   ],
@@ -537,7 +537,7 @@ class _HeatMapCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: !isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: !isMeal ? AppColors.teal : context.adaptiveLightGrey,
                         borderRadius: const BorderRadius.horizontal(
                             left: Radius.circular(999)),
                       ),
@@ -546,7 +546,7 @@ class _HeatMapCard extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: !isMeal ? Colors.white : AppColors.textMid,
+                          color: !isMeal ? Colors.white : context.adaptiveTextMid,
                         ),
                       ),
                     ),
@@ -557,7 +557,7 @@ class _HeatMapCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: isMeal ? AppColors.teal : context.adaptiveLightGrey,
                         borderRadius: const BorderRadius.horizontal(
                             right: Radius.circular(999)),
                       ),
@@ -566,7 +566,7 @@ class _HeatMapCard extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: isMeal ? Colors.white : AppColors.textMid,
+                          color: isMeal ? Colors.white : context.adaptiveTextMid,
                         ),
                       ),
                     ),
@@ -634,9 +634,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppColors.tealLight : AppColors.white,
+          color: selected ? context.adaptiveTealLight : context.cardBg,
           border: Border.all(
-            color: selected ? AppColors.teal : AppColors.borderGrey,
+            color: selected ? AppColors.teal : context.borderColor,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -646,7 +646,7 @@ class _Chip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: selected ? AppColors.teal : AppColors.textMid,
+            color: selected ? AppColors.teal : context.adaptiveTextMid,
           ),
         ),
       ),
@@ -676,7 +676,7 @@ class _HeatGrid extends StatelessWidget {
     return (w - _labelW - _labelGap - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _square(int page, double sq, double r, int maxCount) {
+  Widget _square(BuildContext context, int page, double sq, double r, int maxCount) {
     final count = readings[page] ?? 0;
     final sel = selectedPage == page;
     return GestureDetector(
@@ -688,7 +688,7 @@ class _HeatGrid extends StatelessWidget {
         decoration: BoxDecoration(
           color: QuranData.heatColorRelative(count, maxCount),
           borderRadius: BorderRadius.circular(r),
-          border: sel ? Border.all(color: AppColors.textDark, width: 1) : null,
+          border: sel ? Border.all(color: context.adaptiveTextDark, width: 1) : null,
         ),
       ),
     );
@@ -728,7 +728,7 @@ class _HeatGrid extends StatelessWidget {
                   color: QuranData.heatColorRelative(fatihaCount, maxCount),
                   borderRadius: BorderRadius.circular(r),
                   border: fatihaSelected
-                      ? Border.all(color: AppColors.textDark, width: 1)
+                      ? Border.all(color: context.adaptiveTextDark, width: 1)
                       : null,
                 ),
               ),
@@ -754,7 +754,7 @@ class _HeatGrid extends StatelessWidget {
                 const SizedBox(width: _labelGap),
                 ...List.generate(
                     cuz.pageCount,
-                    (i) => _square(cuz.startPage + i, sq, r, maxCount)),
+                    (i) => _square(context, cuz.startPage + i, sq, r, maxCount)),
               ],
             ),
           ));
@@ -770,7 +770,7 @@ class _HeatGrid extends StatelessWidget {
                       textAlign: TextAlign.right, style: labelStyle),
                 ),
                 const SizedBox(width: _labelGap),
-                ...List.generate(20, (i) => _square(581 + i, sq, r, maxCount)),
+                ...List.generate(20, (i) => _square(context, 581 + i, sq, r, maxCount)),
               ],
             ),
           ));
@@ -780,7 +780,7 @@ class _HeatGrid extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(width: _labelW + _labelGap),
-                ...List.generate(4, (i) => _square(601 + i, sq, r, maxCount)),
+                ...List.generate(4, (i) => _square(context, 601 + i, sq, r, maxCount)),
                 const SizedBox(width: 3),
                 Text('İhlâs · Felak · Nâs', style: labelStyle),
               ],
@@ -814,7 +814,7 @@ class _Legend extends StatelessWidget {
           children: [
             Text('Az',
                 style: GoogleFonts.nunito(
-                    fontSize: 10, color: AppColors.textMid)),
+                    fontSize: 10, color: context.adaptiveTextMid)),
             const SizedBox(width: 4),
             ...levels.map((c) => Container(
                   width: sq,
@@ -828,7 +828,7 @@ class _Legend extends StatelessWidget {
             const SizedBox(width: 1),
             Text('Çok',
                 style: GoogleFonts.nunito(
-                    fontSize: 10, color: AppColors.textMid)),
+                    fontSize: 10, color: context.adaptiveTextMid)),
           ],
         ),
       );
@@ -852,7 +852,7 @@ class _DetailPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.adaptiveLightGrey,
         borderRadius: BorderRadius.circular(8),
       ),
       child: page == null
@@ -896,14 +896,14 @@ class _PageDetail extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.adaptiveTextDark,
                 ),
               ),
               if (surahText.isNotEmpty)
                 Text(
                   surahText,
                   style:
-                      GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid),
+                      GoogleFonts.nunito(fontSize: 10, color: context.adaptiveTextMid),
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -913,8 +913,8 @@ class _PageDetail extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.borderGrey),
+            color: context.cardBg,
+            border: Border.all(color: context.borderColor),
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(

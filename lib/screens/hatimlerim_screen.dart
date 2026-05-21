@@ -7,8 +7,10 @@ import '../models/hatim_model.dart';
 import '../widgets/log_entry_bottom_sheet.dart';
 import '../widgets/hatim_heat_map_sheet.dart';
 import '../widgets/duolingo_button.dart';
+import '../widgets/neumorphic_container.dart';
 import 'tamamlanan_hatimler_screen.dart';
 import '../utils/hatim_remover.dart';
+import '../utils/animations.dart';
 
 const int _arapcaLimit = 3;
 const int _mealLimit = 1;
@@ -112,22 +114,25 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Hatimlerim',
                     style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textDark),
+                        color: context.adaptiveTextDark),
                   ),
                   const SizedBox(height: 24),
-                  _SummaryCards(uid: user!.uid),
+                  StaggeredFadeSlide(
+                    index: 0,
+                    child: _SummaryCards(uid: user!.uid),
+                  ),
                   const SizedBox(height: 32),
-                  const Text(
+                  Text(
                     'Aktif Hatimler',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textMid),
+                        color: context.adaptiveTextMid),
                   ),
                   const SizedBox(height: 16),
                   Expanded(
@@ -155,27 +160,33 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
                             itemBuilder: (context, i) {
                               if (i < hatims.length) {
                                 final hatim = hatims[i];
-                                return _DismissibleHatimCard(
-                                  hatim: hatim,
-                                  onDelete: () => _deleteHatim(hatim),
-                                  onHeatMap: () => HatimHeatMapSheet.show(
-                                    context,
+                                return StaggeredFadeSlide(
+                                  index: i + 1,
+                                  child: _DismissibleHatimCard(
                                     hatim: hatim,
-                                    uid: user!.uid,
-                                    onDevamEt: () => LogEntryBottomSheet.show(
-                                        context, initialHatim: hatim),
+                                    onDelete: () => _deleteHatim(hatim),
+                                    onHeatMap: () => HatimHeatMapSheet.show(
+                                      context,
+                                      hatim: hatim,
+                                      uid: user!.uid,
+                                      onDevamEt: () => LogEntryBottomSheet.show(
+                                          context, initialHatim: hatim),
+                                    ),
                                   ),
                                 );
                               }
                               // Tamamlanan hatimler butonu
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 4, bottom: 16),
-                                child: _TamamlananButton(
-                                  count: completedCount,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const TamamlananHatimlerScreen(),
+                              return StaggeredFadeSlide(
+                                index: hatims.length + 1,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 4, bottom: 16),
+                                  child: _TamamlananButton(
+                                    count: completedCount,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      SlideUpRoute(
+                                        page: const TamamlananHatimlerScreen(),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -207,8 +218,8 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(Icons.menu_book_outlined, size: 64, color: AppColors.borderGrey),
           const SizedBox(height: 16),
-          const Text('Henüz aktif bir hatiminiz yok.',
-              style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+          Text('Henüz aktif bir hatiminiz yok.',
+              style: TextStyle(color: context.adaptiveTextMid, fontSize: 15)),
           const SizedBox(height: 8),
           const Text('Yeni bir hatim başlatmak için + butonuna dokun.',
               style: TextStyle(color: AppColors.textLight, fontSize: 13)),
@@ -278,12 +289,15 @@ class _StatCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 32),
+          ScaleBounce(
+            delay: const Duration(milliseconds: 200),
+            child: Icon(icon, color: color, size: 32),
+          ),
           const SizedBox(height: 8),
           Text(value,
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: color)),
           Text(label,
-              style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+              style: TextStyle(fontSize: 12, color: context.adaptiveTextMid)),
         ],
       ),
     );
@@ -328,13 +342,13 @@ class _DismissibleHatimCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold)),
               content: Text(
                 '"${hatim.displayName}" ve tüm okuma kayıtları silinecek.\nHasanat puanı ve okunan sayfalar geri alınır.',
-                style: const TextStyle(color: AppColors.textMid),
+                style: TextStyle(color: context.adaptiveTextMid),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('İptal',
-                      style: TextStyle(color: AppColors.textMid)),
+                  child: Text('İptal',
+                      style: TextStyle(color: context.adaptiveTextMid)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -373,16 +387,11 @@ class _HatimCardContent extends StatelessWidget {
     final readPages = hatim.currentPage;
     final progress = readPages / 604;
 
-    return Card(
+    return NeumorphicContainer(
       margin: EdgeInsets.zero,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.borderGrey),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
+      padding: const EdgeInsets.all(12),
+      borderRadius: 16,
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -409,13 +418,13 @@ class _HatimCardContent extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
-                          color: AppColors.textDark,
+                          color: context.adaptiveTextDark,
                         ),
                       ),
                       Text(
                         '$readPages/604 sayfa',
                         style: GoogleFonts.nunito(
-                          color: AppColors.textMid,
+                          color: context.adaptiveTextMid,
                           fontSize: 12,
                         ),
                       ),
@@ -428,27 +437,22 @@ class _HatimCardContent extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: AppColors.lightGrey,
+                      color: context.adaptiveLightGrey,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.grid_view_rounded, size: 16, color: AppColors.textMid),
+                    child: Icon(Icons.grid_view_rounded, size: 16, color: context.adaptiveTextMid),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: AppColors.borderGrey,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
-              ),
+            AnimatedProgressBar(
+              value: progress,
+              valueColor: AppColors.teal,
+              backgroundColor: AppColors.borderGrey,
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -508,9 +512,9 @@ class _NewHatimSheetState extends State<_NewHatimSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.bottomSheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -520,11 +524,11 @@ class _NewHatimSheetState extends State<_NewHatimSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Yeni Hatim Başlat',
+              Text('Yeni Hatim Başlat',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.adaptiveTextDark)),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
@@ -630,12 +634,12 @@ class _TypeOption extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.tealLight : AppColors.white,
+            color: isSelected ? context.adaptiveTealLight : context.cardBg,
             border: Border.all(
               color: isSelected
                   ? AppColors.teal
                   : isDisabled
-                      ? AppColors.borderGrey
+                      ? context.borderColor
                       : AppColors.teal,
               width: isSelected ? 2 : 1.5,
             ),
@@ -646,7 +650,7 @@ class _TypeOption extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.teal : AppColors.tealLight,
+                  color: isSelected ? AppColors.teal : context.adaptiveTealLight,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon,
@@ -664,27 +668,27 @@ class _TypeOption extends StatelessWidget {
                             fontSize: 15,
                             color: isDisabled
                                 ? AppColors.textLight
-                                : AppColors.textDark)),
+                                : context.adaptiveTextDark)),
                     Text(subtitle,
                         style: TextStyle(
                             fontSize: 12,
                             color: isDisabled
                                 ? AppColors.errorRed
-                                : AppColors.textMid)),
+                                : context.adaptiveTextMid)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.teal : AppColors.lightGrey,
+                  color: isSelected ? AppColors.teal : context.adaptiveLightGrey,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(count,
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : AppColors.textMid)),
+                        color: isSelected ? Colors.white : context.adaptiveTextMid)),
               ),
             ],
           ),

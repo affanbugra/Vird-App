@@ -10,6 +10,7 @@ import '../data/quran_cuz.dart';
 import '../utils/hatim_calculator.dart';
 import 'log_history_sheet.dart';
 import '../services/notification_service.dart';
+import '../services/home_widget_service.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
   final Hatim? initialHatim;
@@ -35,17 +36,17 @@ class LogEntryBottomSheet extends StatefulWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🎉', style: TextStyle(fontSize: 48)),
+              Text('🎉', style: TextStyle(fontSize: 48)),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Hatim Tamamlandı',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
-                style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                style: TextStyle(fontSize: 15, color: context.adaptiveTextMid),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -58,7 +59,7 @@ class LogEntryBottomSheet extends StatefulWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
+                  child: Text(
                     'Âmin',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
@@ -234,17 +235,17 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Hatim bitiyor',
+          title: Text('Hatim bitiyor',
               style: TextStyle(fontWeight: FontWeight.bold)),
           content: Text(
             'Hatimini bitirmene $pagesRead sayfa kaldı.\n\n'
             '$pagesRead sayfa okundu işaretlenecek ve ${pagesRead * 10} hasanat eklenecek.',
-            style: const TextStyle(color: AppColors.textMid),
+            style: TextStyle(color: context.adaptiveTextMid),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
+              child: Text('İptal', style: TextStyle(color: context.adaptiveTextMid)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -252,7 +253,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Tamam',
+              child: Text('Tamam',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
@@ -341,6 +342,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       await batch.commit();
       NotificationService.cancelForToday();
+      HomeWidgetService.syncOnLogSave();
 
       bool justCompleted = false;
       if (hatimId != null) {
@@ -421,12 +423,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                     children: [
                       Text(
                         _devamHatim!.displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.teal),
                       ),
                       Text(
                         _hatimPositionText(_devamHatim!),
-                        style: const TextStyle(fontSize: 12, color: AppColors.teal),
+                        style: TextStyle(fontSize: 12, color: AppColors.teal),
                       ),
                       Text(
                         _hatimSurahText(_devamHatim!),
@@ -440,7 +442,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 if (_hatims.length > 1 && !_lockedToHatim)
                   GestureDetector(
                     onTap: () => setState(() => _devamHatim = null),
-                    child: const Text('Değiştir',
+                    child: Text('Değiştir',
                         style: TextStyle(
                             fontSize: 12,
                             color: AppColors.teal,
@@ -458,17 +460,17 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             ),
             child: Row(
               children: [
-                const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
+                Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
                 const SizedBox(width: 8),
                 Expanded(
                   child: RichText(
                     text: TextSpan(
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMid),
+                      style: TextStyle(fontSize: 12, color: context.adaptiveTextMid),
                       children: [
                         const TextSpan(text: 'Devam: '),
                         TextSpan(
                           text: 'Sayfa $nextPage',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
                         ),
                         if (nextCuz != null)
                           TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
@@ -488,7 +490,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             autofocus: widget.initialHatim != null,
             decoration: InputDecoration(
               labelText: 'Kaç sayfa okudun?',
-              prefixIcon: const Icon(Icons.add),
+              prefixIcon: Icon(Icons.add),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -506,12 +508,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.info_outline, color: AppColors.textLight, size: 40),
+            Icon(Icons.info_outline, color: AppColors.textLight, size: 40),
             const SizedBox(height: 8),
-            const Text('Aktif hatiminiz yok.',
-                style: TextStyle(color: AppColors.textMid)),
+            Text('Aktif hatiminiz yok.',
+                style: TextStyle(color: context.adaptiveTextMid)),
             const SizedBox(height: 4),
-            const Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
+            Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textLight, fontSize: 12)),
           ],
@@ -522,8 +524,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Hangi hatim?',
-            style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+        Text('Hangi hatim?',
+            style: TextStyle(color: context.adaptiveTextMid, fontSize: 13)),
         const SizedBox(height: 8),
         ..._hatims.map((h) => _HatimSelectCard(
               hatim: h,
@@ -559,13 +561,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                   ),
                 ),
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Text('–',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textMid)),
+                        color: context.adaptiveTextMid)),
               ),
               Expanded(
                 child: TextField(
@@ -588,8 +590,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.adaptiveTextMid, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -630,7 +632,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             const SizedBox(height: 6),
             Text(
               '${_selectedCuz!.pageCount} sayfa kaydedilecek  (${_selectedCuz!.startPage}–${_selectedCuz!.endPage})',
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.teal, fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ],
@@ -639,8 +641,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.adaptiveTextMid, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -691,7 +693,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               _selectedSurah!.startPage == 0
                   ? 'Fâtiha — 1 sayfa kaydedilecek'
                   : '${_selectedSurah!.endPage - _selectedSurah!.startPage + 1} sayfa kaydedilecek  (${_selectedSurah!.startPage}–${_selectedSurah!.endPage})',
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.teal, fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ],
@@ -699,7 +701,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline, size: 13, color: AppColors.textLight),
+              Icon(Icons.info_outline, size: 13, color: AppColors.textLight),
               const SizedBox(width: 4),
               const Expanded(
                 child: Text(
@@ -719,9 +721,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.bottomSheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -731,21 +733,21 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Okuma Kaydet',
+              Text('Okuma Kaydet',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.adaptiveTextDark)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.history, color: AppColors.textMid),
+                    icon: Icon(Icons.history, color: context.adaptiveTextMid),
                     onPressed: () => LogHistorySheet.show(context),
                     tooltip: 'Kayıt geçmişi',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -852,7 +854,7 @@ class _HatimSelectCard extends StatelessWidget {
               ),
               child: Icon(
                 isArapca ? Icons.menu_book : Icons.translate,
-                color: isSelected ? Colors.white : AppColors.textMid,
+                color: isSelected ? Colors.white : context.adaptiveTextMid,
                 size: 18,
               ),
             ),
@@ -866,18 +868,18 @@ class _HatimSelectCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: isSelected ? AppColors.teal : AppColors.textDark,
+                      color: isSelected ? AppColors.teal : context.adaptiveTextDark,
                     ),
                   ),
                   Text(positionText,
-                      style: const TextStyle(color: AppColors.textMid, fontSize: 12)),
+                      style: TextStyle(color: context.adaptiveTextMid, fontSize: 12)),
                   Text(surahText,
-                      style: const TextStyle(color: AppColors.textLight, fontSize: 11)),
+                      style: TextStyle(color: AppColors.textLight, fontSize: 11)),
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.teal, size: 20),
+              Icon(Icons.check_circle, color: AppColors.teal, size: 20),
           ],
         ),
       ),
@@ -901,11 +903,11 @@ class _LockedHatimBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.link, size: 14, color: AppColors.teal),
+          Icon(Icons.link, size: 14, color: AppColors.teal),
           const SizedBox(width: 6),
           Text(
             hatim.displayName,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.teal),
           ),
         ],
@@ -978,14 +980,14 @@ class _Chip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: isSelected ? AppColors.teal : AppColors.textMid),
+            Icon(icon, size: 13, color: isSelected ? AppColors.teal : context.adaptiveTextMid),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppColors.teal : AppColors.textMid,
+                color: isSelected ? AppColors.teal : context.adaptiveTextMid,
               ),
             ),
           ],
@@ -1039,7 +1041,7 @@ class _SaveButton extends StatelessWidget {
       disabledColor: AppColors.borderGrey,
       onPressed: isLoading ? null : onPressed,
       isLoading: isLoading,
-      child: const Text(
+      child: Text(
         'KAYDET',
         style: TextStyle(
           color: Colors.white,

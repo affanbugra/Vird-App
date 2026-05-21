@@ -77,15 +77,15 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Image.asset(AppAssets.logo, height: 80),
               const SizedBox(height: 32),
-              const Text(
+              Text(
                 "Vird'e Hoş Geldin!",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.adaptiveTextDark),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 "Düzenli okumalarla hasenatını artır, kalıcı bir alışkanlık kazan.",
-                style: TextStyle(fontSize: 14, color: AppColors.textMid),
+                style: TextStyle(fontSize: 14, color: context.adaptiveTextMid),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -116,15 +116,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: _isLoading
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                    : const Text('Giriş Yap', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    : Text('Giriş Yap', style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
                   Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('VEYA', style: TextStyle(color: AppColors.textMid)),
+                    child: Text('VEYA', style: TextStyle(color: context.adaptiveTextMid)),
                   ),
                   Expanded(child: Divider()),
                 ],
@@ -150,9 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Image.network(
                   'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
                   height: 24,
-                  errorBuilder: (_, _, _) => const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
+                  errorBuilder: (_, _, _) => Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
                 ),
-                label: const Text('Google ile Giriş Yap', style: TextStyle(color: AppColors.textDark)),
+                label: Text('Google ile Giriş Yap', style: TextStyle(color: context.adaptiveTextDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   side: const BorderSide(color: AppColors.borderGrey),
@@ -167,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     MaterialPageRoute(builder: (context) => const RegisterScreen()),
                   );
                 },
-                child: const Text('Hesabın yok mu? Kayıt Ol', style: TextStyle(color: AppColors.teal)),
+                child: Text('Hesabın yok mu? Kayıt Ol', style: TextStyle(color: AppColors.teal)),
               ),
             ],
           ),

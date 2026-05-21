@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
 import '../app_assets.dart';
+import '../utils/animations.dart';
+import '../widgets/neumorphic_container.dart';
 
 IconData _iconFromName(String name) {
   switch (name) {
@@ -87,7 +89,7 @@ class _VirdScreenState extends State<VirdScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -150,11 +152,14 @@ class _VirdScreenState extends State<VirdScreen> {
           const _SectionHead(kicker: 'Yol Haritası', title: 'Yakında geliyor'),
           ...List.generate(mainCount, (i) {
             final op = i < 2 ? 1.0 : (1.0 - (i - 1) * 0.35).clamp(0.2, 1.0);
-            return Opacity(
-              opacity: op,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _UpdateCard(update: _allUpdates[i]),
+            return StaggeredFadeSlide(
+              index: i,
+              child: Opacity(
+                opacity: op,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _UpdateCard(update: _allUpdates[i]),
+                ),
               ),
             );
           }),
@@ -183,9 +188,9 @@ class _VirdScreenState extends State<VirdScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         builder: (_, controller) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.bottomSheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,7 +201,7 @@ class _VirdScreenState extends State<VirdScreen> {
                   margin: const EdgeInsets.only(top: 12, bottom: 4),
                   width: 40, height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.borderGrey,
+                    color: context.borderColor,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -204,7 +209,7 @@ class _VirdScreenState extends State<VirdScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 child: Text('Yol Haritası',
-                  style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: context.adaptiveTextDark)),
               ),
               Expanded(
                 child: Stack(
@@ -235,8 +240,8 @@ class _VirdScreenState extends State<VirdScreen> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                AppColors.white.withValues(alpha: 0),
-                                AppColors.white,
+                                context.bottomSheetBg.withValues(alpha: 0),
+                                context.bottomSheetBg,
                               ],
                             ),
                           ),
@@ -261,38 +266,34 @@ class _VirdScreenState extends State<VirdScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHead(kicker: 'Senin Sesin', title: 'Bir özellik öner'),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              border: Border.all(color: AppColors.borderGrey),
-              borderRadius: BorderRadius.circular(16),
-            ),
+          NeumorphicContainer(
+            borderRadius: 16,
             padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Bir fikrin var mı?',
-                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: context.adaptiveTextDark)),
                 const SizedBox(height: 4),
                 Text('Paylaşacağın bir fikir, birçok kişi için hayra vesile olabilir.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.45)),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.adaptiveTextMid, height: 1.45)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _controller,
                   onChanged: (_) => setState(() {}),
                   maxLength: 280,
                   maxLines: 3,
-                  style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark),
+                  style: GoogleFonts.nunito(fontSize: 14.5, color: context.adaptiveTextDark),
                   decoration: InputDecoration(
                     hintText: 'Hangi özelliği istersin?',
                     hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight),
                     counterStyle: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
                     filled: true,
-                    fillColor: AppColors.white,
+                    fillColor: context.tileBg,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderGrey, width: 1.5),
+                      borderSide: BorderSide(color: context.borderColor, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -328,24 +329,20 @@ class _VirdScreenState extends State<VirdScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHead(kicker: 'Hakkında', title: 'Vird nedir?'),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              border: Border.all(color: AppColors.borderGrey),
-              borderRadius: BorderRadius.circular(16),
-            ),
+          NeumorphicContainer(
+            borderRadius: 16,
             padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Allah\'a yaklaşmak için belirli zamanda ve belli miktarda yapılan ibadet, dua ve zikri ifade eden tasavvuf terimi.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.6, fontStyle: FontStyle.italic),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.adaptiveTextMid, height: 1.6, fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 12),
                 RichText(
                   text: TextSpan(
-                    style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark, height: 1.6, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.nunito(fontSize: 14.5, color: context.adaptiveTextDark, height: 1.6, fontWeight: FontWeight.w500),
                     children: [
                       const TextSpan(text: 'Vird, ibadetin '),
                       TextSpan(text: 'devamlı',
@@ -357,7 +354,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Bugün Kuran okuma takibiyle başlıyoruz. Yarın namaz, oruç ve diğer alışkanlıklar da burada olacak. Geliştiricinin de bu yolda kendine bir vesilesi; aynı zamanda hayra vesile olabilmek niyetiyle.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.6),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.adaptiveTextMid, height: 1.6),
                 ),
               ],
             ),
@@ -399,7 +396,7 @@ class _SectionHead extends StatelessWidget {
             style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.teal, letterSpacing: 1.4)),
           const SizedBox(height: 4),
           Text(title,
-            style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark, letterSpacing: -0.2)),
+            style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: context.adaptiveTextDark, letterSpacing: -0.2)),
         ],
       ),
     );
@@ -421,12 +418,8 @@ class _UpdateCard extends StatelessWidget {
     final badgeBg   = update.released ? _greenBg      : AppColors.tealLight;
     final badgeFg   = update.released ? _green        : AppColors.teal;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        border: Border.all(color: AppColors.borderGrey),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return NeumorphicContainer(
+      borderRadius: 16,
       child: IntrinsicHeight(
         child: Row(
           children: [
@@ -460,7 +453,7 @@ class _UpdateCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(update.title,
-                                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: context.adaptiveTextDark)),
                               ),
                               const SizedBox(width: 8),
                               Container(
@@ -473,7 +466,7 @@ class _UpdateCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(update.desc,
-                            style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textMid, height: 1.4)),
+                            style: GoogleFonts.nunito(fontSize: 13.5, color: context.adaptiveTextMid, height: 1.4)),
                         ],
                       ),
                     ),
@@ -504,7 +497,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = widget.disabled ? AppColors.borderGrey : AppColors.teal;
+    final bg = widget.disabled ? context.borderColor : AppColors.teal;
     final shadow = widget.disabled ? Colors.transparent : AppColors.tealDark;
     final textColor = widget.disabled ? AppColors.textLight : AppColors.white;
 

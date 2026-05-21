@@ -37,17 +37,17 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Tüm kayıtları sil',
+        title: Text('Tüm kayıtları sil',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
+        content: Text(
           'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
-          style: TextStyle(color: AppColors.textMid),
+          style: TextStyle(color: context.adaptiveTextMid),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
+            child: Text('İptal',
+                style: TextStyle(color: context.adaptiveTextMid)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -56,7 +56,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Tümünü Sil',
+            child: Text('Tümünü Sil',
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -126,7 +126,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.68,
         child: Scaffold(
-          backgroundColor: AppColors.white,
+          backgroundColor: context.bottomSheetBg,
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -136,15 +136,15 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Son Kayıtlar',
                       style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.adaptiveTextDark),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -167,14 +167,14 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                     }
                     final docs = snap.data?.docs ?? [];
                     if (docs.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.history, size: 52, color: AppColors.borderGrey),
                             SizedBox(height: 12),
                             Text('Henüz kayıt yok.',
-                                style: TextStyle(color: AppColors.textMid)),
+                                style: TextStyle(color: context.adaptiveTextMid)),
                           ],
                         ),
                       );
@@ -186,7 +186,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       itemCount: logs.length,
                       separatorBuilder: (ctx, i) =>
-                          const Divider(height: 1, color: AppColors.borderGrey),
+                          Divider(height: 1, color: context.borderColor),
                       itemBuilder: (context, i) => _LogTile(
                         log: logs[i],
                         uid: uid,
@@ -206,11 +206,11 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                           height: 16,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: AppColors.errorRed))
-                      : const Icon(Icons.delete_sweep_outlined,
+                      : Icon(Icons.delete_sweep_outlined,
                           color: AppColors.errorRed, size: 20),
                   label: Text(
                     _deleting ? 'Siliniyor...' : 'Tüm Kayıtları Sil',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.errorRed,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -301,17 +301,17 @@ class _LogTile extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Kaydı sil',
+        title: Text('Kaydı sil',
             style: TextStyle(fontWeight: FontWeight.bold)),
         content: Text(
           '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
-          style: const TextStyle(color: AppColors.textMid),
+          style: TextStyle(color: context.adaptiveTextMid),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
+            child: Text('İptal',
+                style: TextStyle(color: context.adaptiveTextMid)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -320,7 +320,7 @@ class _LogTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sil',
+            child: Text('Sil',
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -377,10 +377,10 @@ class _LogTile extends StatelessWidget {
                     Flexible(
                       child: Text(
                         _title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: AppColors.textDark),
+                            color: context.adaptiveTextDark),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -391,7 +391,7 @@ class _LogTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${_timeText(log.createdAt)} · +${log.pagesRead * 10} ✨',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12, color: AppColors.textLight),
                 ),
               ],
@@ -399,7 +399,7 @@ class _LogTile extends StatelessWidget {
           ),
           // Aksiyonlar
           IconButton(
-            icon: const Icon(Icons.edit_outlined,
+            icon: Icon(Icons.edit_outlined,
                 color: AppColors.teal, size: 20),
             onPressed: () => showModalBottomSheet(
               context: context,
@@ -414,7 +414,7 @@ class _LogTile extends StatelessWidget {
             tooltip: 'Düzenle',
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline,
+            icon: Icon(Icons.delete_outline,
                 color: AppColors.errorRed, size: 20),
             onPressed: () => _delete(context),
             tooltip: 'Sil',
@@ -436,12 +436,12 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.adaptiveTealLight,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
             color: AppColors.teal),

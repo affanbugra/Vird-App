@@ -400,7 +400,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.tealLight,
+          color: context.adaptiveTealLight,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
         ),
@@ -419,7 +419,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       return OutlinedButton(
         onPressed: _leaveTeam,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.borderGrey),
+          side: BorderSide(color: context.borderColor),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -492,7 +492,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('teams')
@@ -614,15 +614,15 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                         // Üye sayısı + üyelik widget'ı
                         Row(
                           children: [
-                            const Icon(Icons.people_outline,
-                                size: 15, color: AppColors.textMid),
+                            Icon(Icons.people_outline,
+                                size: 15, color: context.adaptiveTextMid),
                             const SizedBox(width: 4),
                             Text(
                               '${team.memberCount} üye',
                               style: GoogleFonts.nunito(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textMid,
+                                color: context.adaptiveTextMid,
                               ),
                             ),
                             const Spacer(),
@@ -657,7 +657,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                                     style: GoogleFonts.nunito(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,
-                                      color: AppColors.textDark,
+                                      color: context.adaptiveTextDark,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -741,7 +741,7 @@ class _InviteCodeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.adaptiveTealLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
       ),
@@ -823,14 +823,14 @@ class _RequestRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.adaptiveLightGrey,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: AppColors.tealLight,
+            backgroundColor: context.adaptiveTealLight,
             backgroundImage: avatarSeed != null
                 ? NetworkImage(
                     'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
@@ -857,7 +857,7 @@ class _RequestRow extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+                    color: context.adaptiveTextDark,
                   ),
                 ),
                 if (username.isNotEmpty)
@@ -926,7 +926,7 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.adaptiveLightGrey,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -939,7 +939,7 @@ class _InfoCard extends StatelessWidget {
               text,
               style: GoogleFonts.nunito(
                 fontSize: 13,
-                color: AppColors.textMid,
+                color: context.adaptiveTextMid,
                 height: 1.5,
               ),
             ),
@@ -1053,7 +1053,7 @@ class _LeaderboardSection extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.adaptiveTextDark,
               ),
             ),
             const Spacer(),
@@ -1062,11 +1062,11 @@ class _LeaderboardSection extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
+                  color: context.adaptiveLightGrey,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.refresh,
-                    size: 18, color: AppColors.textMid),
+                child: Icon(Icons.refresh,
+                    size: 18, color: context.adaptiveTextMid),
               ),
             ),
           ],
@@ -1095,7 +1095,7 @@ class _LeaderboardSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.adaptiveLightGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -1176,20 +1176,20 @@ class _LeaderboardRow extends StatelessWidget {
     }
   }
 
-  Color get _bgColor {
+  Color _bgColor(BuildContext context) {
     if (isRed) return AppColors.errorBg;
     if (rank == 1) return AppColors.successBg;
     if (rank == 2) return AppColors.successBg.withValues(alpha: 0.6);
     if (rank == 3) return AppColors.successBg.withValues(alpha: 0.3);
-    return AppColors.white;
+    return context.cardBg;
   }
 
-  Color get _borderColor {
+  Color _borderColor(BuildContext context) {
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
     if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.3);
     if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.15);
-    return AppColors.borderGrey;
+    return context.borderColor;
   }
 
   @override
@@ -1198,8 +1198,8 @@ class _LeaderboardRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: _bgColor,
-        border: Border.all(color: _borderColor),
+        color: _bgColor(context),
+        border: Border.all(color: _borderColor(context)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1227,7 +1227,7 @@ class _LeaderboardRow extends StatelessWidget {
           // Avatar
           CircleAvatar(
             radius: 18,
-            backgroundColor: AppColors.tealLight,
+            backgroundColor: context.adaptiveTealLight,
             backgroundImage: entry.avatarSeed != null
                 ? NetworkImage(
                     'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
@@ -1261,7 +1261,7 @@ class _LeaderboardRow extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
+                          color: context.adaptiveTextDark,
                         ),
                       ),
                     ),
@@ -1389,7 +1389,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1399,7 +1399,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.adaptiveTextDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -1408,7 +1408,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
             maxLines: 4,
             decoration: InputDecoration(
               labelText: widget.label,
-              labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              labelStyle: GoogleFonts.nunito(color: context.adaptiveTextMid),
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(

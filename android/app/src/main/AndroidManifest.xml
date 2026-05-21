@@ -32,6 +32,21 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- home_widget: App Group ID (iOS ile eşleşmeli) -->
+        <meta-data
+            android:name="home_widget.app_group_id"
+            android:value="group.com.example.virdApp" />
+        <!-- Vird Ana Ekran Widget'ı -->
+        <receiver
+            android:name=".VirdWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/vird_widget_provider_info" />
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

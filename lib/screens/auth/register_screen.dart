@@ -110,7 +110,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.adaptiveTextDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -120,14 +120,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Yeni Hesap Oluştur',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.adaptiveTextDark),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Kuran hedeflerini takip etmeye başlamak için aramıza katıl.',
-                style: TextStyle(color: AppColors.textMid),
+                style: TextStyle(color: context.adaptiveTextMid),
               ),
               const SizedBox(height: 32),
               TextField(
@@ -165,15 +165,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 child: _isLoading
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                    : const Text('Kayıt Ol', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    : Text('Kayıt Ol', style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
                   Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('VEYA', style: TextStyle(color: AppColors.textMid)),
+                    child: Text('VEYA', style: TextStyle(color: context.adaptiveTextMid)),
                   ),
                   Expanded(child: Divider()),
                 ],
@@ -200,9 +200,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 icon: Image.network(
                   'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
                   height: 24,
-                  errorBuilder: (_, _, _) => const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
+                  errorBuilder: (_, _, _) => Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4285F4))),
                 ),
-                label: const Text('Google ile Kayıt Ol', style: TextStyle(color: AppColors.textDark)),
+                label: Text('Google ile Kayıt Ol', style: TextStyle(color: context.adaptiveTextDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   side: const BorderSide(color: AppColors.borderGrey),
