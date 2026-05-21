@@ -456,7 +456,8 @@ class _CreateTeamSheet extends StatefulWidget {
 class _CreateTeamSheetState extends State<_CreateTeamSheet> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final bool _isPrivate = true;
+  bool? _isPrivate;
+  String? _genderPolicy;
   bool _isLoading = false;
 
   @override
@@ -471,6 +472,20 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Grup adı gerekli.', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.errorRed,
+      ));
+      return;
+    }
+    if (_isPrivate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Grubun görünürlüğünü seçin.', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.errorRed,
+      ));
+      return;
+    }
+    if (_genderPolicy == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Katılım politikasını seçin.', style: GoogleFonts.nunito()),
         backgroundColor: AppColors.errorRed,
       ));
       return;
@@ -504,6 +519,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
         'adminUid': widget.uid,
         'memberCount': 1,
         'isPrivate': _isPrivate,
+        'genderPolicy': _genderPolicy,
         'inviteCode': inviteCode,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -599,29 +615,54 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 20),
+          // ── Görünürlük ───────────────────────────────────────────────
+          Text(
+            'Görünürlük',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMid,
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline, size: 18, color: AppColors.textMid),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Tüm gruplar şimdilik gizlidir — sadece davet koduyla bulunabilir',
-                    style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      color: AppColors.textMid,
-                      height: 1.3,
-                    ),
+          ),
+          const SizedBox(height: 8),
+          _PrivacyToggle(
+            secili: _isPrivate,
+            onChanged: (v) => setState(() => _isPrivate = v),
+          ),
+          const SizedBox(height: 20),
+          // ── Katılım politikası ───────────────────────────────────────
+          Text(
+            'Katılım Politikası',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMid,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _GenderPolicyToggle(
+            secili: _genderPolicy,
+            onChanged: (v) => setState(() => _genderPolicy = v),
+          ),
+          const SizedBox(height: 10),
+          // ── Uyarı notu ───────────────────────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, size: 11, color: Color(0xFFBBAB00)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Bu ayarlar bir kez belirlenir ve sonradan değiştirilemez. Dikkatle seçin.',
+                  style: GoogleFonts.nunito(
+                    fontSize: 10,
+                    color: const Color(0xFFAA9000),
+                    height: 1.4,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -830,6 +871,190 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Görünürlük Toggle ────────────────────────────────────────────────────────
+
+class _PrivacyToggle extends StatelessWidget {
+  final bool? secili;
+  final ValueChanged<bool> onChanged;
+
+  const _PrivacyToggle({required this.secili, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPublic = secili == false;
+    final isPrivate = secili == true;
+
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Stack(
+        children: [
+          if (secili != null)
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOut,
+              alignment:
+                  isPublic ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(false),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isPublic ? FontWeight.w700 : FontWeight.w500,
+                        color: isPublic
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('🌐  Herkese Açık'),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(true),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isPrivate ? FontWeight.w700 : FontWeight.w500,
+                        color: isPrivate
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('🔒  Sadece Davet'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Katılım Politikası Toggle (3 seçenek) ───────────────────────────────────
+
+class _GenderPolicyToggle extends StatelessWidget {
+  final String? secili;
+  final ValueChanged<String> onChanged;
+
+  const _GenderPolicyToggle({required this.secili, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const options = [
+      ('all', '👥  Herkese'),
+      ('men', '👨  Sadece Beyler'),
+      ('women', '👩  Sadece Hanımlar'),
+    ];
+
+    int? selectedIdx;
+    for (int i = 0; i < options.length; i++) {
+      if (options[i].$1 == secili) {
+        selectedIdx = i;
+        break;
+      }
+    }
+
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Stack(
+        children: [
+          if (selectedIdx != null)
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOut,
+              alignment: Alignment(
+                  selectedIdx == 0 ? -1 : selectedIdx == 1 ? 0 : 1, 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            children: options.map((opt) {
+              final isSelected = secili == opt.$1;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(opt.$1),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.textDark
+                            : const Color(0xFF9E9E9E),
+                      ),
+                      child: Text(opt.$2),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

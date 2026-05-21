@@ -179,7 +179,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback, hafiz, roadmap }
+enum _PanelView { home, backlog, feedback, hafiz, roadmap, migration }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -219,10 +219,11 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
       child: switch (_view) {
         _PanelView.home     => _HomeView(
             key: const ValueKey('home'),
-            onBacklogTap:  () => setState(() => _view = _PanelView.backlog),
-            onFeedbackTap: () => setState(() => _view = _PanelView.feedback),
-            onHafizTap:    () => setState(() => _view = _PanelView.hafiz),
-            onRoadmapTap:  () => setState(() => _view = _PanelView.roadmap),
+            onBacklogTap:    () => setState(() => _view = _PanelView.backlog),
+            onFeedbackTap:   () => setState(() => _view = _PanelView.feedback),
+            onHafizTap:      () => setState(() => _view = _PanelView.hafiz),
+            onRoadmapTap:    () => setState(() => _view = _PanelView.roadmap),
+            onMigrationTap:  () => setState(() => _view = _PanelView.migration),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -240,6 +241,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('roadmap'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
+        _PanelView.migration => _TeamMigrationView(
+            key: const ValueKey('migration'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
       },
     );
   }
@@ -252,7 +257,8 @@ class _HomeView extends StatelessWidget {
   final VoidCallback onFeedbackTap;
   final VoidCallback onHafizTap;
   final VoidCallback onRoadmapTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap});
+  final VoidCallback onMigrationTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onMigrationTap});
 
   @override
   Widget build(BuildContext context) {
@@ -405,6 +411,25 @@ class _HomeView extends StatelessWidget {
                         active: true,
                         badgeCount: pending,
                         onTap: onHafizTap,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('teams')
+                        .snapshots(),
+                    builder: (context, snap) {
+                      final noPolicy = (snap.data?.docs ?? [])
+                          .where((d) => (d.data() as Map<String, dynamic>)['genderPolicy'] == null)
+                          .length;
+                      return _PanelCard(
+                        icon: Icons.group_work_outlined,
+                        title: 'Ekip Migrasyon',
+                        subtitle: 'Gizlilik & cinsiyet politikası',
+                        active: true,
+                        badgeCount: noPolicy,
+                        onTap: onMigrationTap,
                       );
                     },
                   ),
@@ -4787,6 +4812,242 @@ class _FormField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Ekip Migrasyon ───────────────────────────────────────────────────────────
+
+class _TeamMigrationView extends StatefulWidget {
+  final VoidCallback onBack;
+  const _TeamMigrationView({super.key, required this.onBack});
+
+  @override
+  State<_TeamMigrationView> createState() => _TeamMigrationViewState();
+}
+
+class _TeamMigrationViewState extends State<_TeamMigrationView> {
+  List<DocumentSnapshot>? _teams;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final snap = await FirebaseFirestore.instance.collection('teams').orderBy('name').get();
+    setState(() { _teams = snap.docs; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(4, 20, 12, 22),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: Icon(Icons.arrow_back, color: Colors.white.withValues(alpha: 0.8)),
+                ),
+                const SizedBox(width: 2),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Ekip Migrasyon', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                    Text('Gizlilik & cinsiyet politikası', style: TextStyle(color: Color(0x99FFFFFF), fontSize: 12)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_loading)
+            const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.teal)))
+          else if (_teams == null || _teams!.isEmpty)
+            const Expanded(child: Center(child: Text('Ekip bulunamadı.', style: TextStyle(color: AppColors.textMid))))
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _teams!.length,
+                itemBuilder: (context, i) => _TeamMigrationCard(doc: _teams![i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamMigrationCard extends StatefulWidget {
+  final DocumentSnapshot doc;
+  const _TeamMigrationCard({required this.doc});
+
+  @override
+  State<_TeamMigrationCard> createState() => _TeamMigrationCardState();
+}
+
+class _TeamMigrationCardState extends State<_TeamMigrationCard> {
+  late bool _isPrivate;
+  late String _genderPolicy;
+  bool _saved = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.doc.data() as Map<String, dynamic>;
+    _isPrivate = data['isPrivate'] as bool? ?? true;
+    _genderPolicy = data['genderPolicy'] as String? ?? 'all';
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.doc.id)
+        .update({'isPrivate': _isPrivate, 'genderPolicy': _genderPolicy});
+    setState(() { _saving = false; _saved = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final name = data['name'] as String? ?? '—';
+    final memberCount = data['memberCount'] as int? ?? 0;
+    final hasPolicy = (data['genderPolicy'] as String?) != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _saved ? AppColors.teal.withValues(alpha: 0.5) : AppColors.borderGrey,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              ),
+              if (_saved)
+                const Icon(Icons.check_circle, color: AppColors.teal, size: 20)
+              else if (!hasPolicy)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('ayar yok', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w700)),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('mevcut', style: TextStyle(fontSize: 10, color: AppColors.teal, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+          Text('$memberCount üye · ${widget.doc.id}', style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+          const SizedBox(height: 12),
+
+          const Text('Görünürlük', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _MigChip(label: '🌐 Herkese Açık', selected: !_isPrivate, onTap: () => setState(() { _isPrivate = false; _saved = false; })),
+              const SizedBox(width: 8),
+              _MigChip(label: '🔒 Sadece Davet', selected: _isPrivate, onTap: () => setState(() { _isPrivate = true; _saved = false; })),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          const Text('Katılım Politikası', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _MigChip(label: '👥 Herkese', selected: _genderPolicy == 'all', onTap: () => setState(() { _genderPolicy = 'all'; _saved = false; })),
+              const SizedBox(width: 6),
+              _MigChip(label: '👨 Beyler', selected: _genderPolicy == 'men', onTap: () => setState(() { _genderPolicy = 'men'; _saved = false; })),
+              const SizedBox(width: 6),
+              _MigChip(label: '👩 Hanımlar', selected: _genderPolicy == 'women', onTap: () => setState(() { _genderPolicy = 'women'; _saved = false; })),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saving || _saved ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _saved ? AppColors.teal.withValues(alpha: 0.3) : null,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: _saving
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(_saved ? '✓ Kaydedildi' : 'Kaydet',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MigChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _MigChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teal : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? AppColors.teal : AppColors.borderGrey),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.textMid,
+          ),
+        ),
+      ),
     );
   }
 }

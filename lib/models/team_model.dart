@@ -11,6 +11,8 @@ class TeamModel {
   final String? logoAsset;
   final bool isPrivate;
   final String inviteCode;
+  // 'all' | 'men' | 'women'
+  final String genderPolicy;
 
   const TeamModel({
     required this.id,
@@ -23,6 +25,7 @@ class TeamModel {
     this.logoAsset,
     required this.isPrivate,
     required this.inviteCode,
+    this.genderPolicy = 'all',
   });
 
   factory TeamModel.fromFirestore(DocumentSnapshot doc) {
@@ -36,8 +39,9 @@ class TeamModel {
       memberCount: data['memberCount'] as int? ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       logoAsset: data['logoAsset'] as String?,
-      isPrivate: data['isPrivate'] as bool? ?? false,
+      isPrivate: data['isPrivate'] as bool? ?? true,
       inviteCode: data['inviteCode'] as String? ?? '',
+      genderPolicy: data['genderPolicy'] as String? ?? 'all',
     );
   }
 
@@ -51,5 +55,6 @@ class TeamModel {
         if (logoAsset != null) 'logoAsset': logoAsset,
         'isPrivate': isPrivate,
         'inviteCode': inviteCode,
+        'genderPolicy': genderPolicy,
       };
 }

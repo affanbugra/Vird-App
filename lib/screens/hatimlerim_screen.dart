@@ -8,6 +8,7 @@ import '../widgets/log_entry_bottom_sheet.dart';
 import '../widgets/hatim_heat_map_sheet.dart';
 import '../widgets/duolingo_button.dart';
 import 'tamamlanan_hatimler_screen.dart';
+import 'bildirimler_screen.dart';
 import '../utils/hatim_remover.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
@@ -116,12 +117,18 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Hatimlerim',
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textDark),
+                  Row(
+                    children: [
+                      const Text(
+                        'Hatimlerim',
+                        style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark),
+                      ),
+                      const Spacer(),
+                      _BellIcon(uid: user!.uid),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   _SummaryCards(uid: user!.uid),
@@ -771,6 +778,75 @@ class _TamamlananButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Bildirim zili ─────────────────────────────────────────────────────────────
+
+class _BellIcon extends StatelessWidget {
+  final String uid;
+  const _BellIcon({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .where('isRead', isEqualTo: false)
+          .snapshots(),
+      builder: (context, snap) {
+        final unread = snap.data?.docs.length ?? 0;
+
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BildirimlerScreen(uid: uid),
+            ),
+          ),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_outlined,
+                  size: 26,
+                  color: AppColors.textDark,
+                ),
+                if (unread > 0)
+                  Positioned(
+                    right: -5,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: AppColors.errorRed,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 17, minHeight: 17),
+                      child: Text(
+                        unread > 99 ? '99+' : '$unread',
+                        style: GoogleFonts.nunito(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
