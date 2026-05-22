@@ -21,6 +21,7 @@ Adından anlaşılmayan veya kritik detay içeren dosyalar:
 | `lib/data/quran_cuz.dart` | Kuran veri sistemi — tüm modüllerde kullanılır, dokunmadan önce oku |
 | `lib/data/tilavet_secde.dart` | 14 tilavet secdesi sayfa verisi |
 | `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds`, `isHafiz` — global developer/hafız state |
+| `lib/config/team_limits.dart` | Ekip katılım/kurma limitleri (normal/pro/dev) + kullanıcıya gösterilecek hata metinleri |
 
 ---
 
@@ -39,6 +40,7 @@ isPro:            bool? (Console'dan elle atanır, in-app değiştirilemez)
 isDeveloper:      bool (Console'dan elle — DEV badge + çoklu ekip desteği)
 developerTeamIds: List<String> (developer birden fazla ekibin liderboardunda görünür)
 isHafiz:          bool? (Console veya DevPanel'den onaylanınca true — HAFIZ badge)
+cinsiyet:         'bey' | 'hanim' | '' (profil kurulumunda seçilir; ekip gender filtresi için kullanılır)
 username:         string
 avatarSeed:       string? (20 önceden belirlenmiş DiceBear seed — Storage maliyeti yok)
 name:             string
@@ -98,15 +100,28 @@ habitId:   string
 
 ### `teams/{teamId}`
 ```
-name:        string
-description: string
-penaltyNote: string
-adminUid:    string
-memberCount: int
-isPrivate:   bool (true → listede görünmez)
-inviteCode:  string (6 haneli, örn. "XK7P2Q")
-createdAt:   Timestamp
+name:              string
+description:       string
+penaltyNote:       string
+adminUid:          string
+memberCount:       int
+isPrivate:         bool (true → listede görünmez)
+genderPolicy:      'men' | 'women' | 'all'
+showCrossGenderNames: bool (false → karşı cins isimlerini sansürle)
+inviteCode:        string (6 haneli, örn. "XK7P2Q")
+createdAt:         Timestamp
 ```
+
+### `users/{uid}/notifications/{notifId}`
+```
+type:      'team_invite' | 'team_join' | 'join_request' | 'join_approved' | 'join_rejected' | 'announcement' | 'message'
+title:     string
+body:      string
+isRead:    bool
+teamId:    string? (join_request tipinde — admin tıklayınca EkipProfilScreen açılır)
+createdAt: Timestamp
+```
+`announcement` tipine tıklanınca `showRoadmapSheet()` açılır.
 
 ### `teams/{teamId}/requests/{uid}`
 ```
@@ -201,3 +216,10 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 - **Yol haritası bottom sheet sekmeler:** "Tüm sürüm geçmişini gör" sheet'i `_RoadmapSheet` stateful widget'ı — Neler Geldi / Neler Geliyor sekmeleri. Yayındakiler en yeniden eskiye (reversed), yakındakiler sırasıyla gösterilir. `order` alanı her iki grupta bağımsız, görüntüleme sırası type'a göre ayrılır.
 - **Hafız doğrulama gizlilik:** Onay verilince `hafiz_requests/{uid}.driveLink` alanı `FieldValue.delete()` ile silinir. Belge verisi sistemde tutulmaz (KVKK uyumu).
 - **seriDisplayState `atRisk`:** Yalnızca günün son 6 saatinde (`now.hour >= 18`) true döner. Sabah erken saatlerde "tehlikede" göstermek kullanıcı deneyimini bozduğu için bu eşik seçildi.
+- **Ekip cinsiyet politikası (`genderPolicy`):** `men` | `women` | `all`. Herkese açık (`isPrivate: false`) ekip yalnızca `men` veya `women` olabilir; `genderPolicy == 'all'` ekipler daima `isPrivate: true`. Yanlış cinsiyetteki kullanıcılar ekip listesinde görmez, profil sayfasına girerlerse `_GenderBlockedTeamView` gösterilir. `isDeveloper` bu kuralı baypas etmez.
+- **İsim sansürü (`showCrossGenderNames: false`):** `genderPolicy == 'all'` ekipte karşı cins üyeler için `isim.split(' ').map(w => w[0] + '*****').join(' ')`. Kendi profili asla sansürlenmez. Liderboard dışında (örn. admin üye yönetimi) tam isim gösterilir.
+- **Liderboard profil tıklaması — karışık ekiplerde kapalı:** `_LeaderboardSection.onMemberTap` nullable. `genderPolicy == 'all'` ise `null` geçilir → tüm tıklamalar devre dışı. Böylece karışık ekipte üyeler birbirinin profilini açamaz.
+- **Herkese açık ekip join akışı:** Üye olmayan kullanıcı herkese açık ekip profilini açarsa tam içerik değil `_PublicTeamJoinView` gösterilir (ekip adı, üye sayısı, cinsiyet rozeti, açıklama, katılım butonu). Leaderboard veya admin araçları gösterilmez.
+- **Hata yönetimi:** `ErrorWidget.builder` → `_AppErrorWidget` (kırmızı ekran yerine kullanıcı dostu hata). `FlutterError.onError` → Firestore `app_errors` koleksiyonuna yazar (error, stack max 2000 karakter, library, platform, createdAt). DevPanel → Hata Kayıtları ekranından izlenir.
+- **Bildirim sistemi:** `users/{uid}/notifications` subcollection. `announcement` tipine tıklanınca `showRoadmapSheet(context)` açılır — `vird_screen.dart`'ta top-level public fonksiyon. Toplu bildirim (broadcast) admin araçları ile Cloud Function üzerinden yapılır; in-app broadcast UI şu an aktif değil.
+- **`showRoadmapSheet` erişilebilirliği:** `vird_screen.dart` içinde class dışı top-level fonksiyon olarak tanımlandı. Hem `VirdScreen` hem `BildirimlerScreen` bu fonksiyonu çağırabilir — içe aktarma yeterli.

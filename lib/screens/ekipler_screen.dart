@@ -55,6 +55,7 @@ class _EkiplerBody extends StatelessWidget {
     bool isPro,
     bool isDeveloper,
     List<String> adminTeamIds,
+    String cinsiyet,
   ) {
     if (!TeamLimits.canCreate(
         isPro: isPro, isDev: isDeveloper, adminCount: adminTeamIds.length)) {
@@ -93,6 +94,7 @@ class _EkiplerBody extends StatelessWidget {
         uid: uid,
         isDeveloper: isDeveloper,
         isPro: isPro,
+        cinsiyet: cinsiyet,
         adminTeamIds: adminTeamIds,
         onCreated: (teamId) => Navigator.push(
           context,
@@ -147,6 +149,7 @@ class _EkiplerBody extends StatelessWidget {
                 ?.map((e) => e.toString())
                 .toList() ??
             const <String>[];
+        final cinsiyet = (userData?['cinsiyet'] as String?) ?? '';
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -159,10 +162,29 @@ class _EkiplerBody extends StatelessWidget {
                     .toList() ??
                 [];
 
-            // Gizli ekipler: üye olanlar, bekleyen isteği olanlar veya açık ekipler görür
-            final teams = allTeams
-                .where((t) => !t.isPrivate || teamIds.contains(t.id) || pendingTeamIds.contains(t.id))
-                .toList();
+            // Stale adminTeamIds temizliği: gerçekte var olmayan ekipleri anında filtrele + Firestore'dan sil
+            final existingIds = allTeams.map((t) => t.id).toSet();
+            final validAdminTeamIds = teamsSnap.hasData
+                ? adminTeamIds.where((id) => existingIds.contains(id)).toList()
+                : adminTeamIds;
+            if (teamsSnap.hasData && validAdminTeamIds.length < adminTeamIds.length) {
+              final staleIds = adminTeamIds.where((id) => !existingIds.contains(id)).toList();
+              FirebaseFirestore.instance.collection('users').doc(uid).update({
+                'adminTeamIds': FieldValue.arrayRemove(staleIds),
+                'teamIds': FieldValue.arrayRemove(staleIds),
+              });
+            }
+
+            final teams = allTeams.where((t) {
+              // Cinsiyet politikası: yanlış cinsiyete tamamen görünmez (dev bypass)
+              if (cinsiyet.isNotEmpty) {
+                if (t.genderPolicy == 'men' && cinsiyet == 'hanim') return false;
+                if (t.genderPolicy == 'women' && cinsiyet == 'bey') return false;
+              }
+              // Gizli ekipler: sadece üye veya pending olanlar görür
+              if (t.isPrivate && !teamIds.contains(t.id) && !pendingTeamIds.contains(t.id)) return false;
+              return true;
+            }).toList();
 
             if (teamsSnap.connectionState == ConnectionState.waiting &&
                 teams.isEmpty) {
@@ -182,20 +204,62 @@ class _EkiplerBody extends StatelessWidget {
                             final isMyTeam = teamIds.contains(team.id);
                             final isAdmin = adminTeamIds.contains(team.id);
                             final isPending = pendingTeamIds.contains(team.id);
+
+                            void openProfile() => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EkipProfilScreen(
+                                      teamId: team.id,
+                                      currentUid: uid,
+                                      isAdmin: isAdmin,
+                                    ),
+                                  ),
+                                );
+
+                            void handleTap() {
+                              if (isPending && team.isPrivate) {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => _PendingTeamSheet(
+                                    teamId: team.id,
+                                    teamName: team.name,
+                                    currentUid: uid,
+                                  ),
+                                );
+                                return;
+                              }
+                              openProfile();
+                            }
+
+                            if (isAdmin) {
+                              return StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('teams')
+                                    .doc(team.id)
+                                    .collection('requests')
+                                    .snapshots(),
+                                builder: (ctx, reqSnap) {
+                                  final pendingCount = reqSnap.data?.docs.length ?? 0;
+                                  return _TeamCard(
+                                    team: team,
+                                    isMyTeam: isMyTeam,
+                                    isAdmin: true,
+                                    isPending: false,
+                                    pendingCount: pendingCount,
+                                    onTap: openProfile,
+                                  );
+                                },
+                              );
+                            }
                             return _TeamCard(
                               team: team,
                               isMyTeam: isMyTeam,
-                              isAdmin: isAdmin,
+                              isAdmin: false,
                               isPending: isPending,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EkipProfilScreen(
-                                    teamId: team.id,
-                                    currentUid: uid,
-                                  ),
-                                ),
-                              ),
+                              pendingCount: null,
+                              onTap: handleTap,
                             );
                           },
                         ),
@@ -244,7 +308,7 @@ class _EkiplerBody extends StatelessWidget {
                               color: AppColors.teal,
                               bottomColor: AppColors.tealDark,
                               onPressed: () => _openCreateSheet(
-                                  context, isPro, isDeveloper, adminTeamIds),
+                                  context, isPro, isDeveloper, validAdminTeamIds, cinsiyet),
                               child: Text(
                                 'Yeni Ekip Kur',
                                 style: GoogleFonts.nunito(
@@ -317,6 +381,7 @@ class _TeamCard extends StatelessWidget {
   final bool isMyTeam;
   final bool isAdmin;
   final bool isPending;
+  final int? pendingCount;
   final VoidCallback onTap;
 
   const _TeamCard({
@@ -325,6 +390,7 @@ class _TeamCard extends StatelessWidget {
     required this.isAdmin,
     required this.isPending,
     required this.onTap,
+    this.pendingCount,
   });
 
   Widget _buildLogo() {
@@ -476,6 +542,25 @@ class _TeamCard extends StatelessWidget {
                           color: AppColors.textLight,
                         ),
                       ),
+                      if (pendingCount != null && pendingCount! > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3E0),
+                            border: Border.all(color: const Color(0xFFFF9800), width: 0.8),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            '$pendingCount bekleyen',
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFE65100),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -489,12 +574,122 @@ class _TeamCard extends StatelessWidget {
   }
 }
 
+// ─── Bekleyen İstek Sheet (gizli ekip, onay bekleniyor) ──────────────────────
+
+class _PendingTeamSheet extends StatefulWidget {
+  final String teamId;
+  final String teamName;
+  final String currentUid;
+
+  const _PendingTeamSheet({
+    required this.teamId,
+    required this.teamName,
+    required this.currentUid,
+  });
+
+  @override
+  State<_PendingTeamSheet> createState() => _PendingTeamSheetState();
+}
+
+class _PendingTeamSheetState extends State<_PendingTeamSheet> {
+  bool _isLoading = false;
+
+  Future<void> _cancelRequest() async {
+    setState(() => _isLoading = true);
+    try {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      batch.delete(
+        db.collection('teams').doc(widget.teamId).collection('requests').doc(widget.currentUid),
+      );
+      batch.update(db.collection('users').doc(widget.currentUid), {
+        'pendingTeamIds': FieldValue.arrayRemove([widget.teamId]),
+      });
+      await batch.commit();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Hata: $e', style: GoogleFonts.nunito()),
+          backgroundColor: AppColors.errorRed,
+        ));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: AppColors.borderGrey,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFFFE082), width: 1.5),
+              ),
+              child: const Icon(Icons.hourglass_empty_rounded, color: Color(0xFFF59E0B), size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'İsteğin Beklemede',
+              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '"${widget.teamName}" ekibine katılma isteğin gönderildi. Ekip lideri isteğini inceleyip onaylayacak.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isLoading ? null : _cancelRequest,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.errorRed),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.errorRed))
+                    : Text('İsteği İptal Et', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.errorRed)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Yeni Ekip Kur Sheet ──────────────────────────────────────────────────────
 
 class _CreateTeamSheet extends StatefulWidget {
   final String uid;
   final bool isDeveloper;
   final bool isPro;
+  final String cinsiyet;
   final List<String> adminTeamIds;
   final void Function(String teamId) onCreated;
 
@@ -502,6 +697,7 @@ class _CreateTeamSheet extends StatefulWidget {
     required this.uid,
     required this.isDeveloper,
     required this.isPro,
+    required this.cinsiyet,
     required this.adminTeamIds,
     required this.onCreated,
   });
@@ -524,58 +720,45 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
     super.dispose();
   }
 
+  void _showError(String msg) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Eksik bilgi', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        content: Text(msg, style: GoogleFonts.nunito(color: AppColors.textMid)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Tamam', style: GoogleFonts.nunito(color: AppColors.teal, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _create() async {
     final name = _nameCtrl.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Grup adı gerekli.', style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.errorRed,
-      ));
+    if (name.isEmpty) { _showError('Ekip adı gerekli.'); return; }
+    if (_isPrivate == null) { _showError('Görünürlüğü seçin.'); return; }
+    if (_genderPolicy == null) { _showError('Katılım politikasını seçin.'); return; }
+    if (_isPrivate == false && _genderPolicy == 'all') {
+      _showError('Herkese açık ekip karışık olamaz. Gizli yapmak için "Sadece Davet" seçin.');
       return;
     }
-    if (_isPrivate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text('Grubun görünürlüğünü seçin.', style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.errorRed,
-      ));
+    final c = widget.cinsiyet;
+    if (c == 'bey' && _genderPolicy == 'women') {
+      _showError('Beyler yalnızca hanımlara özel ekip açamaz.');
       return;
     }
-    if (_genderPolicy == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text('Katılım politikasını seçin.', style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.errorRed,
-      ));
+    if (c == 'hanim' && _genderPolicy == 'men') {
+      _showError('Hanımlar yalnızca beylere özel ekip açamaz.');
       return;
     }
 
     setState(() => _isLoading = true);
     try {
       final db = FirebaseFirestore.instance;
-
-      // Limit çift kontrol (sheet açıldıktan sonra değişmiş olabilir)
-      final userDoc = await db.collection('users').doc(widget.uid).get();
-      final userData = userDoc.data() ?? {};
-      final latestAdminTeamIds = ((userData['adminTeamIds']) as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const <String>[];
-      if (!TeamLimits.canCreate(
-          isPro: widget.isPro,
-          isDev: widget.isDeveloper,
-          adminCount: latestAdminTeamIds.length)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                TeamLimits.createLimitMessage(
-                    isPro: widget.isPro, isDev: widget.isDeveloper),
-                style: GoogleFonts.nunito()),
-            backgroundColor: AppColors.errorRed,
-          ));
-        }
-        return;
-      }
 
       // Açık ekiplerde davet kodu olmaz
       final inviteCode = (_isPrivate == true) ? _generateInviteCode() : '';
@@ -693,7 +876,11 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           const SizedBox(height: 8),
           _PrivacyToggle(
             secili: _isPrivate,
-            onChanged: (v) => setState(() => _isPrivate = v),
+            onChanged: (v) => setState(() {
+              _isPrivate = v;
+              // Açık seçilince karışık seçeneği geçersiz — temizle
+              if (v == false && _genderPolicy == 'all') _genderPolicy = null;
+            }),
           ),
           const SizedBox(height: 20),
           Text(
@@ -707,8 +894,27 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
           const SizedBox(height: 8),
           _GenderPolicyToggle(
             secili: _genderPolicy,
-            onChanged: (v) => setState(() => _genderPolicy = v),
+            cinsiyet: widget.cinsiyet,
+            isPublic: _isPrivate == false,
+            onChanged: (v) => setState(() {
+              _genderPolicy = v;
+              // Karışık seçilince gizli zorunlu
+              if (v == 'all') _isPrivate = true;
+            }),
           ),
+          if (_genderPolicy == 'all') ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.lock_outline, size: 11, color: AppColors.teal),
+                const SizedBox(width: 4),
+                Text(
+                  'Karışık ekip otomatik olarak "Sadece Davet" yapıldı.',
+                  style: GoogleFonts.nunito(fontSize: 10, color: AppColors.teal),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -864,25 +1070,15 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
         return;
       }
 
-      // 5. Cinsiyet politikası kontrolü
-      if (!widget.isDeveloper && genderPolicy != 'all') {
+      // 5. Cinsiyet politikası kontrolü — developer dahil herkes uymak zorunda
+      if (genderPolicy != 'all') {
         final cinsiyet = userData['cinsiyet'] as String? ?? '';
-        if (genderPolicy == 'men' && cinsiyet == 'hanim') {
-          if (mounted) {
-            setState(() {
-              _error = 'Bu ekip yalnızca erkek üyelere açık.';
-              _isLoading = false;
-            });
-          }
+        if (genderPolicy == 'men' && cinsiyet != 'bey') {
+          if (mounted) setState(() { _error = 'Bu ekip yalnızca erkek üyelere açık.'; _isLoading = false; });
           return;
         }
-        if (genderPolicy == 'women' && cinsiyet == 'bey') {
-          if (mounted) {
-            setState(() {
-              _error = 'Bu ekip yalnızca hanım üyelere açık.';
-              _isLoading = false;
-            });
-          }
+        if (genderPolicy == 'women' && cinsiyet != 'hanim') {
+          if (mounted) setState(() { _error = 'Bu ekip yalnızca hanım üyelere açık.'; _isLoading = false; });
           return;
         }
       }
@@ -1228,24 +1424,43 @@ class _PrivacyToggle extends StatelessWidget {
 
 class _GenderPolicyToggle extends StatelessWidget {
   final String? secili;
+  final String cinsiyet;
+  final bool isPublic;
   final ValueChanged<String> onChanged;
 
-  const _GenderPolicyToggle({required this.secili, required this.onChanged});
+  const _GenderPolicyToggle({
+    required this.secili,
+    required this.cinsiyet,
+    required this.onChanged,
+    this.isPublic = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const options = [
+    const all = [
       ('all', '👥  Herkese'),
       ('men', 'Sadece Beyler'),
       ('women', 'Sadece Hanımlar'),
     ];
 
+    // Cinsiyet kısıtı + açık grup kısıtı
+    final options = all.where((o) {
+      if (cinsiyet == 'bey' && o.$1 == 'women') return false;
+      if (cinsiyet == 'hanim' && o.$1 == 'men') return false;
+      if (isPublic && o.$1 == 'all') return false; // açık ekip karışık olamaz
+      return true;
+    }).toList();
+
+    final n = options.length;
     int? selectedIdx;
-    for (int i = 0; i < options.length; i++) {
-      if (options[i].$1 == secili) {
-        selectedIdx = i;
-        break;
-      }
+    for (int i = 0; i < n; i++) {
+      if (options[i].$1 == secili) { selectedIdx = i; break; }
+    }
+
+    // Sliding indicator alignment: n seçenek için eşit aralıklı -1..1
+    double alignX(int i) {
+      if (n == 1) return 0;
+      return -1 + (2 / (n - 1)) * i;
     }
 
     return Container(
@@ -1262,10 +1477,9 @@ class _GenderPolicyToggle extends StatelessWidget {
             AnimatedAlign(
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeInOut,
-              alignment: Alignment(
-                  selectedIdx == 0 ? -1 : selectedIdx == 1 ? 0 : 1, 0),
+              alignment: Alignment(alignX(selectedIdx), 0),
               child: FractionallySizedBox(
-                widthFactor: 1 / 3,
+                widthFactor: 1 / n,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1293,11 +1507,8 @@ class _GenderPolicyToggle extends StatelessWidget {
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
                         fontSize: 11.5,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.textDark
-                            : const Color(0xFF9E9E9E),
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? AppColors.textDark : const Color(0xFF9E9E9E),
                       ),
                       child: Text(opt.$2),
                     ),

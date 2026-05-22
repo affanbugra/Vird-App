@@ -4,8 +4,8 @@ class TeamLimits {
   // Kaç farklı ekibe üye olabilir (kendi kurduğu hariç)
   static int maxJoin({required bool isPro, required bool isDev}) {
     if (isDev) return _unlimited;
-    if (isPro) return 5;
-    return 3;
+    if (isPro) return 4;
+    return 2;
   }
 
   // Kaç ekip kurabilir (lider olabileceği)
@@ -37,21 +37,17 @@ class TeamLimits {
   static String joinLimitMessage({required bool isPro, required bool isDev}) {
     if (isDev) return '';
     if (isPro) {
-      return 'Pro hesap ekip limitine ulaştı (${maxJoin(isPro: true, isDev: false)} ekip). '
-          'Daha fazlası için geliştirici ile iletişime geçebilirsiniz.';
+      return 'Pro hesapla en fazla 4 ekibe katılabilirsin. Daha fazlası için bizimle iletişime geç.';
     }
-    return 'Ekip limitine ulaştın (${maxJoin(isPro: false, isDev: false)} ekip). '
-        'Daha fazla ekibe katılmak için Pro hesap gereklidir — yakında geliyor!';
+    return '2 ekibe katılma limitine ulaştın. Şu an 1 ekip kurma + 2 farklı ekibe üye olma hakkın var. Daha fazlası için Pro üyelik gerekiyor — yakında geliyor, takipte kal!';
   }
 
   static String createLimitMessage({required bool isPro, required bool isDev}) {
     if (isDev) return '';
     if (isPro) {
-      return 'Pro hesap ekip kurma limitine ulaştı (${maxCreate(isPro: true, isDev: false)} ekip). '
-          'Daha fazlası için geliştirici ile iletişime geçebilirsiniz.';
+      return 'Pro hesapla en fazla 3 ekip kurabilirsin. Daha fazlası için bizimle iletişime geç.';
     }
-    return '1\'den fazla ekip kurmak Pro hesap gerektirir. '
-        'Pro hesap yakında geliyor!';
+    return 'En fazla 1 ekip kurabilirsin. Daha fazlası için Pro üyelik gerekiyor — yakında geliyor, takipte kal!';
   }
 
   static String joinLimitLabel({required bool isPro, required bool isDev}) {

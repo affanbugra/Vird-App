@@ -13,6 +13,8 @@ class TeamModel {
   final String inviteCode;
   // 'all' | 'men' | 'women'
   final String genderPolicy;
+  // Sadece private + all gruplarda geçerli: karşı cinsin adı tam görünsün mü?
+  final bool showCrossGenderNames;
 
   const TeamModel({
     required this.id,
@@ -26,6 +28,7 @@ class TeamModel {
     required this.isPrivate,
     required this.inviteCode,
     this.genderPolicy = 'all',
+    this.showCrossGenderNames = true,
   });
 
   factory TeamModel.fromFirestore(DocumentSnapshot doc) {
@@ -42,6 +45,7 @@ class TeamModel {
       isPrivate: data['isPrivate'] as bool? ?? true,
       inviteCode: data['inviteCode'] as String? ?? '',
       genderPolicy: data['genderPolicy'] as String? ?? 'all',
+      showCrossGenderNames: data['showCrossGenderNames'] as bool? ?? true,
     );
   }
 
@@ -56,5 +60,6 @@ class TeamModel {
         'isPrivate': isPrivate,
         'inviteCode': inviteCode,
         'genderPolicy': genderPolicy,
+        'showCrossGenderNames': showCrossGenderNames,
       };
 }

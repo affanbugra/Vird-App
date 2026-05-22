@@ -231,6 +231,28 @@ onChanged: (t) => setState(() {
 
 ---
 
+### Ekip Sistemi
+
+**Developer bypass → cinsiyet kurallarını kırar**
+Ekip katılım/kurma limitlerinde `isDeveloper` bypass eklenince aynı pattern cinsiyet kontrolüne de yayılma eğilimi gösterir. Cinsiyet kuralı ayrı bir politikadır; limit bypass ile birlikte uygulanmamalı.
+```
+Semptom: Developer kullanıcı kısıtlı cinsiyetli ekibi görebiliyor / ekipte açılıyor.
+Root cause: isDeveloper kontrolü cinsiyet check'ini de kısa devre etmiş.
+Çözüm: Limit ve cinsiyet kontrollerini ayrı if blokları yaz; isDev bypass yalnızca limit bloğuna gir.
+Önlem: CLAUDE.md → "Ekip Sistemi" bölümünü oku — developer ayrıcalıkları net tanımlanmış.
+```
+
+**`_CrossGenderNamesToggle` bottom sheet içinde görsel güncelleme yapmaz**
+Bottom sheet, parent `StreamBuilder`'ın yeni snapshot'ını bekler. Toggle güncellenmesi gecikir veya hiç olmaz.
+```dart
+// ✅ Çözüm: Local optimistic state
+late bool _localValue;
+void initState() { super.initState(); _localValue = widget.value; }
+// Toggle: önce _localValue'yu güncelle → Firestore yaz → hata varsa revert
+```
+
+---
+
 ### Web Deploy
 
 **Beyaz ekran: `FormatException: Unexpected token '<'`**

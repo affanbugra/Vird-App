@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -21,11 +21,34 @@ import 'screens/profil_screen.dart';
 import 'screens/gunluk_takipler_screen.dart';
 import 'widgets/log_entry_bottom_sheet.dart';
 
+Future<void> _logErrorToFirestore(FlutterErrorDetails details) async {
+  try {
+    final stack = details.stack?.toString() ?? '';
+    await FirebaseFirestore.instance.collection('app_errors').add({
+      'error': details.exceptionAsString(),
+      'stack': stack.length > 2000 ? stack.substring(0, 2000) : stack,
+      'library': details.library ?? '',
+      'createdAt': FieldValue.serverTimestamp(),
+      'platform': kIsWeb ? 'web' : 'mobile',
+    });
+  } catch (_) {}
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Kırmızı hata ekranını kullanıcı dostu widget ile değiştir
+  ErrorWidget.builder = (FlutterErrorDetails details) =>
+      _AppErrorWidget(details: details);
+
+  // Tüm Flutter hatalarını sessizce Firestore'a logla
+  FlutterError.onError = (FlutterErrorDetails details) {
+    if (kDebugMode) FlutterError.presentError(details);
+    _logErrorToFirestore(details);
+  };
 
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
@@ -345,6 +368,67 @@ class _NavItem extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Kullanıcı Dostu Hata Ekranı ──────────────────────────────────────────
+class _AppErrorWidget extends StatelessWidget {
+  final FlutterErrorDetails details;
+  const _AppErrorWidget({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72, height: 72,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.error_outline, size: 36, color: Color(0xFFEF4444)),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Bir şeyler ters gitti',
+                style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w800,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Beklenmedik bir hata oluştu.\nGeliştirici bilgilendirildi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14, color: Color(0xFF6B7280), height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 28),
+              TextButton(
+                onPressed: () {
+                  try { Navigator.of(context).pop(); } catch (_) {}
+                },
+                child: const Text(
+                  'Geri Dön',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF00897B),
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

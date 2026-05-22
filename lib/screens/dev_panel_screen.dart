@@ -179,7 +179,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback, hafiz, roadmap }
+enum _PanelView { home, backlog, feedback, hafiz, roadmap, errors }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -223,6 +223,7 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             onFeedbackTap:   () => setState(() => _view = _PanelView.feedback),
             onHafizTap:      () => setState(() => _view = _PanelView.hafiz),
             onRoadmapTap:    () => setState(() => _view = _PanelView.roadmap),
+            onErrorsTap:     () => setState(() => _view = _PanelView.errors),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -240,6 +241,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('roadmap'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
+        _PanelView.errors   => _ErrorLogsView(
+            key: const ValueKey('errors'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
       },
     );
   }
@@ -252,7 +257,8 @@ class _HomeView extends StatelessWidget {
   final VoidCallback onFeedbackTap;
   final VoidCallback onHafizTap;
   final VoidCallback onRoadmapTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap});
+  final VoidCallback onErrorsTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onErrorsTap});
 
   @override
   Widget build(BuildContext context) {
@@ -407,6 +413,43 @@ class _HomeView extends StatelessWidget {
                         onTap: onHafizTap,
                       );
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Expanded(
+                          child: _PanelCard(
+                            icon: Icons.campaign_outlined,
+                            title: 'Bildirim\nPaneli',
+                            subtitle: 'Toplu bildirim yönetimi',
+                            active: false,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('app_errors')
+                                .orderBy('createdAt', descending: true)
+                                .limit(1)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final count = snap.data?.docs.length ?? 0;
+                              return _PanelCard(
+                                icon: Icons.bug_report_outlined,
+                                title: 'Hata\nKayıtları',
+                                subtitle: 'Uygulama hataları',
+                                active: true,
+                                badgeCount: count,
+                                onTap: onErrorsTap,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -4157,6 +4200,163 @@ class _HafizUserCardState extends State<_HafizUserCard> {
               ),
               child: const Text('Kaldır', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Hata Kayıtları ───────────────────────────────────────────────────────────
+
+class _ErrorLogsView extends StatelessWidget {
+  final VoidCallback onBack;
+  const _ErrorLogsView({super.key, required this.onBack});
+
+  String _timeAgo(Timestamp? ts) {
+    if (ts == null) return '';
+    final diff = DateTime.now().difference(ts.toDate());
+    if (diff.inMinutes < 1) return 'Az önce';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    return '${diff.inDays} gün önce';
+  }
+
+  Future<void> _clearAll(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logları Temizle', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Tüm hata kayıtları silinecek.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final snap = await FirebaseFirestore.instance.collection('app_errors').get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snap.docs) { batch.delete(doc.reference); }
+    await batch.commit();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 12, 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+                const SizedBox(width: 4),
+                const Expanded(
+                  child: Text('Hata Kayıtları',
+                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                ),
+                TextButton(
+                  onPressed: () => _clearAll(context),
+                  child: const Text('Temizle', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('app_errors')
+                  .orderBy('createdAt', descending: true)
+                  .limit(50)
+                  .snapshots(),
+              builder: (context, snap) {
+                final docs = snap.data?.docs ?? [];
+                if (snap.connectionState == ConnectionState.waiting && docs.isEmpty) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.teal));
+                }
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 48, color: AppColors.teal),
+                        SizedBox(height: 12),
+                        Text('Hata kaydı yok', style: TextStyle(color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final data = docs[i].data() as Map<String, dynamic>;
+                    final error = data['error'] as String? ?? 'Bilinmeyen hata';
+                    final library = data['library'] as String? ?? '';
+                    final platform = data['platform'] as String? ?? '';
+                    final stack = data['stack'] as String? ?? '';
+                    final ts = data['createdAt'] as Timestamp?;
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.bug_report_outlined, size: 14, color: Color(0xFFEF4444)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(error,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF991B1B)),
+                                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                          if (library.isNotEmpty || platform.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              [if (library.isNotEmpty) library, if (platform.isNotEmpty) platform].join(' · '),
+                              style: const TextStyle(fontSize: 10, color: Color(0xFFB91C1C)),
+                            ),
+                          ],
+                          if (stack.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              stack.length > 300 ? '${stack.substring(0, 300)}…' : stack,
+                              style: const TextStyle(fontSize: 9, color: Color(0xFF6B7280), fontFamily: 'monospace', height: 1.4),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          Text(_timeAgo(ts),
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

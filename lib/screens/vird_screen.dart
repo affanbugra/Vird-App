@@ -7,6 +7,22 @@ import '../app_colors.dart';
 import '../app_assets.dart';
 import '../data/roadmap_entry.dart';
 
+// ─── Public yardımcı: roadmap sheet'ini herhangi bir context'ten aç ──────────
+Future<void> showRoadmapSheet(BuildContext context) async {
+  final snap = await FirebaseFirestore.instance
+      .collection('roadmap_entries')
+      .orderBy('order')
+      .get();
+  final entries = snap.docs.map(RoadmapEntry.fromDoc).toList();
+  if (!context.mounted) return;
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _RoadmapSheet(allEntries: entries),
+  );
+}
+
 // ─── Ana ekran ─────────────────────────────────────────────────────────────
 class VirdScreen extends StatefulWidget {
   const VirdScreen({super.key});

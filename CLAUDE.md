@@ -101,6 +101,32 @@ Tipler: `feat` `fix` `style` `refactor` `docs`
 
 ---
 
+## Ekip Sistemi
+
+Ekip kurallarının özeti — detay `README/STATUS.md` → Teknik Kararlar bölümünde.
+
+**Cinsiyet politikası (`genderPolicy`: `'men'` | `'women'` | `'all'`)**
+- Herkese açık (`isPrivate: false`) ekip **yalnızca** `men` veya `women` olabilir — `all` daima private.
+- Kullanıcı yanlış cinsiyetteyse ekip listeye düşmez; profil sayfasına girerse `_GenderBlockedTeamView` görür.
+- `isDeveloper` bu kuralı **baypas etmez** — cinsiyet kuralı herkese eşit uygulanır.
+
+**Developer ayrıcalıkları (ve sınırları)**
+- Kazanır: DevPanel erişimi + ekip katılım/kurma limitini atlatma.
+- Kazanmaz: Cinsiyet filtresi bypass, özel ekip inviteCode'sız erişim.
+
+**Ekip limitleri** (`lib/config/team_limits.dart`)
+- Katılım: normal = 2, pro = 4, dev = sınırsız.
+- Kurma:   normal = 1, pro = 3, dev = sınırsız.
+
+**Karışık ekip gizliliği (`genderPolicy == 'all'`)**
+- Liderboard üyelerine tıklanamaz (profil açılmaz).
+- Karşı cins isimleri sansürlenir: `kelime[0] + '*****'` (kendi profilinde sansür yok).
+
+**Herkese açık ekip join akışı**
+- Üye olmayan kullanıcı → `_PublicTeamJoinView` (katılım onay ekranı), tam profil değil.
+
+---
+
 ## Antigravity
 
 - **Onay al:** Metinler, tasarımlar, sloganlar için önce öneri sun, onay bekle
