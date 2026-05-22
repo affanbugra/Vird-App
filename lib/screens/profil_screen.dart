@@ -20,6 +20,8 @@ import 'dev_panel_screen.dart';
 import '../utils/seri_calculator.dart';
 import '../utils/text_utils.dart';
 import '../providers/user_provider.dart';
+import '../models/reading_log_model.dart';
+import '../models/hatim_model.dart';
 
 enum HeatTypeFilter { arapca, meal }
 enum HeatTimeFilter { all, month, year }
@@ -48,6 +50,112 @@ class _ProfilScreenState extends State<ProfilScreen> {
   HeatTypeFilter _typeFilter = HeatTypeFilter.arapca;
   HeatTimeFilter _timeFilter = HeatTimeFilter.all;
   int? _selectedPage;
+
+  Future<void> _logPageRead(int page) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final db = FirebaseFirestore.instance;
+    final userRef = db.collection('users').doc(user.uid);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    final userSnap = await userRef.get();
+    final userData = userSnap.data() ?? {};
+
+    final currentSeri = (userData['seri'] as int?) ?? 0;
+    final lastLogTs = userData['lastLogDate'] as Timestamp?;
+    final lastLogDate = lastLogTs != null
+        ? () {
+            final ld = lastLogTs.toDate().toLocal();
+            return DateTime(ld.year, ld.month, ld.day);
+          }()
+        : null;
+
+    final Map<String, dynamic> seriUpdate;
+    bool needsSeriRecalculate = false;
+
+    if (lastLogDate != null && !lastLogDate.isBefore(today)) {
+      seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+    } else if (lastLogDate != null && !lastLogDate.isBefore(yesterday)) {
+      seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+    } else if (lastLogDate == null) {
+      final hadLogYesterday = await userRef
+          .collection('logs')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
+          .where('createdAt', isLessThan: Timestamp.fromDate(today))
+          .limit(1)
+          .get()
+          .then((s) => s.docs.isNotEmpty);
+      if (hadLogYesterday) {
+        needsSeriRecalculate = true;
+        seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+      } else {
+        seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      }
+    } else {
+      seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+    }
+
+    final weekMonday = today.subtract(Duration(days: today.weekday - 1));
+    final weekStartStr = '${weekMonday.year}-${weekMonday.month.toString().padLeft(2, '0')}-${weekMonday.day.toString().padLeft(2, '0')}';
+    final existingWeekStr = userData['weeklyStartDate'] as String?;
+    final Map<String, dynamic> weeklyUpdate;
+    if (existingWeekStr == weekStartStr) {
+      weeklyUpdate = {
+        'weeklyHasanat': FieldValue.increment(10),
+        'weeklyStartDate': weekStartStr,
+      };
+    } else {
+      weeklyUpdate = {
+        'weeklyHasanat': 10,
+        'weeklyStartDate': weekStartStr,
+        if (existingWeekStr != null) ...{
+          'prevWeeklyStartDate': existingWeekStr,
+          'prevWeeklyHasanat': (userData['weeklyHasanat'] as int?) ?? 0,
+        },
+      };
+    }
+
+    final type = _typeFilter == HeatTypeFilter.arapca ? HatimType.arapca : HatimType.meal;
+
+    final batch = db.batch();
+    final logRef = userRef.collection('logs').doc();
+    batch.set(logRef, ReadingLog(
+      id: '',
+      type: type,
+      method: LogMethod.pages,
+      pagesRead: 1,
+      startPage: page,
+      endPage: page,
+      hatimId: null,
+      createdAt: now,
+    ).toMap());
+
+    batch.set(userRef, {
+      'hasanat': FieldValue.increment(10),
+      'totalPages': FieldValue.increment(1),
+      ...seriUpdate,
+      ...weeklyUpdate,
+    }, SetOptions(merge: true));
+
+    await batch.commit();
+
+    if (needsSeriRecalculate) {
+      await SeriCalculator.recalculate(user.uid);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sayfa $page okundu! +10 hasanat'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   void _showHafizSheetDirectly(BuildContext context, Map<String, dynamic> userData, User user) {
     showModalBottomSheet(
@@ -238,7 +346,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             _timeFilter = f;
                             _selectedPage = null;
                           }),
-                          onPageTap: (p) => setState(() => _selectedPage = p),
+                          onPageTap: (p) {
+                            setState(() => _selectedPage = p);
+                            _logPageRead(p);
+                          },
                         ),
                         const SizedBox(height: 24),
                       ],
