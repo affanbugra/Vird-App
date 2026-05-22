@@ -190,10 +190,19 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
                   const SizedBox(height: 16),
                   TextField(
                     autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    maxLength: 50,
+                    onSubmitted: (val) {
+                      newTitle = val;
+                      if (newTitle.trim().isEmpty) return;
+                      Navigator.pop(ctx);
+                      _addNewHabit(newTitle.trim(), selectedColor);
+                    },
                     decoration: InputDecoration(
                       hintText: 'Örn: Sabah Yürüyüşü',
                       filled: true,
                       fillColor: AppColors.lightGrey,
+                      counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -366,9 +375,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
         content: TextField(
           controller: ctrl,
           autofocus: true,
+          textInputAction: TextInputAction.done,
+          maxLength: 50,
+          onSubmitted: (val) {
+            if (val.trim().isNotEmpty) Navigator.pop(ctx, val.trim());
+          },
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.lightGrey,
+            counterText: '',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

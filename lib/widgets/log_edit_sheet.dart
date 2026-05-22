@@ -328,9 +328,13 @@ class _LogEditSheetState extends State<LogEditSheet> {
           controller: _pagesCtrl,
           keyboardType: TextInputType.number,
           autofocus: true,
+          textInputAction: TextInputAction.done,
+          maxLength: 4,
+          onSubmitted: (_) => _loading ? null : _save(),
           decoration: InputDecoration(
             labelText: 'Okunan sayfa sayısı',
             prefixIcon: const Icon(Icons.add),
+            counterText: '',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -347,8 +351,11 @@ class _LogEditSheetState extends State<LogEditSheet> {
                 controller: _startCtrl,
                 keyboardType: TextInputType.number,
                 autofocus: true,
+                textInputAction: TextInputAction.next,
+                maxLength: 4,
                 decoration: InputDecoration(
                   labelText: 'Başlangıç',
+                  counterText: '',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   focusedBorder: OutlineInputBorder(
@@ -370,8 +377,12 @@ class _LogEditSheetState extends State<LogEditSheet> {
               child: TextField(
                 controller: _endCtrl,
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                maxLength: 4,
+                onSubmitted: (_) => _loading ? null : _save(),
                 decoration: InputDecoration(
                   labelText: 'Bitiş',
+                  counterText: '',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   focusedBorder: OutlineInputBorder(

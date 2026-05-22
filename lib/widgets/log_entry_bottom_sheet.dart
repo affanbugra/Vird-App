@@ -755,9 +755,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             controller: _devamPagesCtrl,
             keyboardType: TextInputType.number,
             autofocus: widget.initialHatim != null,
+            textInputAction: TextInputAction.done,
+            maxLength: 4,
+            onSubmitted: (_) => _saveLog(),
             decoration: InputDecoration(
               labelText: 'Kaç sayfa okudun?',
               prefixIcon: const Icon(Icons.add),
+              counterText: '',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -818,8 +822,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 child: TextField(
                   controller: _startPageCtrl,
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 4,
                   decoration: InputDecoration(
                     labelText: 'Başlangıç',
+                    counterText: '',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -840,8 +847,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 child: TextField(
                   controller: _endPageCtrl,
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  maxLength: 4,
+                  onSubmitted: (_) => _saveLog(),
                   decoration: InputDecoration(
                     labelText: 'Bitiş',
+                    counterText: '',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),

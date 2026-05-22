@@ -219,10 +219,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
       child: switch (_view) {
         _PanelView.home     => _HomeView(
             key: const ValueKey('home'),
-            onBacklogTap:  () => setState(() => _view = _PanelView.backlog),
-            onFeedbackTap: () => setState(() => _view = _PanelView.feedback),
-            onHafizTap:    () => setState(() => _view = _PanelView.hafiz),
-            onRoadmapTap:  () => setState(() => _view = _PanelView.roadmap),
+            onBacklogTap:    () => setState(() => _view = _PanelView.backlog),
+            onFeedbackTap:   () => setState(() => _view = _PanelView.feedback),
+            onHafizTap:      () => setState(() => _view = _PanelView.hafiz),
+            onRoadmapTap:    () => setState(() => _view = _PanelView.roadmap),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),

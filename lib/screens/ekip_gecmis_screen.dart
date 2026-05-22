@@ -5,6 +5,8 @@ import '../app_colors.dart';
 import '../utils/name_utils.dart';
 import 'kullanici_profil_screen.dart';
 
+enum _HafizFilter { none, hafizOnly, nonHafiz }
+
 class EkipGecmisScreen extends StatelessWidget {
   final String teamId;
   final String teamName;
@@ -118,10 +120,16 @@ class EkipGecmisScreen extends StatelessWidget {
                 );
               }
 
+              // non-admin için son öğe olarak lider notu eklenir
+              final itemCount = docs.length + (isAdmin ? 0 : 1);
+
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                itemCount: docs.length,
+                itemCount: itemCount,
                 itemBuilder: (context, index) {
+                  if (!isAdmin && index == docs.length) {
+                    return _LeaderNote();
+                  }
                   final doc = docs[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final rankings = (data['rankings'] as List<dynamic>? ?? [])
@@ -138,6 +146,33 @@ class EkipGecmisScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Lider Notu (non-admin) ───────────────────────────────────────────────────
+
+class _LeaderNote extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 14, color: AppColors.textLight),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Tüm geçmiş hafta sıralamalarını ekip liderleri görebilir.',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                color: AppColors.textLight,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -162,12 +197,33 @@ class _GecmisWeekCard extends StatefulWidget {
 
 class _GecmisWeekCardState extends State<_GecmisWeekCard> {
   bool _showLow = false;
+  _HafizFilter _hafizFilter = _HafizFilter.none;
 
   List<Map<String, dynamic>> get _displayed {
-    if (!_showLow) return widget.rankings;
-    return widget.rankings
-        .where((r) => (r['periodHasanat'] as int? ?? 0) < 100)
-        .toList();
+    var list = widget.rankings;
+
+    if (_hafizFilter == _HafizFilter.hafizOnly) {
+      list = list.where((r) => (r['isHafiz'] as bool?) == true).toList();
+    } else if (_hafizFilter == _HafizFilter.nonHafiz) {
+      list = list.where((r) => (r['isHafiz'] as bool?) != true).toList();
+    }
+
+    if (_showLow) {
+      list = list.where((r) => (r['periodHasanat'] as int? ?? 0) < 100).toList();
+    }
+
+    return list;
+  }
+
+  String get _hafizLabel {
+    switch (_hafizFilter) {
+      case _HafizFilter.hafizOnly:
+        return '📖 Sadece Hafız';
+      case _HafizFilter.nonHafiz:
+        return '📖 Hafız Hariç';
+      case _HafizFilter.none:
+        return '📖 Hafız';
+    }
   }
 
   @override
@@ -175,8 +231,13 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
     final displayed = _displayed;
     final totalCount = widget.rankings.length;
     final count = displayed.length;
+    final filtered = _hafizFilter != _HafizFilter.none || _showLow;
     final showRedZone = !_showLow && count > 3;
     final redStartIdx = count - 3;
+
+    final subtitleText = filtered
+        ? '$count / $totalCount kişi'
+        : '$totalCount üye';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -198,7 +259,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
           ),
         ),
         subtitle: Text(
-          _showLow ? '$count / $totalCount kişi' : '$totalCount üye',
+          subtitleText,
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -224,14 +285,28 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
               ),
             )
           else ...[
-            // Filtre chip
+            // Filtre satırı
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
               child: Row(
                 children: [
+                  _GecmisFilterChip(
+                    label: _hafizLabel,
+                    selected: _hafizFilter != _HafizFilter.none,
+                    selectedColor: AppColors.emeraldGreen,
+                    onTap: () => setState(() {
+                      _hafizFilter = switch (_hafizFilter) {
+                        _HafizFilter.none      => _HafizFilter.hafizOnly,
+                        _HafizFilter.hafizOnly => _HafizFilter.nonHafiz,
+                        _HafizFilter.nonHafiz  => _HafizFilter.none,
+                      };
+                    }),
+                  ),
                   const Spacer(),
-                  _FilterChip(
+                  _GecmisFilterChip(
+                    label: '⚠️ <100 Puan',
                     selected: _showLow,
+                    selectedColor: AppColors.errorRed,
                     onTap: () => setState(() => _showLow = !_showLow),
                   ),
                 ],
@@ -242,7 +317,9 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Text(
-                  'Herkes bu hafta 100 puanı aştı 🎉',
+                  _showLow
+                      ? 'Herkes bu hafta 100 puanı aştı 🎉'
+                      : 'Bu filtreye uyan üye yok.',
                   style: GoogleFonts.nunito(
                       color: AppColors.textMid, fontSize: 13),
                 ),
@@ -262,6 +339,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
                         _showLow ||
                         (!isTop && showRedZone && i >= redStartIdx);
                     final uid = r['uid'] as String?;
+                    final isHafiz = (r['isHafiz'] as bool?) ?? false;
 
                     return GestureDetector(
                       onTap: uid != null
@@ -280,6 +358,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
                         isTop: isTop,
                         isRed: isRed,
                         isDeepRed: isDeepRed,
+                        isHafiz: isHafiz,
                       ),
                     );
                   }),
@@ -302,6 +381,7 @@ class _GecmisRow extends StatelessWidget {
   final bool isTop;
   final bool isRed;
   final bool isDeepRed;
+  final bool isHafiz;
 
   const _GecmisRow({
     required this.rank,
@@ -311,6 +391,7 @@ class _GecmisRow extends StatelessWidget {
     required this.isTop,
     required this.isRed,
     this.isDeepRed = false,
+    this.isHafiz = false,
   });
 
   String get _medal {
@@ -376,42 +457,46 @@ class _GecmisRow extends StatelessWidget {
                   ),
           ),
           const SizedBox(width: 8),
-          // Avatar
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.tealLight,
-            backgroundImage: avatarSeed != null
-                ? NetworkImage(
-                    'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
-                  )
-                : null,
-            child: avatarSeed == null
-                ? Text(
-                    nameInitials(name),
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.teal,
-                    ),
-                  )
-                : null,
+          // Avatar (hafız halkası)
+          Container(
+            padding: isHafiz ? const EdgeInsets.all(2) : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: isHafiz
+                  ? Border.all(color: AppColors.emeraldGreen, width: 2)
+                  : null,
+            ),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.tealLight,
+              backgroundImage: avatarSeed != null
+                  ? NetworkImage(
+                      'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
+                    )
+                  : null,
+              child: avatarSeed == null
+                  ? Text(
+                      nameInitials(name),
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.teal,
+                      ),
+                    )
+                  : null,
+            ),
           ),
           const SizedBox(width: 10),
-          // İsim ve kullanıcı adı
+          // İsim
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ],
+            child: Text(
+              name,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark,
+              ),
             ),
           ),
           // Hasanat
@@ -444,11 +529,18 @@ class _GecmisRow extends StatelessWidget {
 
 // ─── Filtre Chip ──────────────────────────────────────────────────────────────
 
-class _FilterChip extends StatelessWidget {
+class _GecmisFilterChip extends StatelessWidget {
+  final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color selectedColor;
 
-  const _FilterChip({required this.selected, required this.onTap});
+  const _GecmisFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.selectedColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -459,20 +551,20 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.errorRed.withValues(alpha: 0.12)
+              ? selectedColor.withValues(alpha: 0.12)
               : AppColors.lightGrey,
           border: Border.all(
-            color: selected ? AppColors.errorRed : AppColors.borderGrey,
+            color: selected ? selectedColor : AppColors.borderGrey,
             width: selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          '⚠️ <100 Puan',
+          label,
           style: GoogleFonts.nunito(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: selected ? AppColors.errorRed : AppColors.textMid,
+            color: selected ? selectedColor : AppColors.textMid,
           ),
         ),
       ),

@@ -132,10 +132,14 @@ class _FormContent extends StatelessWidget {
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
           autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => onSend(),
+          maxLength: 100,
           style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark),
           decoration: InputDecoration(
             labelText: 'E-posta adresi',
             labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+            counterText: '',
             prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textLight, size: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -309,6 +313,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: Icons.mail_outline_rounded,
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: () => FocusScope.of(context).nextFocus(),
+                      maxLength: 100,
                     ),
                     const SizedBox(height: 12),
                     _InputField(
@@ -317,6 +324,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: Icons.lock_outline_rounded,
                       obscureText: _obscurePassword,
                       autofillHints: const [AutofillHints.password],
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: _handleLogin,
+                      maxLength: 64,
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -445,6 +455,9 @@ class _InputField extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<String>? autofillHints;
   final Widget? suffixIcon;
+  final TextInputAction? textInputAction;
+  final VoidCallback? onSubmitted;
+  final int? maxLength;
 
   const _InputField({
     required this.controller,
@@ -454,6 +467,9 @@ class _InputField extends StatelessWidget {
     this.keyboardType,
     this.autofillHints,
     this.suffixIcon,
+    this.textInputAction,
+    this.onSubmitted,
+    this.maxLength,
   });
 
   @override
@@ -463,10 +479,14 @@ class _InputField extends StatelessWidget {
       obscureText: obscureText,
       keyboardType: keyboardType,
       autofillHints: autofillHints,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted != null ? (_) => onSubmitted!() : null,
+      maxLength: maxLength,
       style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.nunito(color: AppColors.textMid, fontSize: 14),
+        counterText: '',
         prefixIcon: Icon(icon, color: AppColors.textLight, size: 20),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
