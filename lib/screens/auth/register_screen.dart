@@ -105,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -205,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 label: Text('Google ile Kayıt Ol', style: TextStyle(color: context.adaptiveTextDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: AppColors.borderGrey),
+                  side: BorderSide(color: context.borderColor),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),

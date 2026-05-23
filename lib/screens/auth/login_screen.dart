@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.scaffoldBg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 label: Text('Google ile Giriş Yap', style: TextStyle(color: context.adaptiveTextDark)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: AppColors.borderGrey),
+                  side: BorderSide(color: context.borderColor),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),

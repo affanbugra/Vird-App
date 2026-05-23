@@ -686,7 +686,7 @@ class _HeatGrid extends StatelessWidget {
         height: sq,
         margin: const EdgeInsets.only(right: _squareGap),
         decoration: BoxDecoration(
-          color: QuranData.heatColorRelative(count, maxCount),
+          color: QuranData.heatColorRelative(context, count, maxCount),
           borderRadius: BorderRadius.circular(r),
           border: sel ? Border.all(color: context.adaptiveTextDark, width: 1) : null,
         ),
@@ -725,7 +725,7 @@ class _HeatGrid extends StatelessWidget {
                 width: sq,
                 height: sq,
                 decoration: BoxDecoration(
-                  color: QuranData.heatColorRelative(fatihaCount, maxCount),
+                  color: QuranData.heatColorRelative(context, fatihaCount, maxCount),
                   borderRadius: BorderRadius.circular(r),
                   border: fatihaSelected
                       ? Border.all(color: context.adaptiveTextDark, width: 1)
@@ -821,7 +821,7 @@ class _Legend extends StatelessWidget {
                   height: sq,
                   margin: const EdgeInsets.only(right: 3),
                   decoration: BoxDecoration(
-                    color: QuranData.heatColor(c),
+                    color: QuranData.heatColor(context, c),
                     borderRadius: BorderRadius.circular(r),
                   ),
                 )),
@@ -924,7 +924,7 @@ class _PageDetail extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: count == 0
                   ? AppColors.textLight
-                  : QuranData.heatColorRelative(count, maxCount),
+                  : QuranData.heatColorRelative(context, count, maxCount),
             ),
           ),
         ),

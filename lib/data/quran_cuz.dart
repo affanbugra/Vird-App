@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_colors.dart';
 
 // Türkiye Diyanet mushafı sayfa sistemi:
 // Fatiha → özel blok (page 0), Bakara 1. ayeti → sayfa 1.
@@ -209,8 +210,8 @@ class QuranData {
     return names.isEmpty ? '' : names.join(' · ');
   }
 
-  static Color heatColor(int count) {
-    if (count == 0) return const Color(0xFFEEEEEF);
+  static Color heatColor(BuildContext context, int count) {
+    if (count == 0) return context.adaptiveLightGrey;
     if (count <= 2) return const Color(0xFFB8DFE4);
     if (count <= 5) return const Color(0xFF7EC4CC);
     if (count <= 10) return const Color(0xFF2A7F8C);
@@ -220,8 +221,8 @@ class QuranData {
 
   // Göreli ısı rengi — max=1 iken bile "en az okunan" seviyede kalır.
   // Taban 10: 10+ okumaya sahip sayfalar tam karanlık eşiğine ulaşabilir.
-  static Color heatColorRelative(int count, int maxCount) {
-    if (count == 0) return const Color(0xFFEEEEEF);
+  static Color heatColorRelative(BuildContext context, int count, int maxCount) {
+    if (count == 0) return context.adaptiveLightGrey;
     final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
     final ratio = count / denom;
     if (ratio <= 0.1) return const Color(0xFFB8DFE4);
