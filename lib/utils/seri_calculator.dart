@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Seri/freeze tarih anahtarı formatı: 'YYYY-M-D' (tek haneli ay ve gün).
+/// frozenDates listesi ve log günü karşılaştırmalarında bu format kullanılır.
+/// Tüm seri hesabı ve takvim kodunda bu fonksiyon üzerinden üret.
+String seriDateKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
 /// Firestore'daki donmuş seri değerini lastLogDate'e göre gerçek duruma çevirir.
 /// value  : gösterilecek seri sayısı
 /// atRisk : true ise dün okundu, bugün henüz okuma yok
@@ -34,7 +39,12 @@ class SeriCalculator {
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
         .get();
 
-    final logDayKeys = <String>{};
+    final userSnap = await db.collection('users').doc(uid).get();
+    final frozenDates = Set<String>.from(
+      ((userSnap.data())?['frozenDates'] as List<dynamic>?) ?? [],
+    );
+
+    final logDayKeys = <String>{...frozenDates};
     for (final doc in snap.docs) {
       if (doc.id == logId) continue; // bu logu dışla
       final type = doc.data()['type'] as String?;
@@ -42,14 +52,14 @@ class SeriCalculator {
       final ts = doc.data()['createdAt'] as Timestamp?;
       if (ts != null) {
         final d = ts.toDate().toLocal();
-        logDayKeys.add('${d.year}-${d.month}-${d.day}');
+        logDayKeys.add(seriDateKey(d));
       }
     }
 
     DateTime? mostRecentLogDay;
     for (int i = 0; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
-      if (logDayKeys.contains('${d.year}-${d.month}-${d.day}')) {
+      if (logDayKeys.contains(seriDateKey(d))) {
         mostRecentLogDay = d;
         break;
       }
@@ -61,7 +71,7 @@ class SeriCalculator {
     final anchorOffset = todayMidnight.difference(mostRecentLogDay).inDays;
     for (int i = anchorOffset; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
-      if (logDayKeys.contains('${d.year}-${d.month}-${d.day}')) {
+      if (logDayKeys.contains(seriDateKey(d))) {
         seri++;
       } else {
         break;
@@ -70,8 +80,8 @@ class SeriCalculator {
     return seri;
   }
 
-  /// Log silindikten sonra çağrılır. Son 90 günlük loglara bakarak
-  /// kullanıcının gerçek mevcut serisini hesaplar ve Firestore'u günceller.
+  /// Log silindikten sonra çağrılır. Son 365 günlük loglara ve donmuş
+  /// günlere bakarak kullanıcının gerçek mevcut serisini hesaplar ve Firestore'u günceller.
   static Future<void> recalculate(String uid) async {
     final db = FirebaseFirestore.instance;
     final now = DateTime.now();
@@ -85,14 +95,20 @@ class SeriCalculator {
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
         .get();
 
-    final logDayKeys = <String>{};
+    final userSnap = await db.collection('users').doc(uid).get();
+    final frozenDates = Set<String>.from(
+      ((userSnap.data())?['frozenDates'] as List<dynamic>?) ?? [],
+    );
+
+    // Donmuş günler de ardışık sayım için aktif gün sayılır
+    final logDayKeys = <String>{...frozenDates};
     for (final doc in snap.docs) {
       final type = doc.data()['type'] as String?;
       if (type != 'arapca' && type != 'meal') continue;
       final ts = doc.data()['createdAt'] as Timestamp?;
       if (ts != null) {
         final d = ts.toDate().toLocal();
-        logDayKeys.add('${d.year}-${d.month}-${d.day}');
+        logDayKeys.add(seriDateKey(d));
       }
     }
 
@@ -100,7 +116,7 @@ class SeriCalculator {
     DateTime? mostRecentLogDay;
     for (int i = 0; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
-      final key = '${d.year}-${d.month}-${d.day}';
+      final key = seriDateKey(d);
       if (logDayKeys.contains(key)) {
         mostRecentLogDay = d;
         break;
@@ -120,7 +136,7 @@ class SeriCalculator {
     final anchorOffset = todayMidnight.difference(mostRecentLogDay).inDays;
     for (int i = anchorOffset; i <= 365; i++) {
       final d = todayMidnight.subtract(Duration(days: i));
-      final key = '${d.year}-${d.month}-${d.day}';
+      final key = seriDateKey(d);
       if (logDayKeys.contains(key)) {
         seri++;
       } else {

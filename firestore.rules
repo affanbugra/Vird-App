@@ -28,9 +28,9 @@ service cloud.firestore {
       allow update: if isOwner(userId)
                     || (isAuth() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['teamIds', 'adminTeamIds', 'teamJoinedAt', 'pendingTeamIds']))
-                    // Geliştirici: sadece cinsiyet alanını tüm kullanıcılarda güncelleyebilir
+                    // Geliştirici: cinsiyet ve streakFreezes alanlarını tüm kullanıcılarda güncelleyebilir
                     || (isDeveloper() && request.resource.data.diff(resource.data)
-                        .affectedKeys().hasOnly(['cinsiyet']))
+                        .affectedKeys().hasOnly(['cinsiyet', 'streakFreezes']))
                     || (isAdmin() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['isHafiz']));
       allow delete: if false;
@@ -117,6 +117,12 @@ service cloud.firestore {
     match /roadmap_entries/{entryId} {
       allow read: if isAuth();
       allow write: if isAdmin();
+    }
+
+    // ── Uygulama meta verileri (migration flag'leri vb.) ─────────────────
+    match /app_meta/{docId} {
+      allow read: if isDeveloper();
+      allow write: if isDeveloper();
     }
 
     // ── Hafız doğrulama başvuruları ────────────────────────────────────

@@ -14,6 +14,8 @@ import '../utils/hatim_calculator.dart';
 import '../utils/seri_calculator.dart';
 import 'log_history_sheet.dart';
 import '../screens/streak_animation_screen.dart';
+import '../screens/streak_freeze_reward_screen.dart';
+import '../services/streak_freeze_service.dart';
 
 class LogEntryBottomSheet extends StatefulWidget {
   final Hatim? initialHatim;
@@ -285,6 +287,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     setState(() => _isLoading = true);
 
     try {
+      // Race condition önleme: ekran açılışındaki auto-freeze henüz
+      // tamamlanmamış olabilir; log kaydından önce bir kez daha çalıştır.
+      try {
+        await StreakFreezeService.autoApplyFreezes(user.uid);
+      } catch (_) {}
+
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
       // ── Seri hesabı ──────────────────────────────────────────────────
@@ -312,6 +320,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         // lastLogDate null — dünkü loglara bak (migration / veri bozulması)
         final hadLogYesterday = lastLogDate == null
             ? await userRef.collection('logs')
+                .where('type', whereIn: ['arapca', 'meal'])
                 .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
                 .where('createdAt', isLessThan: Timestamp.fromDate(today))
                 .limit(1)
@@ -454,20 +463,35 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       if (!mounted) return;
 
+      // Milestone kontrolü — animasyondan bağımsız her log sonrası çalışır.
+      // Transaction ile idempotent; aynı milestone iki kez claim edilemez.
+      final milestoneResult = await StreakFreezeService.claimMilestones(
+          uid: user.uid, newSeri: newSeri);
+
       final overlayCtx = Navigator.of(context, rootNavigator: true).context;
       Navigator.pop(context, justCompleted);
 
       if (shouldShowAnimation && weekData != null) {
-        final wd = weekData; // closure içi type promotion için non-nullable alias
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          StreakAnimationScreen.show(
-            overlayCtx,
+        final wd = weekData;
+        final milestone = milestoneResult;
+        final ctx = overlayCtx;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!ctx.mounted) return;
+          await StreakAnimationScreen.show(
+            ctx,
             count: newSeri,
             prevCount: displayedSeri,
             filled: wd.filled,
             dayLabels: wd.labels,
             todayIndex: 6,
           );
+          if (milestone.claimed.isNotEmpty && ctx.mounted) {
+            await StreakFreezeRewardScreen.show(
+              ctx,
+              milestoneDays: milestone.claimed.last,
+              freezesGranted: milestone.totalGranted,
+            );
+          }
         });
       }
     } catch (e, st) {
@@ -494,28 +518,41 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   Future<({List<bool> filled, List<String> labels})> _getWeekFilled(String uid) async {
     final now     = DateTime.now();
     final today   = DateTime(now.year, now.month, now.day);
-    final startDay = today.subtract(const Duration(days: 6)); // 7 gün: 6 gün önce → bugün
+    final startDay = today.subtract(const Duration(days: 6));
 
-    final snap = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('logs')
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
-        .get();
+    final results = await Future.wait([
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
+          .get(),
+      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+    ]);
 
-    final loggedDays = <String>{};
-    for (final doc in snap.docs) {
-      final type = doc.data()['type'] as String?;
+    final logsSnap = results[0] as QuerySnapshot;
+    final userSnap = results[1] as DocumentSnapshot;
+    final frozenDates = Set<String>.from(
+      ((userSnap.data() as Map<String, dynamic>?)?['frozenDates']
+              as List<dynamic>?) ??
+          [],
+    );
+
+    final loggedDays = <String>{...frozenDates};
+    for (final doc in logsSnap.docs) {
+      final docData = doc.data() as Map<String, dynamic>?;
+      if (docData == null) continue;
+      final type = docData['type'] as String?;
       if (type != 'arapca' && type != 'meal') continue;
-      final d = (doc.data()['createdAt'] as Timestamp?)?.toDate().toLocal();
+      final d = (docData['createdAt'] as Timestamp?)?.toDate().toLocal();
       if (d != null) {
-        loggedDays.add('${d.year}-${d.month}-${d.day}');
+        loggedDays.add(seriDateKey(d));
       }
     }
 
     final filled = List.generate(7, (i) {
       final day = startDay.add(Duration(days: i));
-      return loggedDays.contains('${day.year}-${day.month}-${day.day}');
+      return loggedDays.contains(seriDateKey(day));
     });
 
     // Bug 5: Gün etiketleri dinamik — bugün daima index 6 (sağda)

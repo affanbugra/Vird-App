@@ -22,6 +22,8 @@ Adından anlaşılmayan veya kritik detay içeren dosyalar:
 | `lib/data/tilavet_secde.dart` | 14 tilavet secdesi sayfa verisi |
 | `lib/providers/user_provider.dart` | `isDeveloper`, `developerTeamIds`, `isHafiz` — global developer/hafız state |
 | `lib/config/team_limits.dart` | Ekip katılım/kurma limitleri (normal/pro/dev) + kullanıcıya gösterilecek hata metinleri |
+| `lib/services/streak_freeze_service.dart` | Seri dondurma iş mantığı — `grantFreeze`, `applyFreeze`, `claimMilestones` |
+| `lib/screens/streak_freeze_reward_screen.dart` | Milestone ödül ekranı — buz kristali animasyonu, dark navy tasarım |
 
 ---
 
@@ -50,6 +52,9 @@ weeklyHasanat:     int? (bu haftaki birikmiş hasanat — liderboard hızlandır
 weeklyStartDate:   string? ("YYYY-MM-DD" formatında haftanın Pazartesisi)
 prevWeeklyHasanat: int? (geçen haftanın dondurulmuş hasanatı — arşiv snapshot için)
 prevWeeklyStartDate: string? (geçen haftanın Pazartesisi — arşiv eşleştirme için)
+streakFreezes:     int? (mevcut dondurma hakkı — default 0; normal max 2, pro max 5)
+frozenDates:       List<String>? ('YYYY-M-D' formatında dondurulan günler — seri hesabında okuma logu gibi sayılır)
+claimedStreakMilestones: List<int>? (alınan milestone günleri: [7, 14, 21, 40] — tekrar claim'i önler)
 ```
 
 ### `users/{uid}/hatims/{hatimId}`
@@ -223,3 +228,5 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 - **Hata yönetimi:** `ErrorWidget.builder` → `_AppErrorWidget` (kırmızı ekran yerine kullanıcı dostu hata). `FlutterError.onError` → Firestore `app_errors` koleksiyonuna yazar (error, stack max 2000 karakter, library, platform, createdAt). DevPanel → Hata Kayıtları ekranından izlenir.
 - **Bildirim sistemi:** `users/{uid}/notifications` subcollection. `announcement` tipine tıklanınca `showRoadmapSheet(context)` açılır — `vird_screen.dart`'ta top-level public fonksiyon. Toplu bildirim (broadcast) admin araçları ile Cloud Function üzerinden yapılır; in-app broadcast UI şu an aktif değil.
 - **`showRoadmapSheet` erişilebilirliği:** `vird_screen.dart` içinde class dışı top-level fonksiyon olarak tanımlandı. Hem `VirdScreen` hem `BildirimlerScreen` bu fonksiyonu çağırabilir — içe aktarma yeterli.
+- **Seri dondurma (Streak Freeze):** `frozenDates` user doc'ta `List<String>` ('YYYY-M-D') olarak tutulur. `SeriCalculator.recalculate()` bu günleri gerçek log gibi sayar → eski kullanıcı doc'ları alandaki yokluğu `[]` olarak varsayar, mevcut seri hesabı etkilenmez. Retroaktif onarım yalnızca "dün" için — `SeriCalendarSheet` repair banner + dialog gösterir. Milestone'lar (7/14/21/40 gün): `log_entry_bottom_sheet.dart`'ta log kaydı sonrası kontrol edilir, `claimedStreakMilestones` listesiyle tekrar claim önlenir. `StreakFreezeRewardScreen` seri animasyonunun ardından açılır. Hasanat ile satın alma butonu disabled "Yakında" badge'li — özellik henüz aktif değil (bot abuse riski önlenene kadar).
+- **Seri dondurma limitleri:** `lib/services/streak_freeze_service.dart` → normal kullanıcı max 2, pro max 5. `clampToMax` mantığı: `grantFreeze` ve `claimMilestones` ikisi de `clamp(0, maxFreezes)` uygular.

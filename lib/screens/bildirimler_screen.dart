@@ -169,6 +169,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.check_circle_outline;
       case 'join_rejected':
         return Icons.cancel_outlined;
+      case 'streak_freeze':
+        return Icons.shield_rounded;
       case 'announcement':
         return Icons.campaign_outlined;
       case 'message':
@@ -184,6 +186,8 @@ class _NotificationTile extends StatelessWidget {
         return AppColors.successGreen;
       case 'join_rejected':
         return AppColors.errorRed;
+      case 'streak_freeze':
+        return const Color(0xFF3A9AC4);
       case 'announcement':
         return AppColors.orange;
       default:

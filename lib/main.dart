@@ -1,3 +1,4 @@
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +21,7 @@ import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
 import 'screens/gunluk_takipler_screen.dart';
 import 'widgets/log_entry_bottom_sheet.dart';
+import 'services/streak_freeze_service.dart';
 
 Future<void> _logErrorToFirestore(FlutterErrorDetails details) async {
   try {
@@ -44,10 +46,21 @@ void main() async {
   ErrorWidget.builder = (FlutterErrorDetails details) =>
       _AppErrorWidget(details: details);
 
-  // Tüm Flutter hatalarını sessizce Firestore'a logla
+  // Widget render hatalarını yakala
   FlutterError.onError = (FlutterErrorDetails details) {
     if (kDebugMode) FlutterError.presentError(details);
     _logErrorToFirestore(details);
+  };
+
+  // Async/Future/microtask hatalarını yakala (Promise rejection dahil)
+  // Bu olmadan Flutter Web'de kırmızı ekran gösterir ve Firestore'a gitmez.
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    _logErrorToFirestore(FlutterErrorDetails(
+      exception: error,
+      stack: stack,
+      library: 'async',
+    ));
+    return true; // true = hatayı yutar, uygulama çökmez
   };
 
   FirebaseFirestore.instance.settings = const Settings(
@@ -176,7 +189,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
@@ -185,6 +198,37 @@ class _MainScreenState extends State<MainScreen> {
     GunlukTakiplerScreen(),
     ProfilScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _triggerAutoFreeze();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _triggerAutoFreeze();
+    }
+  }
+
+  Future<void> _triggerAutoFreeze() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await StreakFreezeService.autoApplyFreezes(uid);
+      } catch (e) {
+        debugPrint('Auto-freeze check failed: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

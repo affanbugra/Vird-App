@@ -152,6 +152,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
         final seriState = seriDisplayState(seriRaw, lastLogTs);
         final seri = seriState.value;
         final seriAtRisk = seriState.atRisk;
+        final streakFreezes = (data?['streakFreezes'] as int?) ?? 0;
         final hasanat = (data?['hasanat'] as int?) ?? 0;
         final totalPages = (data?['totalPages'] as int?) ?? 0;
 
@@ -213,6 +214,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             return _StatGrid(
                               seri: seri,
                               seriAtRisk: seriAtRisk,
+                              streakFreezes: streakFreezes,
                               hasanat: hasanat,
                               hatimCount: completedCount,
                               totalPages: totalPages,
@@ -530,6 +532,7 @@ class _ProfileHeader extends StatelessWidget {
 class _StatGrid extends StatelessWidget {
   final int seri;
   final bool seriAtRisk;
+  final int streakFreezes;
   final int hasanat;
   final int hatimCount;
   final int totalPages;
@@ -538,6 +541,7 @@ class _StatGrid extends StatelessWidget {
   const _StatGrid({
     required this.seri,
     this.seriAtRisk = false,
+    this.streakFreezes = 0,
     required this.hasanat,
     required this.hatimCount,
     required this.totalPages,
@@ -548,6 +552,7 @@ class _StatGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final seriColor = seriAtRisk ? AppColors.errorRed : AppColors.orange;
     final seriLabel = seriAtRisk ? 'TEHLİKEDE' : 'SERİ';
+    final freezeBadge = streakFreezes > 0 ? '🛡️ $streakFreezes' : null;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -557,7 +562,7 @@ class _StatGrid extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: GestureDetector(
               onTap: onSeriTap,
-              child: _StatCard(icon: '🔥', value: _fmt(seri), label: seriLabel, color: seriColor),
+              child: _StatCard(icon: '🔥', value: _fmt(seri), label: seriLabel, color: seriColor, badge: freezeBadge),
             ),
           )),
           const SizedBox(width: 8),
@@ -581,12 +586,14 @@ class _StatCard extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
+  final String? badge;
 
   const _StatCard({
     required this.icon,
     required this.value,
     required this.label,
     required this.color,
+    this.badge,
   });
 
   @override
@@ -621,6 +628,17 @@ class _StatCard extends StatelessWidget {
               letterSpacing: 0.4,
             ),
           ),
+          if (badge != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              badge!,
+              style: GoogleFonts.nunito(
+                fontSize: 7.5,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF3A9AC4),
+              ),
+            ),
+          ],
         ],
       ),
     );
