@@ -601,6 +601,366 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
       case PrayerTime.yatsi: return 'Yatsı';
     }
   }
+
+  void _showKerahatInfoSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          padding: const EdgeInsets.only(top: 16, bottom: 24),
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top bar line
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Kerahat Vakitleri Bilgisi',
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textMid),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Scrolling content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        'KERAHAT VAKİTLERİ ÇİZELGESİ',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Responsive Vektörel Çark
+                      Center(
+                        child: SizedBox(
+                          width: 280,
+                          height: 280,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Çark Painter
+                              Positioned.fill(
+                                child: CustomPaint(
+                                  painter: KerahatChartPainter(),
+                                ),
+                              ),
+                              // Orta Daire ve Yazı
+                              Container(
+                                width: 115,
+                                height: 115,
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'NAMAZ ve\nKERAHAT\nVAKİTLERİ',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                              // Dış etiketler (Positioned) - Çemberin tamamen dışına yerleştirildi (beyaz kutular kaldırıldı)
+                              // Öğle (Üstte)
+                              Positioned(
+                                top: 6,
+                                child: Text(
+                                  'Öğle',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // İkindi (Üst Sağ)
+                              Positioned(
+                                top: 36,
+                                right: 18,
+                                child: Text(
+                                  'İkindi',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // Akşam (Orta Sağ)
+                              Positioned(
+                                right: 0,
+                                top: 130,
+                                child: Text(
+                                  'Akşam',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // Yatsı (Alt Sağ)
+                              Positioned(
+                                bottom: 36,
+                                right: 32,
+                                child: Text(
+                                  'Yatsı',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // İmsak (Alt Sol)
+                              Positioned(
+                                bottom: 36,
+                                left: 32,
+                                child: Text(
+                                  'İmsak',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // Güneş (Orta Sol)
+                              Positioned(
+                                left: 0,
+                                top: 130,
+                                child: Text(
+                                  'Güneş',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              // Kerahat Süre Etiketleri (40-45 dk) - Konumları yeni çember boyutuna göre ayarlandı
+                              // Güneş Yanı (Güneş sonrası kerahet)
+                              Positioned(
+                                top: 110,
+                                left: 32,
+                                child: RotationTransition(
+                                  turns: const AlwaysStoppedAnimation(200 / 360),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white,
+                                      border: Border.all(color: AppColors.borderGrey),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                                  ),
+                                ),
+                              ),
+                              // Öğle Yanı (Zeval vakti)
+                              Positioned(
+                                top: 45,
+                                left: 104,
+                                child: RotationTransition(
+                                  turns: const AlwaysStoppedAnimation(262 / 360),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white,
+                                      border: Border.all(color: AppColors.borderGrey),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                                  ),
+                                ),
+                              ),
+                              // Akşam Yanı (Akşam öncesi kerahet)
+                              Positioned(
+                                top: 110,
+                                right: 32,
+                                child: RotationTransition(
+                                  turns: const AlwaysStoppedAnimation(360 / 360),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white,
+                                      border: Border.all(color: AppColors.borderGrey),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Açıklamalar (Kart Tasarımları)
+                      _buildKerahatInfoCard(
+                        title: 'Hiçbir Namaz Kılınmayan Kerahet Vakitleri',
+                        color: AppColors.errorRed,
+                        bgColor: AppColors.errorBg,
+                        rules: [
+                          'Güneş doğduktan sonraki ilk 40-45 dakikalık süre.',
+                          'Öğle namazı vaktinden önceki 40-45 dakikalık süre (Zeval vakti).',
+                          'Akşam namazı vaktinden önceki 40-45 dakikalık süre. (Not: Sadece o günün ikindi namazının farzı kılınmamışsa kılınabilir).',
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildKerahatInfoCard(
+                        title: 'İkindi Namazı Sonrası Sınırlama',
+                        color: AppColors.teal,
+                        bgColor: AppColors.tealLight,
+                        rules: [
+                          'İkindi namazının farzı kılındıktan sonra nafile namaz kılınmaz.',
+                          'Ancak akşam kerahat vakti (son 40-45 dk) girinceye kadar kaza namazları kılınabilir.',
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildKerahatInfoCard(
+                        title: 'Sabah Namazı Vakti Sınırlaması',
+                        color: AppColors.gold,
+                        bgColor: AppColors.goldSoft.withValues(alpha: 0.15),
+                        rules: [
+                          'İmsak ile Güneş arasındaki vakitte, sadece sabah namazının sünneti kılınabilir.',
+                          'Bu süre içerisinde sabahın sünneti hariç başka hiçbir nafile namaz kılınmaz.',
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildKerahatInfoCard(
+                        title: 'Namaz Kılınabilen Vakitler (Mübah)',
+                        color: AppColors.successGreen,
+                        bgColor: AppColors.successBg.withValues(alpha: 0.35),
+                        rules: [
+                          'Yeşil renkle gösterilen tüm zaman dilimlerinde (Öğle-İkindi arası, Akşam-İmsak arası vb.) kaza veya nafile olarak her türlü namaz serbestçe kılınabilir.',
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildKerahatInfoCard({
+    required String title,
+    required Color color,
+    required Color bgColor,
+    required List<String> rules,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...rules.map((rule) => Padding(
+            padding: const EdgeInsets.only(left: 18, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• ', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                Expanded(
+                  child: Text(
+                    rule,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      color: AppColors.textDark,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final cinsiyet = context.read<UserProvider>().cinsiyet ?? 'bey';
@@ -632,13 +992,33 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Haftalık Namaz Takibi',
-                style: GoogleFonts.nunito(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'Haftalık Namaz Takibi',
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _showKerahatInfoSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.tealLight,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: AppColors.teal,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Container(
@@ -907,4 +1287,56 @@ class PrayerPieChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class KerahatChartPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 42; // Dış etiketler için kenar payı (çemberi biraz küçülterek yazıları dışa aldık)
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    double toRad(double deg) => deg * math.pi / 180;
+
+    void drawSector(double startDeg, double sweepDeg, Color fillColor, Color borderColor) {
+      final fillPaint = Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill;
+
+      final borderPaint = Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
+      canvas.drawArc(rect, toRad(startDeg), toRad(sweepDeg), true, fillPaint);
+      canvas.drawArc(rect, toRad(startDeg), toRad(sweepDeg), true, borderPaint);
+    }
+
+    // 1. Akşam öncesi Kerahet (Kırmızı)
+    drawSector(-10, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
+
+    // 2. Akşam'dan İmsak'a (Yeşil)
+    drawSector(10, 125, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
+
+    // 3. İmsak - Güneş arası (Sarı)
+    drawSector(135, 45, AppColors.goldSoft.withValues(alpha: 0.25), AppColors.gold);
+
+    // 4. Güneş sonrası Kerahet (Kırmızı)
+    drawSector(180, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
+
+    // 5. Sabah kerahet bitişi - Öğle kerahet başlangıcı (Yeşil)
+    drawSector(200, 55, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
+
+    // 6. Zeval vakti / Öğle öncesi Kerahet (Kırmızı)
+    drawSector(255, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
+
+    // 7. Öğle - İkindi arası (Yeşil)
+    drawSector(270, 45, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
+
+    // 8. İkindi - Akşam kerahet başlangıcı arası (Mavi/Teal)
+    drawSector(315, 35, AppColors.tealSoft.withValues(alpha: 0.25), AppColors.teal);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

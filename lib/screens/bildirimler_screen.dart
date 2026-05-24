@@ -5,9 +5,17 @@ import '../app_colors.dart';
 import 'ekip_profil_screen.dart';
 import 'vird_screen.dart';
 
-class BildirimlerScreen extends StatelessWidget {
+class BildirimlerScreen extends StatefulWidget {
   final String uid;
   const BildirimlerScreen({super.key, required this.uid});
+
+  @override
+  State<BildirimlerScreen> createState() => _BildirimlerScreenState();
+}
+
+class _BildirimlerScreenState extends State<BildirimlerScreen> {
+  bool _isSelectionMode = false;
+  final Set<String> _selectedDocIds = {};
 
   Future<void> _markAllRead(List<QueryDocumentSnapshot> unreadDocs) async {
     if (unreadDocs.isEmpty) return;
@@ -18,6 +26,80 @@ class BildirimlerScreen extends StatelessWidget {
     await batch.commit();
   }
 
+  Future<void> _deleteSelected() async {
+    if (_selectedDocIds.isEmpty) return;
+    
+    // Premium onay diyaloğu göster
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Bildirimleri Sil',
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textDark,
+          ),
+        ),
+        content: Text(
+          'Seçili ${_selectedDocIds.length} bildirimi silmek istediğinize emin misiniz?',
+          style: GoogleFonts.nunito(
+            fontSize: 15,
+            color: AppColors.textMid,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Vazgeç',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMid,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Sil',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w700,
+                color: AppColors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (final id in _selectedDocIds) {
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .collection('notifications')
+          .doc(id);
+      batch.delete(ref);
+    }
+    await batch.commit();
+
+    setState(() {
+      _selectedDocIds.clear();
+      _isSelectionMode = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,7 +107,7 @@ class BildirimlerScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc(uid)
+            .doc(widget.uid)
             .collection('notifications')
             .orderBy('createdAt', descending: true)
             .snapshots(),
@@ -42,25 +124,65 @@ class BildirimlerScreen extends StatelessWidget {
             appBar: AppBar(
               backgroundColor: AppColors.white,
               elevation: 0,
-              centerTitle: true,
+              centerTitle: _isSelectionMode ? false : true,
+              leading: _isSelectionMode
+                  ? IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textDark),
+                      onPressed: () {
+                        setState(() {
+                          _isSelectionMode = false;
+                          _selectedDocIds.clear();
+                        });
+                      },
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                      onPressed: () => Navigator.pop(context),
+                    ),
               title: Text(
-                'Bildirimler',
+                _isSelectionMode ? '${_selectedDocIds.length} bildirim seçildi' : 'Bildirimler',
                 style: GoogleFonts.nunito(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                  fontSize: _isSelectionMode ? 16 : 20,
+                  fontWeight: _isSelectionMode ? FontWeight.w600 : FontWeight.w800,
                   color: AppColors.textDark,
                 ),
               ),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-                onPressed: () => Navigator.pop(context),
-              ),
               actions: [
-                if (hasUnread)
+                if (!_isSelectionMode) ...[
+                  if (hasUnread)
+                    TextButton(
+                      onPressed: () => _markAllRead(unreadDocs),
+                      child: Text(
+                        'Tümü okundu',
+                        style: GoogleFonts.nunito(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.teal,
+                        ),
+                      ),
+                    ),
+                  if (docs.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: AppColors.textDark),
+                      onPressed: () {
+                        setState(() {
+                          _isSelectionMode = true;
+                        });
+                      },
+                    ),
+                ] else ...[
                   TextButton(
-                    onPressed: () => _markAllRead(unreadDocs),
+                    onPressed: () {
+                      setState(() {
+                        if (_selectedDocIds.length == docs.length) {
+                          _selectedDocIds.clear();
+                        } else {
+                          _selectedDocIds.addAll(docs.map((d) => d.id));
+                        }
+                      });
+                    },
                     child: Text(
-                      'Tümü okundu',
+                      _selectedDocIds.length == docs.length ? 'Seçimi Kaldır' : 'Tümünü Seç',
                       style: GoogleFonts.nunito(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -68,6 +190,12 @@ class BildirimlerScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (_selectedDocIds.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: AppColors.errorRed),
+                      onPressed: _deleteSelected,
+                    ),
+                ],
               ],
             ),
             body: snap.connectionState == ConnectionState.waiting && docs.isEmpty
@@ -77,16 +205,30 @@ class BildirimlerScreen extends StatelessWidget {
                     : ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         itemCount: docs.length,
-                        separatorBuilder: (_, __) => const Divider(
+                        separatorBuilder: (_, index) => const Divider(
                           height: 1,
                           indent: 72,
                           endIndent: 16,
                         ),
                         itemBuilder: (context, i) {
                           final doc = docs[i];
+                          final isSelected = _selectedDocIds.contains(doc.id);
                           return _NotificationTile(
                             doc: doc,
-                            uid: uid,
+                            uid: widget.uid,
+                            isSelectionMode: _isSelectionMode,
+                            isSelected: isSelected,
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedDocIds.remove(doc.id);
+                                  } else {
+                                    _selectedDocIds.add(doc.id);
+                                  }
+                                });
+                              }
+                            },
                           );
                         },
                       ),
@@ -113,7 +255,7 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.tealLight,
                 shape: BoxShape.circle,
               ),
@@ -154,7 +296,17 @@ class _EmptyState extends StatelessWidget {
 class _NotificationTile extends StatelessWidget {
   final QueryDocumentSnapshot doc;
   final String uid;
-  const _NotificationTile({required this.doc, required this.uid});
+  final bool isSelectionMode;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NotificationTile({
+    required this.doc,
+    required this.uid,
+    required this.isSelectionMode,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   Map<String, dynamic> get _data => doc.data() as Map<String, dynamic>;
 
@@ -240,6 +392,74 @@ class _NotificationTile extends StatelessWidget {
     }
   }
 
+  Widget _buildNotificationBody(String body, String type) {
+    if (body.isEmpty) return const SizedBox.shrink();
+
+    final normalStyle = GoogleFonts.nunito(
+      fontSize: 13,
+      color: AppColors.textMid,
+      height: 1.4,
+    );
+
+    final boldStyle = GoogleFonts.nunito(
+      fontSize: 13,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textDark,
+      height: 1.4,
+    );
+
+    // 1. Durum: join_approved (örn: "Ekip Adı ekibine katıldın.")
+    if (type == 'join_approved') {
+      const suffix = ' ekibine katıldın.';
+      if (body.endsWith(suffix)) {
+        final teamName = body.substring(0, body.length - suffix.length);
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: '"$teamName"', style: boldStyle),
+              TextSpan(text: suffix, style: normalStyle),
+            ],
+          ),
+        );
+      }
+    }
+
+    // 2. Durum: join_rejected (örn: "Ekip Adı ekibine katılma isteğin onaylanmadı.")
+    if (type == 'join_rejected') {
+      const suffix = ' ekibine katılma isteğin onaylanmadı.';
+      if (body.endsWith(suffix)) {
+        final teamName = body.substring(0, body.length - suffix.length);
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: '"$teamName"', style: boldStyle),
+              TextSpan(text: suffix, style: normalStyle),
+            ],
+          ),
+        );
+      }
+    }
+
+    // 3. Durum: Çift tırnak içeren metinler (örn: Ahmet "Ekip Adı" ekibine katılmak istiyor.)
+    if (body.contains('"')) {
+      final parts = body.split('"');
+      final spans = <TextSpan>[];
+      for (int i = 0; i < parts.length; i++) {
+        if (i % 2 == 1) {
+          // Tırnak içi (bold + tırnaklar)
+          spans.add(TextSpan(text: '"${parts[i]}"', style: boldStyle));
+        } else {
+          // Normal metin
+          spans.add(TextSpan(text: parts[i], style: normalStyle));
+        }
+      }
+      return Text.rich(TextSpan(children: spans));
+    }
+
+    // Varsayılan: Normal metin
+    return Text(body, style: normalStyle);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isRead = (_data['isRead'] as bool?) ?? true;
@@ -251,7 +471,7 @@ class _NotificationTile extends StatelessWidget {
 
     return Dismissible(
       key: ValueKey(doc.id),
-      direction: DismissDirection.endToStart,
+      direction: isSelectionMode ? DismissDirection.none : DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -260,13 +480,33 @@ class _NotificationTile extends StatelessWidget {
       ),
       onDismissed: (_) => _delete(),
       child: GestureDetector(
-        onTap: () => _handleTap(context),
+        onTap: isSelectionMode ? onTap : () => _handleTap(context),
         child: Container(
           color: isRead ? Colors.transparent : AppColors.tealLight.withValues(alpha: 0.35),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Seçim Kutusu (Checkbox)
+              if (isSelectionMode) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  margin: const EdgeInsets.only(right: 12, top: 9),
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? AppColors.teal : AppColors.textLight,
+                      width: 2,
+                    ),
+                    color: isSelected ? AppColors.teal : Colors.transparent,
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, size: 14, color: AppColors.white)
+                      : null,
+                ),
+              ],
               // İkon
               Container(
                 width: 40,
@@ -307,33 +547,28 @@ class _NotificationTile extends StatelessWidget {
                     ),
                     if (body.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(
-                        body,
-                        style: GoogleFonts.nunito(
-                          fontSize: 13,
-                          color: AppColors.textMid,
-                          height: 1.4,
-                        ),
-                      ),
+                      _buildNotificationBody(body, type),
                     ],
                   ],
                 ),
               ),
               // Sağ taraf: okunmamış nokta veya chevron
-              if (!isRead) ...[
-                const SizedBox(width: 8),
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(top: 4),
-                  decoration: const BoxDecoration(
-                    color: AppColors.teal,
-                    shape: BoxShape.circle,
+              if (!isSelectionMode) ...[
+                if (!isRead) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.teal,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-              ] else if (isTappable) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right, size: 16, color: AppColors.textLight),
+                ] else if (isTappable) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 16, color: AppColors.textLight),
+                ],
               ],
             ],
           ),
