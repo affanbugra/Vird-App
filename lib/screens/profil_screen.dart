@@ -1707,6 +1707,31 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  // ── Cinsiyet — sadece görüntüleme, düzenlenemez ──────────
+                  Builder(
+                    builder: (_) {
+                      final cinsiyet = widget.userData['cinsiyet'] as String?;
+                      final label = cinsiyet == 'hanim'
+                          ? 'Hanımefendi'
+                          : cinsiyet == 'bey'
+                              ? 'Beyefendi'
+                              : 'Belirtilmemiş';
+                      return InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Cinsiyet (Değiştirilemez)',
+                          labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                          prefixIcon: const Icon(Icons.wc, color: AppColors.teal),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabled: false,
+                        ),
+                        child: Text(
+                          label,
+                          style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark, fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),

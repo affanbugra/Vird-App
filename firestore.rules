@@ -14,6 +14,10 @@ service cloud.firestore {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isDeveloper == true;
     }
 
+    function isDeveloper() {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isDeveloper == true;
+    }
+
     // ── Kullanıcı profilleri ───────────────────────────────────────────
     match /users/{userId} {
       // Herkes okuyabilir (liderboard, profil görüntüleme)
@@ -24,6 +28,9 @@ service cloud.firestore {
       allow update: if isOwner(userId)
                     || (isAuth() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['teamId']))
+                    // Geliştirici: sadece cinsiyet alanını tüm kullanıcılarda güncelleyebilir
+                    || (isDeveloper() && request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['cinsiyet']))
                     || (isAdmin() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['isHafiz']));
       allow delete: if false;

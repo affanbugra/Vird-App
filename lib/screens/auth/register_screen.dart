@@ -47,6 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String? _cinsiyet;
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
@@ -54,6 +55,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final password = _passwordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) return;
+    if (_cinsiyet == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen cinsiyet seçimi yapınız.')),
+      );
+      return;
+    }
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,6 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'seri': 0,
           'totalPages': 0,
           'hatimCount': 0,
+          'cinsiyet': _cinsiyet, // 'hanim' veya 'bey'
         });
       } catch (e) {
         debugPrint('Profil Firestore yazma hatası: $e');
@@ -167,6 +175,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
+              const SizedBox(height: 24),
+              // --- CİNSİYET SEÇİMİ ---
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 11, color: Color(0xFFBBAB00)),
+                      const SizedBox(width: 4),
+                      const Expanded(
+                        child: Text(
+                          'Bu seçim yalnızca bir kez yapılabilir ve daha sonra değiştirilemez. Lütfen doğru seçeneği işaretlediğinizden emin olunuz.',
+                          style: TextStyle(fontSize: 10, color: Color(0xFFAA9000), height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _CinsiyetToggle(
+                    secili: _cinsiyet,
+                    onChanged: (val) => setState(() => _cinsiyet = val),
+                  ),
+                  if (_cinsiyet == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
+                      child: Text(
+                        'Lütfen bir seçenek belirtin.',
+                        style: TextStyle(fontSize: 11, color: Colors.red.shade400),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleRegister,
@@ -223,3 +263,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
+/// Hanımefendi / Beyefendi — kayan toggle seçimi
+class _CinsiyetToggle extends StatelessWidget {
+  final String? secili;
+  final ValueChanged<String> onChanged;
+
+  const _CinsiyetToggle({required this.secili, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isHanim = secili == 'hanim';
+    final bool isBey = secili == 'bey';
+
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderGrey, width: 1),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Stack(
+        children: [
+          if (secili != null)
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeInOut,
+              alignment: isHanim ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.10),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged('hanim'),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 220),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isHanim ? FontWeight.w700 : FontWeight.w500,
+                        color: isHanim ? AppColors.textDark : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('Hanımefendi'),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged('bey'),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 220),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isBey ? FontWeight.w700 : FontWeight.w500,
+                        color: isBey ? AppColors.textDark : const Color(0xFF9E9E9E),
+                      ),
+                      child: const Text('Beyefendi'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

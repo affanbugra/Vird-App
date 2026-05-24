@@ -8,6 +8,8 @@ class UserProvider extends ChangeNotifier {
   bool _isHafiz = false;
   String? _teamId;
   List<String> _developerTeamIds = const [];
+  /// 'hanim' veya 'bey' — kayıt sırasında seçilir, tüm uygulamada kullanılır
+  String? _cinsiyet;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
 
   bool get isDeveloper => _isDeveloper;
@@ -15,6 +17,11 @@ class UserProvider extends ChangeNotifier {
   bool get isHafiz => _isHafiz;
   String? get teamId => _teamId;
   List<String> get developerTeamIds => _developerTeamIds;
+  String? get cinsiyet => _cinsiyet;
+
+  /// Kullanıcının cinsiyetine göre hitap şeklini döner.
+  /// Örnek: 'Hanımefendi' veya 'Beyefendi'
+  String get hitap => _cinsiyet == 'hanim' ? 'Hanımefendi' : 'Beyefendi';
 
   void listenToUser(String? uid) {
     _sub?.cancel();
@@ -23,6 +30,7 @@ class UserProvider extends ChangeNotifier {
       _isPro = false;
       _isHafiz = false;
       _teamId = null;
+      _cinsiyet = null;
       notifyListeners();
       return;
     }
@@ -36,6 +44,7 @@ class UserProvider extends ChangeNotifier {
       _isPro = (data?['isPro'] as bool?) ?? false;
       _isHafiz = (data?['isHafiz'] as bool?) ?? false;
       _teamId = data?['teamId'] as String?;
+      _cinsiyet = data?['cinsiyet'] as String?;
       _developerTeamIds = ((data?['developerTeamIds']) as List?)
               ?.map((e) => e.toString())
               .toList() ??
