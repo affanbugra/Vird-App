@@ -1592,6 +1592,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
   final _newPassCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   bool _passwordLoading = false;
+  bool _deleteLoading = false;
   late bool _hasPassword;
 
   late final List<String> _sortedCities;
@@ -1683,6 +1684,98 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
     } finally {
       if (mounted) setState(() => _passwordLoading = false);
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Hesabı Sil',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
+        content: Text(
+          'Hesabının tüm bilgileri ve ilerlemelerin kalıcı olarak silinecektir. Bu işlem geri alınamaz.\n\nOnaylıyor musun?',
+          style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Vazgeç',
+                style: GoogleFonts.nunito(color: context.colors.textSecondary, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Evet, Sil',
+                style: GoogleFonts.nunito(color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleteLoading = true);
+
+    // Firestore silme sırasında MandatorySetup tetiklenmesin
+    try { context.read<UserProvider>().suppressSetup(); } catch (_) {}
+
+    final uid = widget.user.uid;
+    final authProvider = context.read<AuthProvider>();
+    // Navigator ve ScaffoldMessenger'ı async öncesinde yakala:
+    // user.delete() auth state'i değiştirince context stale olabilir,
+    // NavigatorState referansı ise her zaman geçerli kalır.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      // 1. Token'ı tazele — hesap dışarıdan silinmişse veya oturum tamamen geçersizse
+      //    burada hata fırlatır. requires-recent-login yalnızca user.delete()'te yakalanır.
+      await widget.user.reload();
+
+      // 2. Firestore verisini sil — hâlâ authenticated olduğumuz için kurallar geçerli.
+      final logsSnap = await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('logs').get();
+      for (final doc in logsSnap.docs) await doc.reference.delete();
+
+      final hatimsSnap = await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('hatims').get();
+      for (final doc in hatimsSnap.docs) await doc.reference.delete();
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+
+      // 3. Auth hesabını sil — Firestore temizlendi, artık güvenli.
+      await widget.user.delete();
+
+      // 4. Sheet'leri kapat — navigator önceden alındığı için context stale olsa da güvenli.
+      // signOut() çağrılmıyor: user.delete() zaten auth state'i null yapıyor,
+      // AuthWrapper LoginScreen'e otomatik geçer ve çift auth event oluşmaz.
+      navigator.popUntil((route) => route.isFirst);
+
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteLoading = false);
+      if (e.code == 'requires-recent-login') {
+        navigator.popUntil((route) => route.isFirst);
+        authProvider.signOut(); // fire-and-forget — AuthWrapper geçişini tetikler
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Güvenlik nedeniyle hesabınızı silmeden önce tekrar giriş yapmalısınız.'),
+            backgroundColor: AppColors.errorRed,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Hata: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteLoading = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
     }
   }
 
@@ -1920,6 +2013,29 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               icon: const Icon(Icons.link_rounded, size: 18, color: AppColors.teal),
               label: Text('Başka cihazdan giriş linki gönder',
                 style: GoogleFonts.nunito(fontSize: 14, color: AppColors.teal, fontWeight: FontWeight.w600)),
+            ),
+
+            // ── Hesabı Sil ─────────────────────────────────────────
+            const SizedBox(height: 8),
+            Center(
+              child: _deleteLoading
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : TextButton(
+                      onPressed: _deleteAccount,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      child: Text(
+                        'Hesabımı Kalıcı Olarak Sil',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          color: context.colors.textTertiary,
+                          decoration: TextDecoration.underline,
+                          decorationColor: context.colors.textTertiary,
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -2768,6 +2884,28 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
               '${widget.email} adresine giriş linki gönderildi.\nLinke tıkladığında o cihazda otomatik giriş yapılır.',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: Color(0xFFB45309)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mailı göremiyorsan spam / gereksiz klasörünü de kontrol etmeyi unutma.',
+                      style: GoogleFonts.nunito(
+                          fontSize: 12, color: const Color(0xFF92400E), height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             SizedBox(

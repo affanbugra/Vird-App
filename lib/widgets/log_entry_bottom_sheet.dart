@@ -93,6 +93,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   // ── Devam ──────────────────────────────────────────────────────────
   Hatim? _devamHatim;
   final _devamPagesCtrl = TextEditingController();
+  final _devamStartPageCtrl = TextEditingController();
 
   // ── Sayfa ──────────────────────────────────────────────────────────
   final _startPageCtrl = TextEditingController();
@@ -123,6 +124,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       _sayfaHatim = widget.initialHatim;
       _cuzHatim = widget.initialHatim;
       _globalType = widget.initialHatim!.type;
+      _devamStartPageCtrl.text = _nextPageFor(widget.initialHatim!).toString();
     }
     _fetchHatims();
   }
@@ -131,6 +133,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   void dispose() {
     _tabController.dispose();
     _devamPagesCtrl.dispose();
+    _devamStartPageCtrl.dispose();
     _startPageCtrl.dispose();
     _endPageCtrl.dispose();
     super.dispose();
@@ -158,11 +161,21 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       // Devam sekmesinde tek hatim varsa otomatik seç
       if (widget.initialHatim == null && _hatims.length == 1) {
         _devamHatim = _hatims.first;
+        _devamStartPageCtrl.text = _nextPageFor(_hatims.first).toString();
       }
     });
   }
 
   // ── Yardımcı ───────────────────────────────────────────────────────
+
+  // Hatim için önerilen başlangıç sayfası:
+  // Son logun endPage + 1 — son log 604 ise ve hatim bitmemişse firstUnreadPage.
+  int _nextPageFor(Hatim hatim) {
+    final lastEnd = hatim.lastSessionEndPage;
+    if (lastEnd == 0) return hatim.firstUnreadPage;
+    if (lastEnd >= 604 && !hatim.isCompleted) return hatim.firstUnreadPage;
+    return (lastEnd + 1).clamp(1, 604);
+  }
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -199,9 +212,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         }
         method = LogMethod.hatim;
         type = _devamHatim!.type;
-        startPage = _devamHatim!.lastReadPage >= 604
-            ? _devamHatim!.firstUnreadPage
-            : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+        final startPageInput = int.tryParse(_devamStartPageCtrl.text) ?? 0;
+        if (startPageInput <= 0 || startPageInput > 604) {
+          _showError('Geçerli bir başlangıç sayfası gir (1–604).');
+          return;
+        }
+        startPage = startPageInput;
         endPage = (startPage + entered - 1).clamp(1, 604);
         pagesRead = endPage - startPage + 1; // gerçek sayfa adedi (clamped)
         devamEnteredPages = entered;
@@ -452,7 +468,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       // Bug 1: prevCount olarak Firestore ham değeri değil, görüntülenen değer kullanılıyor
       final shouldShowAnimation = newSeri > displayedSeri;
 
-      ({List<bool> filled, List<String> labels})? weekData;
+      ({List<bool> filled, List<bool> frozenMask, List<String> labels})? weekData;
       if (shouldShowAnimation && mounted) {
         try {
           weekData = await _getWeekFilled(user.uid);
@@ -483,6 +499,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             count: newSeri,
             prevCount: displayedSeri,
             filled: wd.filled,
+            frozenMask: wd.frozenMask,
             dayLabels: wd.labels,
             todayIndex: 6,
           );
@@ -516,7 +533,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
   static const _dayAbbr = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
 
-  Future<({List<bool> filled, List<String> labels})> _getWeekFilled(String uid) async {
+  Future<({List<bool> filled, List<bool> frozenMask, List<String> labels})> _getWeekFilled(String uid) async {
     final now     = DateTime.now();
     final today   = DateTime(now.year, now.month, now.day);
     final startDay = today.subtract(const Duration(days: 6));
@@ -539,21 +556,27 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           [],
     );
 
-    final loggedDays = <String>{...frozenDates};
+    final readDays = <String>{};
     for (final doc in logsSnap.docs) {
       final docData = doc.data() as Map<String, dynamic>?;
       if (docData == null) continue;
       final type = docData['type'] as String?;
       if (type != 'arapca' && type != 'meal') continue;
       final d = (docData['createdAt'] as Timestamp?)?.toDate().toLocal();
-      if (d != null) {
-        loggedDays.add(seriDateKey(d));
-      }
+      if (d != null) readDays.add(seriDateKey(d));
     }
+
+    final loggedDays = <String>{...frozenDates, ...readDays};
 
     final filled = List.generate(7, (i) {
       final day = startDay.add(Duration(days: i));
       return loggedDays.contains(seriDateKey(day));
+    });
+
+    // Dondurulmuş ama okunmamış günler — animasyonda mavi gösterilir
+    final frozenMask = List.generate(7, (i) {
+      final key = seriDateKey(startDay.add(Duration(days: i)));
+      return frozenDates.contains(key) && !readDays.contains(key);
     });
 
     // Bug 5: Gün etiketleri dinamik — bugün daima index 6 (sağda)
@@ -562,7 +585,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       return _dayAbbr[day.weekday - 1];
     });
 
-    return (filled: filled, labels: labels);
+    return (filled: filled, frozenMask: frozenMask, labels: labels);
   }
 
   // ── Tilavet Secdesi Prompt ──────────────────────────────────────────
@@ -690,11 +713,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     // Eğer initialHatim ile gelindiyse hatim zaten seçili — direk input göster
     if (_devamHatim != null) {
-      final nextPage = _devamHatim!.lastReadPage >= 604
-          ? _devamHatim!.firstUnreadPage
-          : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+      final startPageVal = int.tryParse(_devamStartPageCtrl.text) ?? _nextPageFor(_devamHatim!);
+      final nextPage = startPageVal.clamp(1, 604);
       final nextCuz = QuranData.cuzForPage(nextPage);
       final nextSurah = QuranData.surahsOnPage(nextPage);
+      final remaining = 604 - _devamHatim!.currentPage;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -763,28 +786,75 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
+                Row(
+                  children: [
+                    const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Başlangıç:',
                       style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
-                      children: [
-                        const TextSpan(text: 'Devam: '),
-                        TextSpan(
-                          text: 'Sayfa $nextPage',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 52,
+                      height: 28,
+                      child: TextField(
+                        controller: _devamStartPageCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 3,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.teal,
                         ),
-                        if (nextCuz != null)
-                          TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
-                        if (nextSurah.isNotEmpty)
-                          TextSpan(text: ' · $nextSurah'),
-                      ],
+                        decoration: InputDecoration(
+                          counterText: '',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.5)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(color: AppColors.teal),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.4)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        [
+                          if (nextCuz != null)
+                            '${nextCuz.cuzNo}. cüz, ${nextPage - nextCuz.startPage + 1}. sayfa',
+                          if (nextSurah.isNotEmpty) nextSurah,
+                        ].join(' · '),
+                        style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (remaining > 0) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 26),
+                    child: Text(
+                      'Hatimde $remaining sayfa kaldı',
+                      style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -841,7 +911,10 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               isSelected: false,
               positionText: _hatimPositionText(h),
               surahText: _hatimSurahText(h),
-              onTap: () => setState(() => _devamHatim = h),
+              onTap: () => setState(() {
+                _devamHatim = h;
+                _devamStartPageCtrl.text = _nextPageFor(h).toString();
+              }),
             )),
       ],
     );

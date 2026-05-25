@@ -20,9 +20,12 @@ class HatimCalculator {
         .where('hatimId', isEqualTo: hatimId)
         .get();
 
-    // 2. Okunan sayfaları bir Set'te topla ve en yüksek sayfayı bul
+    // 2. Okunan sayfaları bir Set'te topla, en yüksek sayfayı ve en son oturumun
+    //    bitiş sayfasını bul.
     final Set<int> readPages = {};
     int lastReadPage = 0;
+    int lastSessionEndPage = 0;
+    DateTime? lastLogTime;
 
     for (var doc in logsSnap.docs) {
       final data = doc.data();
@@ -37,6 +40,11 @@ class HatimCalculator {
           if (p >= 1) readPages.add(p);
         }
         lastReadPage = math.max(lastReadPage, end.clamp(0, 604));
+        // En son kaydedilen logun endPage'i — kullanıcının kaldığı yer
+        if (lastLogTime == null || log.createdAt.isAfter(lastLogTime)) {
+          lastLogTime = log.createdAt;
+          lastSessionEndPage = end.clamp(0, 604);
+        }
       }
     }
 
@@ -71,6 +79,7 @@ class HatimCalculator {
       'currentPage': calculatedPage,
       'lastReadPage': lastReadPage,
       'firstUnreadPage': firstUnreadPage,
+      'lastSessionEndPage': lastSessionEndPage,
       'isCompleted': isCompleted,
     };
 

@@ -33,7 +33,7 @@ service cloud.firestore {
                         .affectedKeys().hasOnly(['cinsiyet', 'streakFreezes']))
                     || (isAdmin() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['isHafiz']));
-      allow delete: if false;
+      allow delete: if isOwner(userId) || isDeveloper();
 
       // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir
       match /logs/{logId} {

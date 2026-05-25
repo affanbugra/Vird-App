@@ -2875,9 +2875,9 @@ class _TeamSettingsSheet extends StatelessWidget {
       _       => 'Karışık (Herkese Açık)',
     };
     final genderIcon = switch (team.genderPolicy) {
-      'men'   => Icons.male_outlined,
-      'women' => Icons.female_outlined,
-      _       => Icons.groups_outlined,
+      'men'   => Icons.person_outlined,
+      'women' => Icons.woman_outlined,
+      _       => Icons.people_outlined,
     };
 
     return Container(
@@ -3149,9 +3149,9 @@ class _PublicTeamJoinView extends StatelessWidget {
       _       => 'Herkese Açık',
     };
     final genderIcon = switch (team.genderPolicy) {
-      'men'   => Icons.male_outlined,
-      'women' => Icons.female_outlined,
-      _       => Icons.groups_outlined,
+      'men'   => Icons.person_outlined,
+      'women' => Icons.woman_outlined,
+      _       => Icons.people_outlined,
     };
     final genderColor = switch (team.genderPolicy) {
       'men'   => const Color(0xFF1976D2),
@@ -3350,7 +3350,7 @@ class _GenderBlockedTeamView extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  forMen ? Icons.male_outlined : Icons.female_outlined,
+                  forMen ? Icons.person_outlined : Icons.woman_outlined,
                   size: 40,
                   color: forMen ? const Color(0xFF1976D2) : const Color(0xFFE91E63),
                 ),

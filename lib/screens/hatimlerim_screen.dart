@@ -11,6 +11,7 @@ import '../widgets/duolingo_button.dart';
 import 'tamamlanan_hatimler_screen.dart';
 import 'bildirimler_screen.dart';
 import '../utils/hatim_remover.dart';
+import '../data/quran_cuz.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
 import '../widgets/seri_calendar_sheet.dart';
@@ -170,12 +171,12 @@ class _HatimlerimScreenState extends State<HatimlerimScreen> {
                                 return _DismissibleHatimCard(
                                   hatim: hatim,
                                   onDelete: () => _deleteHatim(hatim),
+                                  onDevamEt: () => LogEntryBottomSheet.show(
+                                      context, initialHatim: hatim),
                                   onHeatMap: () => HatimHeatMapSheet.show(
                                     context,
                                     hatim: hatim,
                                     uid: user!.uid,
-                                    onDevamEt: () => LogEntryBottomSheet.show(
-                                        context, initialHatim: hatim),
                                   ),
                                 );
                               }
@@ -338,11 +339,13 @@ class _DismissibleHatimCard extends StatelessWidget {
   final Hatim hatim;
   final VoidCallback onDelete;
   final VoidCallback onHeatMap;
+  final VoidCallback onDevamEt;
 
   const _DismissibleHatimCard({
     required this.hatim,
     required this.onDelete,
     required this.onHeatMap,
+    required this.onDevamEt,
   });
 
   @override
@@ -395,7 +398,7 @@ class _DismissibleHatimCard extends StatelessWidget {
         onDismissed: (_) => onDelete(),
         child: GestureDetector(
           onTap: onHeatMap,
-          child: _HatimCardContent(hatim: hatim, onHeatMap: onHeatMap),
+          child: _HatimCardContent(hatim: hatim, onHeatMap: onHeatMap, onDevamEt: onDevamEt),
         ),
       ),
     );
@@ -405,15 +408,19 @@ class _DismissibleHatimCard extends StatelessWidget {
 class _HatimCardContent extends StatelessWidget {
   final Hatim hatim;
   final VoidCallback onHeatMap;
+  final VoidCallback onDevamEt;
 
-  const _HatimCardContent({required this.hatim, required this.onHeatMap});
+  const _HatimCardContent({required this.hatim, required this.onHeatMap, required this.onDevamEt});
 
   @override
   Widget build(BuildContext context) {
     final isArapca = hatim.type == HatimType.arapca;
-    // currentPage artık gerçekten okunan benzersiz sayfa sayısını temsil ediyor
     final readPages = hatim.currentPage;
     final progress = readPages / 604;
+    final cuzRead = (readPages / 20.0).floor().clamp(0, 30);
+    final lastEnd = hatim.lastSessionEndPage;
+    final lastCuz = lastEnd > 0 ? QuranData.cuzForPage(lastEnd) : null;
+    final pageInCuz = lastCuz != null ? lastEnd - lastCuz.startPage + 1 : 0;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -455,7 +462,10 @@ class _HatimCardContent extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '$readPages/604 sayfa',
+                        [
+                          if (lastCuz != null) '${lastCuz.cuzNo}. cüz, $pageInCuz. sayfa',
+                          '$cuzRead/30 cüz',
+                        ].join('  ·  '),
                         style: GoogleFonts.nunito(
                           color: context.colors.textSecondary,
                           fontSize: 12,
@@ -464,6 +474,25 @@ class _HatimCardContent extends StatelessWidget {
                     ],
                   ),
                 ),
+                GestureDetector(
+                  onTap: onDevamEt,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.teal,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Devam',
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Isı haritası ikonu
                 GestureDetector(
                   onTap: onHeatMap,

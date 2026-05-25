@@ -24,6 +24,7 @@ import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
 import 'screens/gunluk_takipler_screen.dart';
 import 'widgets/log_entry_bottom_sheet.dart';
+import 'widgets/mandatory_setup_sheet.dart';
 import 'services/streak_freeze_service.dart';
 
 Future<void> _logErrorToFirestore(FlutterErrorDetails details) async {
@@ -169,7 +170,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (auth.isLoading) return const SplashScreen();
         if (auth.isAuthenticated) {
           if (auth.needsProfileSetup) {
-            return ProfileSetupScreen(name: auth.user?.displayName ?? '');
+            return ProfileSetupScreen(name: auth.user?.displayName ?? '', requiresCinsiyet: true);
           }
           return const MainScreen();
         }
@@ -197,6 +198,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  bool _mandatorySetupShown = false;
 
   final List<Widget> _screens = const [
     HatimlerimScreen(),
@@ -236,8 +238,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// UserProvider veri gelince zorunlu kurulum ekranını tetikle
+  void _checkMandatorySetup(UserProvider userProvider) {
+    if (!userProvider.needsMandatorySetup || _mandatorySetupShown) return;
+    _mandatorySetupShown = true;
+    // Firestore'dan son veriyi al
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final userData = doc.data() ?? {};
+      if (!mounted) return;
+      await MandatorySetupSheet.show(context, userData);
+      // Sheet kapandıktan sonra flag sıfırla (tekrar açılabilsin gerekirse)
+      _mandatorySetupShown = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // UserProvider izle — zorunlu kurulum kontrolü
+    final userProvider = context.watch<UserProvider>();
+    _checkMandatorySetup(userProvider);
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
