@@ -299,7 +299,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Bugün Kuran okuma takibiyle başlıyoruz. Yarın namaz, oruç ve diğer alışkanlıklar da burada olacak. Geliştiricinin de bu yolda kendine bir vesilesi; aynı zamanda hayra vesile olabilmek niyetiyle.',
+                  'Bugün Kuran okuma takibiyle başlıyoruz. Yarın namaz, oruç ve diğer alışkanlıklar juga burada olacak. Geliştiricinin de bu yolda kendine bir vesilesi; aynı zamanda hayra vesile olabilmek niyetiyle.',
                   style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.6),
                 ),
               ],
@@ -325,7 +325,6 @@ class _VirdScreenState extends State<VirdScreen> {
 }
 
 // ─── Yardımcı widget'lar ──────────────────────────────────────────────────
-
 class _SectionHead extends StatelessWidget {
   final String kicker;
   final String title;
@@ -559,13 +558,13 @@ class _RoadmapSheetState extends State<_RoadmapSheet> {
                       label: 'Neler Geldi',
                       count: released.length,
                       active: _tab == 'released',
-                      onTap: () => setState(() => _tab = 'released'),
+                      onTap: () => setState(() => _tab == 'released'),
                     ),
                     _SheetTab(
                       label: 'Neler Geliyor',
                       count: upcoming.length,
                       active: _tab == 'upcoming',
-                      onTap: () => setState(() => _tab = 'upcoming'),
+                      onTap: () => setState(() => _tab == 'upcoming'),
                     ),
                   ],
                 ),

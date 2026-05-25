@@ -51,6 +51,11 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
+      // Vird tercihleri — sadece sahibi
+      match /vird_preferences/{virdId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // Bildirimler — okuma/silme/güncelleme sadece sahibine; oluşturma auth kullanıcılara açık
       // (lider, isteği kabul/ret ettiğinde karşı kullanıcının bildirimlerine yazar)
       match /notifications/{notifId} {
