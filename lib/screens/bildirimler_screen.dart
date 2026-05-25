@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../app_colors.dart';
 import '../app_theme.dart';
 import 'ekip_profil_screen.dart';
-import 'vird_screen.dart';
 
 class BildirimlerScreen extends StatefulWidget {
   final String uid;
@@ -388,9 +387,8 @@ class _NotificationTile extends StatelessWidget {
           ),
         ),
       );
-    } else if (type == 'announcement') {
-      showRoadmapSheet(context);
     }
+    // announcement: sadece okundu işaretle, navigasyon yok
   }
 
   Widget _buildNotificationBody(BuildContext context, String body, String type) {

@@ -180,7 +180,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback, hafiz, roadmap, errors }
+enum _PanelView { home, backlog, feedback, hafiz, roadmap, errors, broadcast }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -220,11 +220,12 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
       child: switch (_view) {
         _PanelView.home     => _HomeView(
             key: const ValueKey('home'),
-            onBacklogTap:    () => setState(() => _view = _PanelView.backlog),
-            onFeedbackTap:   () => setState(() => _view = _PanelView.feedback),
-            onHafizTap:      () => setState(() => _view = _PanelView.hafiz),
-            onRoadmapTap:    () => setState(() => _view = _PanelView.roadmap),
-            onErrorsTap:     () => setState(() => _view = _PanelView.errors),
+            onBacklogTap:     () => setState(() => _view = _PanelView.backlog),
+            onFeedbackTap:    () => setState(() => _view = _PanelView.feedback),
+            onHafizTap:       () => setState(() => _view = _PanelView.hafiz),
+            onRoadmapTap:     () => setState(() => _view = _PanelView.roadmap),
+            onErrorsTap:      () => setState(() => _view = _PanelView.errors),
+            onBroadcastTap:   () => setState(() => _view = _PanelView.broadcast),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -246,6 +247,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('errors'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
+        _PanelView.broadcast => _BroadcastView(
+            key: const ValueKey('broadcast'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
       },
     );
   }
@@ -259,7 +264,8 @@ class _HomeView extends StatelessWidget {
   final VoidCallback onHafizTap;
   final VoidCallback onRoadmapTap;
   final VoidCallback onErrorsTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onErrorsTap});
+  final VoidCallback onBroadcastTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onErrorsTap, required this.onBroadcastTap});
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +454,8 @@ class _HomeView extends StatelessWidget {
               icon: Icons.campaign_outlined,
               label: 'Bildirim',
               color: const Color(0xFF8B5CF6),
-              active: false,
+              active: true,
+              onTap: onBroadcastTap,
             )),
             const SizedBox(width: 10),
             Expanded(child: _PanelTile(
@@ -5009,6 +5016,527 @@ class _FormField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Broadcast Bildirimi ──────────────────────────────────────────────────────
+
+enum _BroadcastTarget { all, team, user }
+
+class _BroadcastView extends StatefulWidget {
+  final VoidCallback onBack;
+  const _BroadcastView({super.key, required this.onBack});
+
+  @override
+  State<_BroadcastView> createState() => _BroadcastViewState();
+}
+
+class _BroadcastViewState extends State<_BroadcastView> {
+  final _titleCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  final _filterCtrl = TextEditingController();
+
+  _BroadcastTarget _target = _BroadcastTarget.all;
+  bool _sending = false;
+  String? _statusMsg;
+  bool _statusSuccess = false;
+  List<Map<String, dynamic>> _recent = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    _filterCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRecent() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('app_broadcasts')
+        .orderBy('createdAt', descending: true)
+        .limit(5)
+        .get();
+    if (!mounted) return;
+    setState(() {
+      _recent = snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+    });
+  }
+
+  Future<void> _send() async {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty || body.isEmpty) {
+      setState(() { _statusMsg = 'Başlık ve içerik boş olamaz.'; _statusSuccess = false; });
+      return;
+    }
+
+    setState(() { _sending = true; _statusMsg = null; });
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final List<String> uids;
+      String confirmLabel;
+
+      // ── 1. Hedef UIDs bul (dry-run) ──
+      if (_target == _BroadcastTarget.all) {
+        final snap = await db.collection('users').limit(100).get();
+        uids = snap.docs.map((d) => d.id).toList();
+        confirmLabel = '${uids.length} kullanıcıya';
+
+      } else if (_target == _BroadcastTarget.team) {
+        final filter = _filterCtrl.text.trim();
+        if (filter.isEmpty) {
+          if (mounted) setState(() { _statusMsg = 'Ekip adı gir.'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final teamSnap = await db.collection('teams')
+            .where('name', isEqualTo: filter)
+            .limit(1)
+            .get();
+        if (!mounted) return;
+        if (teamSnap.docs.isEmpty) {
+          setState(() { _statusMsg = '"$filter" adında ekip bulunamadı. (Büyük/küçük harf önemli)'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final teamId = teamSnap.docs.first.id;
+        final teamName = (teamSnap.docs.first.data())['name'] as String? ?? filter;
+        final userSnap = await db.collection('users')
+            .where('teamIds', arrayContains: teamId)
+            .get();
+        uids = userSnap.docs.map((d) => d.id).toList();
+        confirmLabel = '"$teamName" ekibinin ${uids.length} üyesine';
+
+      } else {
+        final filter = _filterCtrl.text.trim();
+        if (filter.isEmpty) {
+          if (mounted) setState(() { _statusMsg = 'Kullanıcı adı gir.'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final userSnap = await db.collection('users')
+            .where('username', isEqualTo: filter)
+            .limit(1)
+            .get();
+        if (!mounted) return;
+        if (userSnap.docs.isEmpty) {
+          setState(() { _statusMsg = '"$filter" kullanıcısı bulunamadı. (Büyük/küçük harf önemli)'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        uids = [userSnap.docs.first.id];
+        confirmLabel = '@$filter kullanıcısına';
+      }
+
+      if (uids.isEmpty) {
+        if (mounted) setState(() { _statusMsg = 'Hedef kullanıcı bulunamadı.'; _sending = false; _statusSuccess = false; });
+        return;
+      }
+
+      // ── 2. Onay diyaloğu ──
+      if (!mounted) return;
+      setState(() { _sending = false; });
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ctx.colors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.campaign_outlined, color: Color(0xFF8B5CF6), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Bildirim Gönder',
+              style: TextStyle(fontWeight: FontWeight.w800, color: ctx.colors.textPrimary, fontSize: 16),
+            ),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$confirmLabel gönderilecek:',
+                style: TextStyle(fontSize: 13, color: ctx.colors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ctx.colors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ctx.colors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: ctx.colors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      body,
+                      style: TextStyle(fontSize: 12, color: ctx.colors.textSecondary),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Vazgeç', style: TextStyle(fontWeight: FontWeight.w700, color: ctx.colors.textSecondary)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+              child: const Text('Gönder', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+      if (!mounted) return;
+      setState(() { _sending = true; });
+
+      // ── 3. Batch gönder ──
+      WriteBatch batch = db.batch();
+      int opCount = 0;
+
+      for (final uid in uids) {
+        final ref = db.collection('users').doc(uid).collection('notifications').doc();
+        batch.set(ref, {
+          'type': 'announcement',
+          'title': title,
+          'body': body,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        opCount++;
+        if (opCount >= 490) {
+          await batch.commit();
+          batch = db.batch();
+          opCount = 0;
+        }
+      }
+      if (opCount > 0) await batch.commit();
+
+      // ── 4. Audit logu ──
+      await db.collection('app_broadcasts').add({
+        'title': title,
+        'body': body,
+        'target': _target.name,
+        'targetFilter': _target == _BroadcastTarget.all ? null : _filterCtrl.text.trim(),
+        'recipientCount': uids.length,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      _titleCtrl.clear();
+      _bodyCtrl.clear();
+      _filterCtrl.clear();
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _statusMsg = '${uids.length} kullanıcıya gönderildi ✓';
+        _statusSuccess = true;
+      });
+      await _loadRecent();
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _statusMsg = 'Hata: $e';
+        _statusSuccess = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.colors.surface,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 22),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E1B3A), Color(0xFF2D1B69)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.campaign_outlined, color: Color(0xFF8B5CF6), size: 22),
+                const SizedBox(width: 10),
+                const Text(
+                  'Bildirim Gönder',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Hedef seçici
+                  _BroadcastSectionLabel('Hedef'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: _BroadcastTarget.values.map((t) {
+                      final labels = {
+                        _BroadcastTarget.all: 'Herkese',
+                        _BroadcastTarget.team: 'Ekip',
+                        _BroadcastTarget.user: 'Kişi',
+                      };
+                      final selected = _target == t;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => setState(() { _target = t; _filterCtrl.clear(); }),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selected ? const Color(0xFF8B5CF6) : context.colors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: selected ? const Color(0xFF8B5CF6) : context.colors.border,
+                              ),
+                            ),
+                            child: Text(
+                              labels[t]!,
+                              style: TextStyle(
+                                color: selected ? Colors.white : context.colors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  // Filtre alanı (Ekip/Kişi seçiliyse)
+                  if (_target != _BroadcastTarget.all) ...[
+                    const SizedBox(height: 16),
+                    _BroadcastSectionLabel(_target == _BroadcastTarget.team ? 'Ekip Adı' : 'Kullanıcı Adı'),
+                    const SizedBox(height: 8),
+                    _BroadcastTextField(
+                      controller: _filterCtrl,
+                      hint: _target == _BroadcastTarget.team ? 'Ekip adını gir...' : 'Kullanıcı adını gir...',
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Büyük/küçük harf ve boşluk önemlidir — Firestore\'da nasıl yazıyorsa öyle yaz.',
+                      style: TextStyle(color: context.colors.textTertiary, fontSize: 11),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+                  _BroadcastSectionLabel('Başlık'),
+                  const SizedBox(height: 8),
+                  _BroadcastTextField(controller: _titleCtrl, hint: 'Bildirim başlığı...'),
+
+                  const SizedBox(height: 16),
+                  _BroadcastSectionLabel('İçerik'),
+                  const SizedBox(height: 8),
+                  _BroadcastTextField(controller: _bodyCtrl, hint: 'Bildirim metni...', maxLines: 4),
+
+                  const SizedBox(height: 24),
+
+                  // Gönder butonu
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _sending ? null : _send,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: _sending
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send_rounded, size: 18),
+                      label: Text(
+                        _sending ? 'Gönderiliyor...' : 'Gönder',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                    ),
+                  ),
+
+                  // Durum mesajı
+                  if (_statusMsg != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: (_statusSuccess ? AppColors.successGreen : AppColors.errorRed).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (_statusSuccess ? AppColors.successGreen : AppColors.errorRed).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        _statusMsg!,
+                        style: TextStyle(
+                          color: _statusSuccess ? AppColors.successGreen : AppColors.errorRed,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Son gönderilen bildirimler
+                  if (_recent.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    _BroadcastSectionLabel('Son Gönderilenler'),
+                    const SizedBox(height: 10),
+                    ..._recent.map((b) {
+                      final ts = b['createdAt'] as Timestamp?;
+                      final dt = ts?.toDate().toLocal();
+                      final count = b['recipientCount'] as int? ?? 0;
+                      final target = b['target'] as String? ?? 'all';
+                      final filter = b['targetFilter'] as String?;
+                      final targetLabel = target == 'all'
+                          ? 'Herkese ($count)'
+                          : target == 'team'
+                              ? 'Ekip: ${filter ?? ''} ($count)'
+                              : 'Kişi: ${filter ?? ''}';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: context.colors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.colors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Expanded(
+                                child: Text(
+                                  b['title'] as String? ?? '',
+                                  style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w700, fontSize: 13),
+                                ),
+                              ),
+                              if (dt != null)
+                                Text(_relativeTime(dt), style: TextStyle(color: context.colors.textTertiary, fontSize: 11)),
+                            ]),
+                            const SizedBox(height: 4),
+                            Text(
+                              b['body'] as String? ?? '',
+                              style: TextStyle(color: context.colors.textSecondary, fontSize: 12),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                targetLabel,
+                                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BroadcastSectionLabel extends StatelessWidget {
+  final String text;
+  const _BroadcastSectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: context.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+class _BroadcastTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final int maxLines;
+
+  const _BroadcastTextField({
+    required this.controller,
+    required this.hint,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: context.colors.textTertiary, fontSize: 14),
+        filled: true,
+        fillColor: context.colors.surfaceVariant,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: context.colors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+        ),
+      ),
     );
   }
 }

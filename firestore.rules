@@ -125,6 +125,12 @@ service cloud.firestore {
       allow write: if isDeveloper();
     }
 
+    // ── Yayın bildirimleri (admin audit logu) ─────────────────────────────────
+    match /app_broadcasts/{broadcastId} {
+      allow read: if isDeveloper();
+      allow write: if isDeveloper();
+    }
+
     // ── Hafız doğrulama başvuruları ────────────────────────────────────
     // Oluşturma: yalnızca kendi uid'i için (uid = doc key)
     // Okuma/güncelleme: isAuth() — developer panelinin cross-user erişimi için
