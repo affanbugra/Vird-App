@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
@@ -180,11 +181,11 @@ class _LogEditSheetState extends State<LogEditSheet> {
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 10),
-                  const Text(
+                  Builder(builder: (bCtx) => Text(
                     'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
-                    style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                    style: TextStyle(fontSize: 15, color: bCtx.colors.textSecondary),
                     textAlign: TextAlign.center,
-                  ),
+                  )),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -241,9 +242,9 @@ class _LogEditSheetState extends State<LogEditSheet> {
     final typeLabel = log.type == HatimType.arapca ? 'Arapça' : 'Meal';
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -254,11 +255,11 @@ class _LogEditSheetState extends State<LogEditSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Kaydı Düzenle',
+              Text('Kaydı Düzenle',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.colors.textPrimary)),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
@@ -271,13 +272,13 @@ class _LogEditSheetState extends State<LogEditSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline,
-                    size: 14, color: AppColors.textLight),
+                Icon(Icons.info_outline,
+                    size: 14, color: context.colors.textTertiary),
                 const SizedBox(width: 6),
                 Text(
                   () {
@@ -288,7 +289,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
                     }
                     return '$typeLabel · $_methodLabel';
                   }(),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMid),
+                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                 ),
               ],
             ),
@@ -306,7 +307,7 @@ class _LogEditSheetState extends State<LogEditSheet> {
             child: DuolingoButton(
               color: AppColors.teal,
               bottomColor: AppColors.tealDark,
-              disabledColor: AppColors.borderGrey,
+              disabledColor: context.colors.border,
               onPressed: _loading ? null : _save,
               isLoading: _loading,
               child: const Text('KAYDET',
@@ -365,13 +366,13 @@ class _LogEditSheetState extends State<LogEditSheet> {
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text('–',
                   style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textMid)),
+                      color: context.colors.textSecondary)),
             ),
             Expanded(
               child: TextField(

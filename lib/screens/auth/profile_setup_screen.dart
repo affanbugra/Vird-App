@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:provider/provider.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../../app_colors.dart';
+import '../../app_theme.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/text_utils.dart';
 import '../../providers/auth_provider.dart';
@@ -81,13 +82,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
                 onPressed: () => Navigator.pop(context),
               )
             : const SizedBox.shrink(),
@@ -98,14 +99,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Biraz Kendinden Bahset',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Bu bilgiler ekip eşleşmelerinde ve profilinde görünecek. (İsteğe bağlı)',
-                style: TextStyle(color: AppColors.textMid),
+                style: TextStyle(color: context.colors.textSecondary),
               ),
               const SizedBox(height: 32),
               DropdownSearch<String>(
@@ -184,7 +185,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }
                 },
-                child: const Text('Bu adımı atla', style: TextStyle(color: AppColors.textMid)),
+                child: Text('Bu adımı atla', style: TextStyle(color: context.colors.textSecondary)),
               ),
             ],
           ),

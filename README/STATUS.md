@@ -8,6 +8,8 @@ Adından anlaşılmayan veya kritik detay içeren dosyalar:
 
 | Dosya | Not |
 |---|---|
+| `lib/providers/theme_provider.dart` | ChangeNotifier; SharedPreferences key `'isDarkMode'` ile tema kalıcılaştırma. `toggle()` light↔dark geçiş. |
+| `lib/app_theme.dart` | `VirdColors` ThemeExtension (light/dark renk setleri) + `AppTheme.light/dark`. Tüm UI renkleri buradan alınır. |
 | `lib/screens/ekip_profil_screen.dart` | Ekip profili + haftalık liderboard (client-side `periodStart`) |
 | `lib/screens/profil_screen.dart` | Kendi profili — Kuran haritası + `_HafizSheet` (doğrulama başvurusu) bu ekranda |
 | `lib/screens/kullanici_profil_screen.dart` | Başka kullanıcı profili — read-only |
@@ -230,3 +232,4 @@ QuranData.cuzler                                     // List<CuzInfo> — 30 cü
 - **`showRoadmapSheet` erişilebilirliği:** `vird_screen.dart` içinde class dışı top-level fonksiyon olarak tanımlandı. Hem `VirdScreen` hem `BildirimlerScreen` bu fonksiyonu çağırabilir — içe aktarma yeterli.
 - **Seri dondurma (Streak Freeze):** `frozenDates` user doc'ta `List<String>` ('YYYY-M-D') olarak tutulur. `SeriCalculator.recalculate()` bu günleri gerçek log gibi sayar → eski kullanıcı doc'ları alandaki yokluğu `[]` olarak varsayar, mevcut seri hesabı etkilenmez. Retroaktif onarım yalnızca "dün" için — `SeriCalendarSheet` repair banner + dialog gösterir. Milestone'lar (7/14/21/40 gün): `log_entry_bottom_sheet.dart`'ta log kaydı sonrası kontrol edilir, `claimedStreakMilestones` listesiyle tekrar claim önlenir. `StreakFreezeRewardScreen` seri animasyonunun ardından açılır. Hasanat ile satın alma butonu disabled "Yakında" badge'li — özellik henüz aktif değil (bot abuse riski önlenene kadar).
 - **Seri dondurma limitleri:** `lib/services/streak_freeze_service.dart` → normal kullanıcı max 2, pro max 5. `clampToMax` mantığı: `grantFreeze` ve `claimMilestones` ikisi de `clamp(0, maxFreezes)` uygular.
+- **Dark mode:** `VirdColors` ThemeExtension (`lib/app_theme.dart`) ile iki renk seti — `VirdColors.light` ve `VirdColors.dark`. Tüm widget'larda `context.colors.*` ile erişilir; hard-coded renk yasak (kural tablosu CLAUDE.md'de). `ThemeProvider` → SharedPreferences key `'isDarkMode'`. `BottomSheetThemeData` + `DialogThemeData` her iki ThemeData'ya eklenmiş → sheet/dialog otomatik tema rengi alır. `QuranData.heatColorRelative()` ek `isDark` parametresi: koyu modda okunmamış sayfa görünmez koyu, en çok okunan parlak teal. `DuolingoButton.disabledColor` nullable — null ise `context.colors.surfaceVariant` fallback.

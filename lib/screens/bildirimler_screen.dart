@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import 'ekip_profil_screen.dart';
 import 'vird_screen.dart';
 
@@ -33,20 +34,20 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Bildirimleri Sil',
           style: GoogleFonts.nunito(
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
         content: Text(
           'Seçili ${_selectedDocIds.length} bildirimi silmek istediğinize emin misiniz?',
           style: GoogleFonts.nunito(
             fontSize: 15,
-            color: AppColors.textMid,
+            color: context.colors.textSecondary,
           ),
         ),
         actions: [
@@ -56,7 +57,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
               'Vazgeç',
               style: GoogleFonts.nunito(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -73,7 +74,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
               'Sil',
               style: GoogleFonts.nunito(
                 fontWeight: FontWeight.w700,
-                color: AppColors.white,
+                color: Colors.white,
               ),
             ),
           ),
@@ -103,7 +104,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -120,14 +121,14 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
           final hasUnread = unreadDocs.isNotEmpty;
 
           return Scaffold(
-            backgroundColor: AppColors.white,
+            backgroundColor: context.colors.surface,
             appBar: AppBar(
-              backgroundColor: AppColors.white,
+              backgroundColor: context.colors.surface,
               elevation: 0,
               centerTitle: _isSelectionMode ? false : true,
               leading: _isSelectionMode
                   ? IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textDark),
+                      icon: Icon(Icons.close, color: context.colors.textPrimary),
                       onPressed: () {
                         setState(() {
                           _isSelectionMode = false;
@@ -136,7 +137,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                       },
                     )
                   : IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                      icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
                       onPressed: () => Navigator.pop(context),
                     ),
               title: Text(
@@ -144,7 +145,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: _isSelectionMode ? 16 : 20,
                   fontWeight: _isSelectionMode ? FontWeight.w600 : FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               actions: [
@@ -163,7 +164,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                     ),
                   if (docs.isNotEmpty)
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppColors.textDark),
+                      icon: Icon(Icons.delete_outline, color: context.colors.textPrimary),
                       onPressed: () {
                         setState(() {
                           _isSelectionMode = true;
@@ -255,8 +256,8 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 80,
               height: 80,
-              decoration: const BoxDecoration(
-                color: AppColors.tealLight,
+              decoration: BoxDecoration(
+                color: context.colors.tealSurface,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -271,7 +272,7 @@ class _EmptyState extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -280,7 +281,7 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
                 fontSize: 13,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -392,19 +393,19 @@ class _NotificationTile extends StatelessWidget {
     }
   }
 
-  Widget _buildNotificationBody(String body, String type) {
+  Widget _buildNotificationBody(BuildContext context, String body, String type) {
     if (body.isEmpty) return const SizedBox.shrink();
 
     final normalStyle = GoogleFonts.nunito(
       fontSize: 13,
-      color: AppColors.textMid,
+      color: context.colors.textSecondary,
       height: 1.4,
     );
 
     final boldStyle = GoogleFonts.nunito(
       fontSize: 13,
       fontWeight: FontWeight.w800,
-      color: AppColors.textDark,
+      color: context.colors.textPrimary,
       height: 1.4,
     );
 
@@ -482,7 +483,7 @@ class _NotificationTile extends StatelessWidget {
       child: GestureDetector(
         onTap: isSelectionMode ? onTap : () => _handleTap(context),
         child: Container(
-          color: isRead ? Colors.transparent : AppColors.tealLight.withValues(alpha: 0.35),
+          color: isRead ? Colors.transparent : context.colors.tealSurface.withValues(alpha: 0.35),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,13 +498,13 @@ class _NotificationTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? AppColors.teal : AppColors.textLight,
+                      color: isSelected ? AppColors.teal : context.colors.textTertiary,
                       width: 2,
                     ),
                     color: isSelected ? AppColors.teal : Colors.transparent,
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check, size: 14, color: AppColors.white)
+                      ? const Icon(Icons.check, size: 14, color: Colors.white)
                       : null,
                 ),
               ],
@@ -531,7 +532,7 @@ class _NotificationTile extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 14,
                               fontWeight: isRead ? FontWeight.w600 : FontWeight.w800,
-                              color: AppColors.textDark,
+                              color: context.colors.textPrimary,
                             ),
                           ),
                         ),
@@ -540,14 +541,14 @@ class _NotificationTile extends StatelessWidget {
                           _timeAgo(ts),
                           style: GoogleFonts.nunito(
                             fontSize: 11,
-                            color: AppColors.textLight,
+                            color: context.colors.textTertiary,
                           ),
                         ),
                       ],
                     ),
                     if (body.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      _buildNotificationBody(body, type),
+                      _buildNotificationBody(context, body, type),
                     ],
                   ],
                 ),
@@ -567,7 +568,7 @@ class _NotificationTile extends StatelessWidget {
                   ),
                 ] else if (isTappable) ...[
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, size: 16, color: AppColors.textLight),
+                  Icon(Icons.chevron_right, size: 16, color: context.colors.textTertiary),
                 ],
               ],
             ],

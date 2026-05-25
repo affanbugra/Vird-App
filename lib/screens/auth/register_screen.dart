@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../app_colors.dart';
+import '../../app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'profile_setup_screen.dart';
 
@@ -125,12 +126,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -140,14 +141,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Yeni Hesap Oluştur',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Kuran hedeflerini takip etmeye başlamak için aramıza katıl.',
-                style: TextStyle(color: AppColors.textMid),
+                style: TextStyle(color: context.colors.textSecondary),
               ),
               const SizedBox(height: 32),
               TextField(
@@ -230,14 +231,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : const Text('Kayıt Ol', style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('VEYA', style: TextStyle(color: AppColors.textMid)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('VEYA', style: TextStyle(color: context.colors.textSecondary)),
                   ),
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                 ],
               ),
               const SizedBox(height: 16),
@@ -258,10 +259,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                       },
                 icon: Image.asset('assets/images/google_logo.png', height: 22),
-                label: const Text('Google ile Kayıt Ol', style: TextStyle(color: AppColors.textDark)),
+                label: Text('Google ile Kayıt Ol', style: TextStyle(color: context.colors.textPrimary)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: AppColors.borderGrey),
+                  side: BorderSide(color: context.colors.border),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -288,9 +289,9 @@ class _CinsiyetToggle extends StatelessWidget {
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey, width: 1),
+        border: Border.all(color: context.colors.border, width: 1),
       ),
       padding: const EdgeInsets.all(4),
       child: Stack(
@@ -304,7 +305,7 @@ class _CinsiyetToggle extends StatelessWidget {
                 widthFactor: 0.5,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.colors.surface,
                     borderRadius: BorderRadius.circular(9),
                     boxShadow: [
                       BoxShadow(
@@ -329,7 +330,7 @@ class _CinsiyetToggle extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: isHanim ? FontWeight.w700 : FontWeight.w500,
-                        color: isHanim ? AppColors.textDark : const Color(0xFF9E9E9E),
+                        color: isHanim ? context.colors.textPrimary : context.colors.textTertiary,
                       ),
                       child: const Text('Hanımefendi'),
                     ),
@@ -346,7 +347,7 @@ class _CinsiyetToggle extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: isBey ? FontWeight.w700 : FontWeight.w500,
-                        color: isBey ? AppColors.textDark : const Color(0xFF9E9E9E),
+                        color: isBey ? context.colors.textPrimary : context.colors.textTertiary,
                       ),
                       child: const Text('Beyefendi'),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../app_colors.dart';
+import '../../app_theme.dart';
 
 class MagicLinkConfirmScreen extends StatefulWidget {
   final String link;
@@ -52,7 +53,7 @@ class _MagicLinkConfirmScreenState extends State<MagicLinkConfirmScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -68,14 +69,14 @@ class _MagicLinkConfirmScreenState extends State<MagicLinkConfirmScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Giriş yapabilmek için hesabınızın e-posta adresini girin.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid),
+                style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary),
               ),
               const SizedBox(height: 32),
               TextField(
@@ -84,7 +85,7 @@ class _MagicLinkConfirmScreenState extends State<MagicLinkConfirmScreen> {
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: 'E-posta',
-                  labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                  labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),

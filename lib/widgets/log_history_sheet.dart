@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
@@ -57,15 +58,15 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
             if (currentSeri > 0) ...[
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
+                  style: TextStyle(
+                      color: context.colors.textSecondary, fontSize: 14),
                   children: [
                     const TextSpan(text: '🔥 Seriniz '),
                     TextSpan(
                       text: '$currentSeri gün',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.colors.textPrimary),
                     ),
                     const TextSpan(text: '\'den '),
                     const TextSpan(
@@ -80,17 +81,17 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
               ),
               const SizedBox(height: 10),
             ],
-            const Text(
+            Text(
               'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
-              style: TextStyle(color: AppColors.textMid),
+              style: TextStyle(color: context.colors.textSecondary),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
+            child: Text('İptal',
+                style: TextStyle(color: context.colors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -172,7 +173,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.68,
         child: Scaffold(
-          backgroundColor: AppColors.white,
+          backgroundColor: context.colors.surface,
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -182,12 +183,12 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Son Kayıtlar',
                       style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.colors.textPrimary),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -213,14 +214,14 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                     }
                     final docs = snap.data?.docs ?? [];
                     if (docs.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.history, size: 52, color: AppColors.borderGrey),
-                            SizedBox(height: 12),
+                            Icon(Icons.history, size: 52, color: context.colors.border),
+                            const SizedBox(height: 12),
                             Text('Henüz kayıt yok.',
-                                style: TextStyle(color: AppColors.textMid)),
+                                style: TextStyle(color: context.colors.textSecondary)),
                           ],
                         ),
                       );
@@ -236,7 +237,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       itemCount: logs.length,
                       separatorBuilder: (ctx, i) =>
-                          const Divider(height: 1, color: AppColors.borderGrey),
+                          Divider(height: 1, color: context.colors.border),
                       itemBuilder: (context, i) => _LogTile(
                         log: logs[i],
                         uid: uid,
@@ -379,15 +380,15 @@ class _LogTile extends StatelessWidget {
             if (seriDrops) ...[
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
+                  style: TextStyle(
+                      color: context.colors.textSecondary, fontSize: 14),
                   children: [
                     const TextSpan(text: 'Seriniz '),
                     TextSpan(
                       text: '$currentSeri gün',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.colors.textPrimary),
                     ),
                     const TextSpan(text: '\'den '),
                     TextSpan(
@@ -407,7 +408,7 @@ class _LogTile extends StatelessWidget {
             ],
             Text(
               '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
-              style: const TextStyle(color: AppColors.textMid),
+              style: TextStyle(color: context.colors.textSecondary),
             ),
             if (seriDrops) ...[
               const SizedBox(height: 8),
@@ -424,8 +425,8 @@ class _LogTile extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
+            child: Text('İptal',
+                style: TextStyle(color: context.colors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -497,10 +498,10 @@ class _LogTile extends StatelessWidget {
                     Flexible(
                       child: Text(
                         _title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: AppColors.textDark),
+                            color: context.colors.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -511,8 +512,8 @@ class _LogTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${_timeText(log.createdAt)} · +${log.pagesRead * 10} ✨',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textLight),
+                  style: TextStyle(
+                      fontSize: 12, color: context.colors.textTertiary),
                 ),
               ],
             ),
@@ -556,7 +557,7 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.colors.tealSurface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

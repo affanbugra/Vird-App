@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../app_theme.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const _kAccent      = Color(0xFFF5A623);
@@ -248,7 +249,7 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -263,11 +264,11 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1F1B14).withValues(alpha: 0.07),
+                      color: context.colors.textPrimary.withValues(alpha: 0.07),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close_rounded,
-                        size: 18, color: Color(0xFF8A8470)),
+                    child: Icon(Icons.close_rounded,
+                        size: 18, color: context.colors.textSecondary),
                   ),
                 ),
               ),

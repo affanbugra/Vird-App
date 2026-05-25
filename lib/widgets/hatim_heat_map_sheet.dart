@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../data/quran_cuz.dart';
@@ -123,13 +124,13 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '$label  (Sayfa $page)',
-              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -160,14 +161,14 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                 icon: Icon(Icons.access_time,
                     color: currentStatus == 'pending'
                         ? AppColors.errorRed
-                        : AppColors.textMid,
+                        : context.colors.textSecondary,
                     size: 18),
                 label: Text(
                   'Henüz Yapmadım',
                   style: GoogleFonts.nunito(
                     color: currentStatus == 'pending'
                         ? AppColors.errorRed
-                        : AppColors.textMid,
+                        : context.colors.textSecondary,
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                   ),
@@ -177,7 +178,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                   side: BorderSide(
                     color: currentStatus == 'pending'
                         ? AppColors.errorRed
-                        : AppColors.borderGrey,
+                        : context.colors.border,
                   ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -221,9 +222,9 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
@@ -233,7 +234,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -245,7 +246,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.tealLight,
+                      color: context.colors.tealSurface,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -266,24 +267,24 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         Text(
                           'Okuma haritası',
-                          style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid),
+                          style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textMid, size: 20),
+                    icon: Icon(Icons.close, color: context.colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 16, color: AppColors.borderGrey),
+            Divider(height: 16, color: context.colors.border),
             // İçerik
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
@@ -351,7 +352,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                         padding: const EdgeInsets.symmetric(
                             vertical: 12, horizontal: 16),
                         decoration: BoxDecoration(
-                          color: AppColors.lightGrey,
+                          color: context.colors.surfaceVariant,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -359,10 +360,10 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                           children: [
                             _StatItem(value: '$readCount', label: 'SAYFA'),
                             Container(
-                                width: 1, height: 28, color: AppColors.borderGrey),
+                                width: 1, height: 28, color: context.colors.border),
                             _StatItem(value: '$completedCuz/30', label: 'CÜZ'),
                             Container(
-                                width: 1, height: 28, color: AppColors.borderGrey),
+                                width: 1, height: 28, color: context.colors.border),
                             _StatItem(value: '${604 - readCount}', label: 'KALAN'),
                           ],
                         ),
@@ -388,17 +389,17 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  _LegendDot(color: AppColors.borderGrey),
+                                  _LegendDot(color: context.colors.border),
                                   const SizedBox(width: 4),
                                   Text('Okunmadı',
                                       style: GoogleFonts.nunito(
-                                          fontSize: 10, color: AppColors.textMid)),
+                                          fontSize: 10, color: context.colors.textSecondary)),
                                   const SizedBox(width: 12),
                                   _LegendDot(color: _kReadColor),
                                   const SizedBox(width: 4),
                                   Text('Okundu',
                                       style: GoogleFonts.nunito(
-                                          fontSize: 10, color: AppColors.textMid)),
+                                          fontSize: 10, color: context.colors.textSecondary)),
                                 ],
                               ),
                               // Detay paneli
@@ -420,7 +421,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                               style: GoogleFonts.nunito(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
+                                color: context.colors.textPrimary,
                               ),
                             ),
                             const Spacer(),
@@ -433,11 +434,11 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: AppColors.lightGrey,
+                                  color: context.colors.surfaceVariant,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.settings_outlined,
-                                    size: 14, color: AppColors.textMid),
+                                child: Icon(Icons.settings_outlined,
+                                    size: 14, color: context.colors.textSecondary),
                               ),
                             ),
                           ],
@@ -499,7 +500,7 @@ class _StatItem extends StatelessWidget {
             style: GoogleFonts.nunito(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
                 letterSpacing: 0.4)),
       ],
     );
@@ -536,13 +537,13 @@ class _DetailPanel extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.lightGrey,
+          color: context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderGrey),
+          border: Border.all(color: context.colors.border),
         ),
         child: Text(
           'Detay için bir sayfaya dokun',
-          style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+          style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary),
         ),
       );
     }
@@ -557,9 +558,9 @@ class _DetailPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         children: [
@@ -572,14 +573,14 @@ class _DetailPanel extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 if (surahText.isNotEmpty)
                   Text(
                     surahText,
                     style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textMid),
+                        fontSize: 11, color: context.colors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
               ],
@@ -590,7 +591,7 @@ class _DetailPanel extends StatelessWidget {
             decoration: BoxDecoration(
               color: isRead
                   ? _kReadColor.withValues(alpha: 0.12)
-                  : AppColors.borderGrey,
+                  : context.colors.border,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -598,7 +599,7 @@ class _DetailPanel extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: isRead ? _kReadColor : AppColors.textMid,
+                color: isRead ? _kReadColor : context.colors.textSecondary,
               ),
             ),
           ),
@@ -635,7 +636,7 @@ class _BinaryHeatGrid extends StatelessWidget {
     return (squaresArea - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _square(int page, double sq, double radius, {bool usePage1Color = false}) {
+  Widget _square(BuildContext context, int page, double sq, double radius, {bool usePage1Color = false}) {
     final actualPage = usePage1Color ? 1 : page;
     final isRead = readPages.contains(actualPage);
     final isSelected = selectedPage == page;
@@ -646,13 +647,13 @@ class _BinaryHeatGrid extends StatelessWidget {
     Color? badgeColor;
     if (hasSecde) {
       if (!isRead) {
-        badgeColor = AppColors.textLight;
+        badgeColor = context.colors.textTertiary;
       } else if (sStatus == 'done') {
         badgeColor = AppColors.gold;
       } else if (sStatus == 'pending') {
         badgeColor = AppColors.errorRed;
       } else {
-        badgeColor = AppColors.textLight;
+        badgeColor = context.colors.textTertiary;
       }
     }
 
@@ -670,9 +671,9 @@ class _BinaryHeatGrid extends StatelessWidget {
             height: sq,
             margin: const EdgeInsets.only(right: _squareGap),
             decoration: BoxDecoration(
-              color: isRead ? _kReadColor : AppColors.borderGrey,
+              color: isRead ? _kReadColor : context.colors.border,
               borderRadius: BorderRadius.circular(radius),
-              border: isSelected ? Border.all(color: AppColors.textDark, width: 1.5) : null,
+              border: isSelected ? Border.all(color: context.colors.textPrimary, width: 1.5) : null,
             ),
           ),
           if (hasSecde)
@@ -707,7 +708,7 @@ class _BinaryHeatGrid extends StatelessWidget {
         final labelStyle = GoogleFonts.nunito(
           fontSize: 8,
           fontWeight: FontWeight.w700,
-          color: AppColors.textLight,
+          color: context.colors.textTertiary,
         );
 
         final rows = <Widget>[];
@@ -723,7 +724,7 @@ class _BinaryHeatGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(width: _labelW + _labelGap),
-              _square(0, sq, radius, usePage1Color: true),
+              _square(context, 0, sq, radius, usePage1Color: true),
               const SizedBox(width: 5),
               Text('Fâtiha', style: labelStyle),
               const Spacer(),
@@ -780,7 +781,7 @@ class _BinaryHeatGrid extends StatelessWidget {
                   ),
                   const SizedBox(width: _labelGap),
                   ...List.generate(
-                      cuz.pageCount, (i) => _square(cuz.startPage + i, sq, radius)),
+                      cuz.pageCount, (i) => _square(context, cuz.startPage + i, sq, radius)),
                 ],
               ),
             ));
@@ -796,7 +797,7 @@ class _BinaryHeatGrid extends StatelessWidget {
                     child: Text('30', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(20, (i) => _square(581 + i, sq, radius)),
+                  ...List.generate(20, (i) => _square(context, 581 + i, sq, radius)),
                 ],
               ),
             ));
@@ -807,7 +808,7 @@ class _BinaryHeatGrid extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(width: _labelW + _labelGap),
-                  ...List.generate(4, (i) => _square(601 + i, sq, radius)),
+                  ...List.generate(4, (i) => _square(context, 601 + i, sq, radius)),
                   const SizedBox(width: 3),
                   Text('İhlâs · Felak · Nâs', style: labelStyle),
                 ],
@@ -860,17 +861,17 @@ class _DateChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: AppColors.textMid),
+          Icon(icon, size: 11, color: context.colors.textSecondary),
           const SizedBox(width: 4),
           Text(label,
-              style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMid)),
+              style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textSecondary)),
         ],
       ),
     );
@@ -909,23 +910,23 @@ class _LogRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 13, color: AppColors.textMid),
+          Icon(icon, size: 13, color: context.colors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(pageText,
-                style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textDark)),
+                style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textPrimary)),
           ),
           Text('$pagesRead sy.',
-              style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMid)),
+              style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textSecondary)),
           if (dateText.isNotEmpty) ...[
             const SizedBox(width: 8),
             Text(dateText,
-                style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textLight)),
+                style: GoogleFonts.nunito(fontSize: 10, color: context.colors.textTertiary)),
           ],
         ],
       ),
@@ -1017,15 +1018,15 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
             if (seriDrops) ...[
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
+                  style: TextStyle(
+                      color: context.colors.textSecondary, fontSize: 14),
                   children: [
                     const TextSpan(text: 'Seriniz '),
                     TextSpan(
                       text: '$currentSeri gün',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.colors.textPrimary),
                     ),
                     const TextSpan(text: '\'den '),
                     TextSpan(
@@ -1045,7 +1046,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
             ],
             Text(
               'Bu okuma kaydı silinsin mi?\nHasanat ${pagesRead * 10} geri alınacak.',
-              style: const TextStyle(color: AppColors.textMid),
+              style: TextStyle(color: context.colors.textSecondary),
             ),
             if (seriDrops) ...[
               const SizedBox(height: 8),
@@ -1062,8 +1063,8 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
+            child: Text('İptal',
+                style: TextStyle(color: context.colors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1091,9 +1092,9 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
@@ -1102,7 +1103,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(999)),
             ),
             Padding(
@@ -1113,17 +1114,17 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                       style: GoogleFonts.nunito(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textDark)),
+                          color: context.colors.textPrimary)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close,
-                        color: AppColors.textMid, size: 20),
+                    icon: Icon(Icons.close,
+                        color: context.colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 16, color: AppColors.borderGrey),
+            Divider(height: 16, color: context.colors.border),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -1151,7 +1152,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                   if (docs.isEmpty) {
                     return Center(
                       child: Text('Henüz okuma kaydı yok.',
-                          style: GoogleFonts.nunito(color: AppColors.textMid)),
+                          style: GoogleFonts.nunito(color: context.colors.textSecondary)),
                     );
                   }
 
@@ -1160,7 +1161,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     itemCount: docs.length,
                     separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: AppColors.borderGrey),
+                        Divider(height: 1, color: context.colors.border),
                     itemBuilder: (context, i) {
                       final doc = docs[i];
                       return _LogRowDetailed(
@@ -1258,10 +1259,10 @@ class _LogRowDetailed extends StatelessWidget {
                     Flexible(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: AppColors.textDark,
+                          color: context.colors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1270,7 +1271,7 @@ class _LogRowDetailed extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.tealLight,
+                        color: context.colors.tealSurface,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1287,7 +1288,7 @@ class _LogRowDetailed extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${_timeText(log.createdAt)} · +${log.pagesRead * 10} ✨',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                  style: TextStyle(fontSize: 12, color: context.colors.textTertiary),
                 ),
               ],
             ),

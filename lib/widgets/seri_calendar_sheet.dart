@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../utils/seri_calculator.dart' show seriDateKey;
 
 // Ice palette (local)
@@ -151,9 +152,9 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.92,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: RefreshIndicator(
           onRefresh: _loadLogs,
@@ -168,7 +169,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 12, bottom: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -187,7 +188,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                       style: GoogleFonts.nunito(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -225,7 +226,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: _prevMonth,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                   ),
                   Expanded(
                     child: Text(
@@ -234,7 +235,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -242,8 +243,8 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                     icon: const Icon(Icons.chevron_right),
                     onPressed: _canGoNext ? _nextMonth : null,
                     color: _canGoNext
-                        ? AppColors.textMid
-                        : AppColors.borderGrey,
+                        ? context.colors.textSecondary
+                        : context.colors.border,
                   ),
                 ],
               ),
@@ -263,7 +264,7 @@ class _SeriCalendarSheetState extends State<SeriCalendarSheet> {
                               style: GoogleFonts.nunito(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textLight,
+                                color: context.colors.textTertiary,
                               ),
                             ),
                           ),
@@ -380,12 +381,12 @@ class _CalendarCell extends StatelessWidget {
   Widget build(BuildContext context) {
     Color? bgColor;
     BoxBorder? border;
-    Color textColor = AppColors.textDark;
+    Color textColor = context.colors.textPrimary;
     FontWeight fontWeight = FontWeight.w500;
     Widget? overlay;
 
     if (isFuture) {
-      textColor = AppColors.borderGrey;
+      textColor = context.colors.border;
     } else if (hasLog) {
       bgColor = AppColors.orange;
       textColor = Colors.white;
@@ -455,7 +456,7 @@ class _FreezeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: hasFreeze ? _kIceBg : AppColors.lightGrey,
+          color: hasFreeze ? _kIceBg : context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(999),
           border: hasFreeze ? Border.all(color: _kIceBorder, width: 1) : null,
         ),
@@ -464,14 +465,14 @@ class _FreezeChip extends StatelessWidget {
           children: [
             Icon(Icons.shield_rounded,
                 size: 13,
-                color: hasFreeze ? _kIce : AppColors.textLight),
+                color: hasFreeze ? _kIce : context.colors.textTertiary),
             const SizedBox(width: 4),
             Text(
               '$count hak',
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: hasFreeze ? _kIceDark : AppColors.textLight,
+                color: hasFreeze ? _kIceDark : context.colors.textTertiary,
               ),
             ),
           ],
@@ -489,9 +490,9 @@ class _FreezeInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(
@@ -504,7 +505,7 @@ class _FreezeInfoSheet extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.lightGrey,
+                color: context.colors.surfaceVariant,
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -531,7 +532,7 @@ class _FreezeInfoSheet extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ],
@@ -545,7 +546,7 @@ class _FreezeInfoSheet extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 14,
               height: 1.55,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 24),
@@ -556,7 +557,7 @@ class _FreezeInfoSheet extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -571,21 +572,21 @@ class _FreezeInfoSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6F8FA),
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.lightGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
-                    size: 16, color: AppColors.textLight),
+                Icon(Icons.info_outline_rounded,
+                    size: 16, color: context.colors.textTertiary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Maksimum 2 hak birikilebilir (Pro: 5 hak).',
                     style: GoogleFonts.nunito(
                       fontSize: 12,
-                      color: AppColors.textMid,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                 ),
@@ -615,7 +616,7 @@ class _FreezeInfoSheet extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -631,7 +632,7 @@ class _FreezeInfoSheet extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   ),
@@ -723,7 +724,7 @@ class _MilestoneRow extends StatelessWidget {
               label,
               style: GoogleFonts.nunito(
                 fontSize: 13,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
           ),
@@ -766,9 +767,9 @@ class _BuyFreezeButton extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -780,7 +781,7 @@ class _BuyFreezeButton extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ],
@@ -834,7 +835,7 @@ class _SummaryChip extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.lightGrey,
+          color: context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -846,14 +847,14 @@ class _SummaryChip extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             Text(
               label,
               style: GoogleFonts.nunito(
                 fontSize: 11,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
               ),
             ),
           ],

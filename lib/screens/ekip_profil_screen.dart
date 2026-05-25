@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../config/team_limits.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
@@ -464,7 +465,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text('İptal',
-                style: GoogleFonts.nunito(color: AppColors.textMid)),
+                style: GoogleFonts.nunito(color: ctx.colors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -502,7 +503,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text('İptal',
-                style: GoogleFonts.nunito(color: AppColors.textMid)),
+                style: GoogleFonts.nunito(color: ctx.colors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -732,10 +733,22 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _TeamSettingsSheet(
-        team: team,
-        isAdmin: isAdmin,
-        onEditField: isAdmin ? (field) => _showEditSheet(context, team, field) : null,
+      builder: (_) => StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('teams')
+            .doc(widget.teamId)
+            .snapshots(),
+        builder: (context, snap) {
+          if (!snap.hasData || !snap.data!.exists) {
+            return const SizedBox.shrink();
+          }
+          final latestTeam = TeamModel.fromFirestore(snap.data!);
+          return _TeamSettingsSheet(
+            team: latestTeam,
+            isAdmin: isAdmin,
+            onEditField: isAdmin ? (field) => _showEditSheet(context, latestTeam, field) : null,
+          );
+        },
       ),
     );
   }
@@ -786,7 +799,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.tealLight,
+          color: context.colors.tealSurface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
         ),
@@ -867,7 +880,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('teams')
@@ -979,7 +992,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                               value: 'teamSettings',
                               child: Row(
                                 children: [
-                                  const Icon(Icons.tune_outlined, color: AppColors.textDark, size: 20),
+                                  Icon(Icons.tune_outlined, color: context.colors.textPrimary, size: 20),
                                   const SizedBox(width: 8),
                                   Text('Takım Ayarları', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                                 ],
@@ -1004,7 +1017,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                                 value: 'manageMembers',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.manage_accounts_outlined, color: AppColors.textDark, size: 20),
+                                    Icon(Icons.manage_accounts_outlined, color: context.colors.textPrimary, size: 20),
                                     const SizedBox(width: 8),
                                     Text('Üyeleri Yönet', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                                   ],
@@ -1061,15 +1074,15 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                         // Üye sayısı + üyelik widget'ı
                         Row(
                           children: [
-                            const Icon(Icons.people_outline,
-                                size: 15, color: AppColors.textMid),
+                            Icon(Icons.people_outline,
+                                size: 15, color: context.colors.textSecondary),
                             const SizedBox(width: 4),
                             Text(
                               '${team.memberCount} üye',
                               style: GoogleFonts.nunito(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textMid,
+                                color: context.colors.textSecondary,
                               ),
                             ),
                             const Spacer(),
@@ -1083,6 +1096,15 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                             ),
                           ],
                         ),
+
+                        if (team.description.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _InfoCard(icon: Icons.info_outline, text: team.description),
+                        ],
+                        if (team.penaltyNote.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _PenaltyCard(note: team.penaltyNote),
+                        ],
 
                         // ── Admin: davet kodu kartı ──────────────────────
                         if (isAdmin && team.inviteCode.isNotEmpty) ...[
@@ -1139,7 +1161,7 @@ class _EkipProfilScreenState extends State<EkipProfilScreen> {
                                               children: [
                                                 Text(
                                                   'Bekleyen İstekler',
-                                                  style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                                                  style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
                                                 ),
                                                 Text(
                                                   '${docs.length} kişi ekibe katılmak istiyor',
@@ -1215,7 +1237,7 @@ class _InviteCodeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.colors.tealSurface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
       ),
@@ -1426,9 +1448,9 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
         top: false,
@@ -1452,7 +1474,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                   child: Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.borderGrey,
+                      color: context.colors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1472,7 +1494,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                               style: GoogleFonts.nunito(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
+                                color: context.colors.textPrimary,
                               ),
                             ),
                             if (!isLoading)
@@ -1480,7 +1502,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                                 docs.isEmpty
                                     ? 'Bekleyen istek yok'
                                     : '${docs.length} kişi bekliyor · Onaylarsan ekibe katılır',
-                                style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid),
+                                style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textSecondary),
                               ),
                           ],
                         ),
@@ -1508,7 +1530,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                 ),
 
                 const SizedBox(height: 16),
-                const Divider(height: 1, color: AppColors.borderGrey),
+                Divider(height: 1, color: context.colors.border),
 
                 // ── İstek listesi ────────────────────────────────────────────
                 if (isLoading)
@@ -1535,7 +1557,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                           style: GoogleFonts.nunito(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textMid,
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],
@@ -1550,7 +1572,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       shrinkWrap: true,
                       itemCount: docs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, indent: 72, endIndent: 20, color: AppColors.borderGrey),
+                      separatorBuilder: (_, __) => Divider(height: 1, indent: 72, endIndent: 20, color: context.colors.border),
                       itemBuilder: (ctx, i) {
                         final doc = docs[i];
                         final data = doc.data() as Map<String, dynamic>;
@@ -1573,7 +1595,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                               // Avatar
                               CircleAvatar(
                                 radius: 22,
-                                backgroundColor: AppColors.tealLight,
+                                backgroundColor: context.colors.tealSurface,
                                 backgroundImage: avatarSeed != null
                                     ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
                                     : null,
@@ -1595,7 +1617,7 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                                         Flexible(
                                           child: Text(
                                             name,
-                                            style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                                            style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -1623,14 +1645,14 @@ class _PendingRequestsSheetState extends State<_PendingRequestsSheet> {
                                     Row(
                                       children: [
                                         if (username.isNotEmpty)
-                                          Text('@$username', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                                          Text('@$username', style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
                                         if (username.isNotEmpty && (city.isNotEmpty || university.isNotEmpty))
-                                          Text(' · ', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                                          Text(' · ', style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
                                         if (city.isNotEmpty || university.isNotEmpty)
-                                          Flexible(child: Text([city, university].where((s) => s.isNotEmpty).join(' · '), style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight), overflow: TextOverflow.ellipsis)),
+                                          Flexible(child: Text([city, university].where((s) => s.isNotEmpty).join(' · '), style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary), overflow: TextOverflow.ellipsis)),
                                         if (requestedAt != null) ...[
-                                          Text(' · ', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
-                                          Text(_timeAgo(requestedAt), style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                                          Text(' · ', style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
+                                          Text(_timeAgo(requestedAt), style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
                                         ],
                                       ],
                                     ),
@@ -1740,7 +1762,7 @@ class _RequestRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1750,7 +1772,7 @@ class _RequestRow extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: AppColors.tealLight,
+                backgroundColor: context.colors.tealSurface,
                 backgroundImage: avatarSeed != null
                     ? NetworkImage(
                         'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
@@ -1770,7 +1792,7 @@ class _RequestRow extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(name,
-                              style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                              style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                         ),
                         if (cinsiyetLabel.isNotEmpty)
                           Container(
@@ -1791,7 +1813,7 @@ class _RequestRow extends StatelessWidget {
                       ],
                     ),
                     if (username.isNotEmpty)
-                      Text('@$username', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                      Text('@$username', style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
                   ],
                 ),
               ),
@@ -1804,10 +1826,10 @@ class _RequestRow extends StatelessWidget {
                 if (detailParts.isNotEmpty)
                   Expanded(
                     child: Text(detailParts.join(' · '),
-                        style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMid),
+                        style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textSecondary),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
-                Text(_timeAgo(), style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight)),
+                Text(_timeAgo(), style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary)),
               ],
             ),
           ],
@@ -1867,20 +1889,20 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: AppColors.textMid),
+          Icon(icon, size: 16, color: context.colors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
               style: GoogleFonts.nunito(
                 fontSize: 13,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -1899,18 +1921,20 @@ class _PenaltyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        border: Border.all(color: const Color(0xFFFFE082)),
+        color: AppColors.gold.withValues(alpha: isDark ? 0.1 : 0.15),
+        border: Border.all(color: AppColors.gold.withValues(alpha: isDark ? 0.3 : 0.4)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.warning_amber_rounded,
-              size: 16, color: Color(0xFFF59E0B)),
+              size: 16, color: AppColors.gold),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1921,7 +1945,7 @@ class _PenaltyCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFFF59E0B),
+                    color: AppColors.gold,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -1930,7 +1954,7 @@ class _PenaltyCard extends StatelessWidget {
                   note,
                   style: GoogleFonts.nunito(
                     fontSize: 13,
-                    color: const Color(0xFF92400E),
+                    color: context.colors.textPrimary,
                     height: 1.4,
                   ),
                 ),
@@ -2078,7 +2102,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
               style: GoogleFonts.nunito(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const Spacer(),
@@ -2087,11 +2111,11 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
+                  color: context.colors.surfaceVariant,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.refresh,
-                    size: 18, color: AppColors.textMid),
+                child: Icon(Icons.refresh,
+                    size: 18, color: context.colors.textSecondary),
               ),
             ),
           ],
@@ -2099,11 +2123,11 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
         const SizedBox(height: 4),
         Row(
           children: [
-            const Icon(Icons.access_time, size: 13, color: AppColors.textLight),
+            Icon(Icons.access_time, size: 13, color: context.colors.textTertiary),
             const SizedBox(width: 4),
             Text(
               'Sıfırlanmaya ${_fmtDuration(widget.untilMidnight)} kaldı',
-              style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
+              style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary),
             ),
           ],
         ),
@@ -2165,14 +2189,14 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
                 'Henüz üye yok.',
                 style: GoogleFonts.nunito(
-                    fontSize: 13, color: AppColors.textLight),
+                    fontSize: 13, color: context.colors.textTertiary),
               ),
             ),
           )
@@ -2190,7 +2214,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.nunito(
                     fontSize: 12.5,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                     height: 1.6,
                     fontStyle: FontStyle.italic,
                   ),
@@ -2201,7 +2225,7 @@ class _LeaderboardSectionState extends State<_LeaderboardSection> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.nunito(
                     fontSize: 11,
-                    color: AppColors.textLight,
+                    color: context.colors.textTertiary,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
                   ),
@@ -2272,10 +2296,10 @@ class _SortChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? activeColor : AppColors.lightGrey,
+          color: selected ? activeColor : context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? activeColor : AppColors.borderGrey,
+            color: selected ? activeColor : context.colors.border,
           ),
         ),
         child: Text(
@@ -2283,7 +2307,7 @@ class _SortChip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.textMid,
+            color: selected ? Colors.white : context.colors.textSecondary,
           ),
         ),
       ),
@@ -2329,23 +2353,34 @@ class _LeaderboardRow extends StatelessWidget {
     }
   }
 
-  Color get _bgColor {
+  Color _bgColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      // Dark modda: şeffaf/ton tabanlı renkler — arka planla uyumlu
+      if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.22);
+      if (isRed) return AppColors.errorRed.withValues(alpha: 0.10);
+      if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.18);
+      if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.12);
+      if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.07);
+      return context.colors.surface;
+    }
+    // Light mode (orijinal)
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.48);
     if (isRed) return AppColors.errorBg;
     if (rank == 1) return AppColors.successBg;
     if (rank == 2) return AppColors.successBg.withValues(alpha: 0.6);
     if (rank == 3) return AppColors.successBg.withValues(alpha: 0.3);
-    return AppColors.white;
+    return context.colors.surface;
   }
 
-  Color get _borderColor {
+  Color _borderColor(BuildContext context) {
     if (isMe) return AppColors.teal;
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.85);
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
     if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.3);
     if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.15);
-    return AppColors.borderGrey;
+    return context.colors.border;
   }
 
   double get _borderWidth => isMe ? 2.0 : 1.0;
@@ -2356,8 +2391,8 @@ class _LeaderboardRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: _bgColor,
-        border: Border.all(color: _borderColor, width: _borderWidth),
+        color: _bgColor(context),
+        border: Border.all(color: _borderColor(context), width: _borderWidth),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -2377,7 +2412,7 @@ class _LeaderboardRow extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: isRed ? AppColors.errorRed : AppColors.textMid,
+                      color: isRed ? AppColors.errorRed : context.colors.textSecondary,
                     ),
                   ),
           ),
@@ -2393,7 +2428,7 @@ class _LeaderboardRow extends StatelessWidget {
             ),
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: AppColors.tealLight,
+              backgroundColor: context.colors.tealSurface,
               backgroundImage: entry.avatarSeed != null
                   ? NetworkImage(
                       'https://api.dicebear.com/7.x/micah/png?seed=${entry.avatarSeed}&backgroundColor=transparent',
@@ -2426,7 +2461,7 @@ class _LeaderboardRow extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -2447,7 +2482,7 @@ class _LeaderboardRow extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.tealLight,
+                          color: context.colors.tealSurface,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -2499,14 +2534,14 @@ class _LeaderboardRow extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                   color: entry.periodHasanat > 0
                       ? AppColors.gold
-                      : AppColors.textLight,
+                      : context.colors.textTertiary,
                 ),
               ),
               Text(
                 'hasanat',
                 style: GoogleFonts.nunito(
                   fontSize: 9,
-                  color: AppColors.textLight,
+                  color: context.colors.textTertiary,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -2590,7 +2625,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -2600,7 +2635,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -2610,7 +2645,7 @@ class _EditFieldSheetState extends State<_EditFieldSheet> {
             maxLength: 300,
             decoration: InputDecoration(
               labelText: widget.label,
-              labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
               counterText: '',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -2683,9 +2718,9 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
         widget.members.where((m) => m.uid != widget.leaderUid).toList();
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, 32 + MediaQuery.of(context).viewInsets.bottom),
@@ -2700,7 +2735,7 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
                 style: GoogleFonts.nunito(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -2712,7 +2747,7 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
           ),
           Text(
             'Ekipten çıkarmak istediğiniz üyeye dokunun.',
-            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+            style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 16),
           if (kickable.isEmpty)
@@ -2722,7 +2757,7 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
                 child: Text(
                   'Çıkarılabilecek başka üye yok.',
                   style: GoogleFonts.nunito(
-                      fontSize: 13, color: AppColors.textLight),
+                      fontSize: 13, color: context.colors.textTertiary),
                 ),
               ),
             )
@@ -2739,14 +2774,14 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: AppColors.tealLight,
+            backgroundColor: context.colors.tealSurface,
             backgroundImage: member.avatarSeed != null
                 ? NetworkImage(
                     'https://api.dicebear.com/7.x/micah/png?seed=${member.avatarSeed}&backgroundColor=transparent',
@@ -2773,14 +2808,14 @@ class _ManageMembersSheetState extends State<_ManageMembersSheet> {
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 if (member.username.isNotEmpty)
                   Text(
                     '@${member.username}',
                     style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textLight),
+                        fontSize: 11, color: context.colors.textTertiary),
                   ),
               ],
             ),
@@ -2846,9 +2881,9 @@ class _TeamSettingsSheet extends StatelessWidget {
     };
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).padding.bottom + 28),
       child: SingleChildScrollView(
@@ -2859,20 +2894,20 @@ class _TeamSettingsSheet extends StatelessWidget {
             Center(
               child: Container(
                 width: 36, height: 4,
-                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(2)),
               ),
             ),
             const SizedBox(height: 20),
             Text(
               'Takım Ayarları',
-              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
             ),
             const SizedBox(height: 4),
             Text(
               isAdmin
                   ? 'Ekip bilgilerini buradan görüntüleyebilir ve düzenleyebilirsin.'
                   : 'Ekip hakkında bilgiler.',
-              style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
+              style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary),
             ),
             const SizedBox(height: 20),
             _SettingRow(icon: privacyIcon, label: 'Görünürlük', value: privacyLabel),
@@ -2898,7 +2933,7 @@ class _TeamSettingsSheet extends StatelessWidget {
               else
                 Text(
                   'Henüz açıklama eklenmemiş.',
-                  style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textLight),
+                  style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textTertiary),
                 ),
             ],
 
@@ -2915,7 +2950,7 @@ class _TeamSettingsSheet extends StatelessWidget {
               else
                 Text(
                   'Henüz ceza notu eklenmemiş.',
-                  style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textLight),
+                  style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textTertiary),
                 ),
             ],
           ],
@@ -2938,7 +2973,7 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark),
+          style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
         ),
         const Spacer(),
         if (onEdit != null)
@@ -2947,7 +2982,7 @@ class _SectionHeader extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.tealLight,
+                color: context.colors.tealSurface,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -2976,21 +3011,21 @@ class _SettingRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           Container(
             width: 38, height: 38,
-            decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: context.colors.tealSurface, borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, size: 20, color: AppColors.teal),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(label, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+            child: Text(label, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
           ),
-          Text(value, style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid)),
+          Text(value, style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textSecondary)),
         ],
       ),
     );
@@ -3041,16 +3076,16 @@ class _CrossGenderNamesToggleState extends State<_CrossGenderNamesToggle> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         children: [
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
-              color: _localValue ? AppColors.tealLight : const Color(0xFFFCE4EC),
+              color: _localValue ? context.colors.tealSurface : const Color(0xFFFCE4EC),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -3066,13 +3101,13 @@ class _CrossGenderNamesToggleState extends State<_CrossGenderNamesToggle> {
               children: [
                 Text(
                   'Karşı cins isimleri',
-                  style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                  style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
                 ),
                 Text(
                   _localValue
                       ? 'Herkes herkesi tam adıyla görüyor'
                       : 'Karşı cins adları sansürlü görünüyor',
-                  style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMid),
+                  style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textSecondary),
                 ),
               ],
             ),
@@ -3126,16 +3161,16 @@ class _PublicTeamJoinView extends StatelessWidget {
     final genderBg = switch (team.genderPolicy) {
       'men'   => const Color(0xFFE3F2FD),
       'women' => const Color(0xFFFCE4EC),
-      _       => AppColors.tealLight,
+      _       => context.colors.tealSurface,
     };
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
           onPressed: onBack,
         ),
       ),
@@ -3163,7 +3198,7 @@ class _PublicTeamJoinView extends StatelessWidget {
               // Ekip adı
               Text(
                 team.name,
-                style: GoogleFonts.nunito(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                style: GoogleFonts.nunito(fontSize: 26, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
               ),
               const SizedBox(height: 12),
               // Üye sayısı + cinsiyet politikası
@@ -3171,13 +3206,13 @@ class _PublicTeamJoinView extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(20)),
+                    decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(20)),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.people_outline, size: 14, color: AppColors.textMid),
+                        Icon(Icons.people_outline, size: 14, color: context.colors.textSecondary),
                         const SizedBox(width: 4),
-                        Text('${team.memberCount} üye', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                        Text('${team.memberCount} üye', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
                       ],
                     ),
                   ),
@@ -3201,14 +3236,14 @@ class _PublicTeamJoinView extends StatelessWidget {
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(14)),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: AppColors.textMid),
+                      Icon(Icons.info_outline, size: 16, color: context.colors.textSecondary),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(team.description, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5)),
+                        child: Text(team.description, style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary, height: 1.5)),
                       ),
                     ],
                   ),
@@ -3249,7 +3284,7 @@ class _PublicTeamJoinView extends StatelessWidget {
                 child: Text(
                   'Bu ekibe katılmak istiyor musun?',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMid),
+                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.textSecondary),
                 ),
               ),
               const SizedBox(height: 16),
@@ -3268,7 +3303,7 @@ class _PublicTeamJoinView extends StatelessWidget {
                 width: double.infinity,
                 child: TextButton(
                   onPressed: onBack,
-                  child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                  child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -3292,15 +3327,15 @@ class _GenderBlockedTeamView extends StatelessWidget {
   Widget build(BuildContext context) {
     final forMen = genderPolicy == 'men';
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
           onPressed: onBack,
         ),
-        title: Text(teamName, style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        title: Text(teamName, style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
       ),
       body: Center(
         child: Padding(
@@ -3323,7 +3358,7 @@ class _GenderBlockedTeamView extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 forMen ? 'Sadece Beyler' : 'Sadece Hanımlar',
-                style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
               ),
               const SizedBox(height: 10),
               Text(
@@ -3331,17 +3366,17 @@ class _GenderBlockedTeamView extends StatelessWidget {
                     ? 'Bu ekip yalnızca erkek üyelere açıktır.'
                     : 'Bu ekip yalnızca hanım üyelere açıktır.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+                style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: onBack,
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.borderGrey),
+                  side: BorderSide(color: context.colors.border),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
               ),
             ],
           ),
@@ -3360,15 +3395,15 @@ class _LockedTeamView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(teamName, style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        title: Text(teamName, style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
       ),
       body: Center(
         child: Padding(
@@ -3378,29 +3413,29 @@ class _LockedTeamView extends StatelessWidget {
             children: [
               Container(
                 width: 80, height: 80,
-                decoration: BoxDecoration(color: AppColors.lightGrey, shape: BoxShape.circle),
-                child: const Icon(Icons.lock_outlined, size: 36, color: AppColors.textMid),
+                decoration: BoxDecoration(color: context.colors.surfaceVariant, shape: BoxShape.circle),
+                child: Icon(Icons.lock_outlined, size: 36, color: context.colors.textSecondary),
               ),
               const SizedBox(height: 20),
               Text(
                 'Gizli Ekip',
-                style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
               ),
               const SizedBox(height: 10),
               Text(
                 'Bu ekip gizlidir. Sadece kabul edilmiş üyeler ekip içeriğini görebilir.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+                style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.borderGrey),
+                  side: BorderSide(color: context.colors.border),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                child: Text('Geri Dön', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
               ),
             ],
           ),

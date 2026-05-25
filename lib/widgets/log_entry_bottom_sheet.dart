@@ -4,6 +4,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../models/reading_log_model.dart';
@@ -49,11 +50,11 @@ class LogEntryBottomSheet extends StatefulWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Text(
+              Builder(builder: (ctx) => Text(
                 'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
-                style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                style: TextStyle(fontSize: 15, color: ctx.colors.textSecondary),
                 textAlign: TextAlign.center,
-              ),
+              )),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -262,12 +263,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           content: Text(
             'Hatimini bitirmene $pagesRead sayfa kaldı.\n\n'
             '$pagesRead sayfa okundu işaretlenecek ve ${pagesRead * 10} hasanat eklenecek.',
-            style: const TextStyle(color: AppColors.textMid),
+            style: TextStyle(color: context.colors.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
+              child: Text('İptal', style: TextStyle(color: context.colors.textSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -587,13 +588,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '$label  (Sayfa $page) içeren bir bölüm okudunuz.\nTilavet secdesini yaptınız mı?',
-              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -702,7 +703,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.tealLight,
+              color: context.colors.tealSurface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
             ),
@@ -759,7 +760,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -769,7 +770,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                 Expanded(
                   child: RichText(
                     text: TextSpan(
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMid),
+                      style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                       children: [
                         const TextSpan(text: 'Devam: '),
                         TextSpan(
@@ -816,14 +817,14 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.info_outline, color: AppColors.textLight, size: 40),
+            Icon(Icons.info_outline, color: context.colors.textTertiary, size: 40),
             const SizedBox(height: 8),
-            const Text('Aktif hatiminiz yok.',
-                style: TextStyle(color: AppColors.textMid)),
+            Text('Aktif hatiminiz yok.',
+                style: TextStyle(color: context.colors.textSecondary)),
             const SizedBox(height: 4),
-            const Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
+            Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                style: TextStyle(color: context.colors.textTertiary, fontSize: 12)),
           ],
         ),
       );
@@ -832,8 +833,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Hangi hatim?',
-            style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+        Text('Hangi hatim?',
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
         const SizedBox(height: 8),
         ..._hatims.map((h) => _HatimSelectCard(
               hatim: h,
@@ -872,13 +873,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                   ),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text('–',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textMid)),
+                        color: context.colors.textSecondary)),
               ),
               Expanded(
                 child: TextField(
@@ -905,8 +906,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -956,8 +957,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -1017,12 +1018,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline, size: 13, color: AppColors.textLight),
+              Icon(Icons.info_outline, size: 13, color: context.colors.textTertiary),
               const SizedBox(width: 4),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Sure logları serbest kaydedilir — hatimle ilişkilendirilemez.',
-                  style: TextStyle(color: AppColors.textLight, fontSize: 11),
+                  style: TextStyle(color: context.colors.textTertiary, fontSize: 11),
                 ),
               ),
             ],
@@ -1037,9 +1038,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -1049,16 +1050,16 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Okuma Kaydet',
+              Text('Okuma Kaydet',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.colors.textPrimary)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.history, color: AppColors.textMid),
+                    icon: Icon(Icons.history, color: context.colors.textSecondary),
                     onPressed: () => LogHistorySheet.show(context),
                     tooltip: 'Kayıt geçmişi',
                   ),
@@ -1095,7 +1096,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           TabBar(
             controller: _tabController,
             labelColor: AppColors.teal,
-            unselectedLabelColor: AppColors.textLight,
+            unselectedLabelColor: context.colors.textTertiary,
             indicatorColor: AppColors.teal,
             labelPadding: EdgeInsets.zero,
             onTap: (_) => setState(() {}),
@@ -1153,9 +1154,9 @@ class _HatimSelectCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : Colors.white,
+          color: isSelected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -1165,12 +1166,12 @@ class _HatimSelectCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.teal : AppColors.borderGrey,
+                color: isSelected ? AppColors.teal : context.colors.border,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 isArapca ? Icons.menu_book : Icons.translate,
-                color: isSelected ? Colors.white : AppColors.textMid,
+                color: isSelected ? Colors.white : context.colors.textSecondary,
                 size: 18,
               ),
             ),
@@ -1184,13 +1185,13 @@ class _HatimSelectCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: isSelected ? AppColors.teal : AppColors.textDark,
+                      color: isSelected ? AppColors.teal : context.colors.textPrimary,
                     ),
                   ),
                   Text(positionText,
-                      style: const TextStyle(color: AppColors.textMid, fontSize: 12)),
+                      style: TextStyle(color: context.colors.textSecondary, fontSize: 12)),
                   Text(surahText,
-                      style: const TextStyle(color: AppColors.textLight, fontSize: 11)),
+                      style: TextStyle(color: context.colors.textTertiary, fontSize: 11)),
                 ],
               ),
             ),
@@ -1212,7 +1213,7 @@ class _LockedHatimBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.colors.tealSurface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
       ),
@@ -1286,9 +1287,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : Colors.white,
+          color: isSelected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -1296,14 +1297,14 @@ class _Chip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: isSelected ? AppColors.teal : AppColors.textMid),
+            Icon(icon, size: 13, color: isSelected ? AppColors.teal : context.colors.textSecondary),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppColors.teal : AppColors.textMid,
+                color: isSelected ? AppColors.teal : context.colors.textSecondary,
               ),
             ),
           ],
@@ -1354,7 +1355,6 @@ class _SaveButton extends StatelessWidget {
       height: 48, // Toplam 52px (48 + 4 depth)
       color: AppColors.teal,
       bottomColor: AppColors.tealDark,
-      disabledColor: AppColors.borderGrey,
       onPressed: isLoading ? null : onPressed,
       isLoading: isLoading,
       child: const Text(

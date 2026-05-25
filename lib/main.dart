@@ -9,7 +9,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
+import 'app_theme.dart';
+// VirdColorsX (context.colors) bu dosyadan gelir
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
@@ -99,9 +102,13 @@ void main() async {
 
   final showHome = prefs.getBool('showHome') ?? false;
 
+  final themeProvider = ThemeProvider();
+  await themeProvider.init();
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProxyProvider<AuthProvider, UserProvider>(
           create: (_) => UserProvider(),
@@ -123,14 +130,13 @@ class VirdApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
     return MaterialApp(
       title: 'Vird',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal),
-        textTheme: GoogleFonts.nunitoTextTheme(),
-        scaffoldBackgroundColor: AppColors.white,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeProvider.themeMode,
       home: AuthWrapper(initialShowHome: showHome, pendingMagicLink: pendingMagicLink),
     );
   }
@@ -304,7 +310,7 @@ class _MainBottomNav extends StatelessWidget {
     return BottomAppBar(
       notchMargin: 8,
       shape: const CircularNotchedRectangle(),
-      color: AppColors.white,
+      color: context.colors.surface,
       elevation: 8,
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -377,7 +383,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.teal : AppColors.textLight;
+    final color = active ? AppColors.teal : context.colors.textTertiary;
 
     return Expanded(
       child: GestureDetector(
@@ -426,7 +432,7 @@ class _AppErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.colors.surface,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -442,19 +448,19 @@ class _AppErrorWidget extends StatelessWidget {
                 child: const Icon(Icons.error_outline, size: 36, color: Color(0xFFEF4444)),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Bir şeyler ters gitti',
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2937),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Beklenmedik bir hata oluştu.\nGeliştirici bilgilendirildi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14, color: Color(0xFF6B7280), height: 1.5,
+                  fontSize: 14, color: context.colors.textSecondary, height: 1.5,
                 ),
               ),
               const SizedBox(height: 28),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../data/quran_cuz.dart';
 import '../utils/name_utils.dart';
 import '../utils/seri_calculator.dart';
@@ -74,7 +75,7 @@ class _KullaniciProfilScreenState extends State<KullaniciProfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -261,7 +262,7 @@ class _UserHeader extends StatelessWidget {
             ),
             child: CircleAvatar(
               radius: avatarR,
-              backgroundColor: AppColors.tealLight,
+              backgroundColor: context.colors.tealSurface,
               backgroundImage: avatarSeed != null
                   ? NetworkImage(
                       'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
@@ -292,7 +293,7 @@ class _UserHeader extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -364,7 +365,7 @@ class _UserHeader extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textMid,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                 ],
@@ -374,7 +375,7 @@ class _UserHeader extends StatelessWidget {
                     locationParts.join(' · '),
                     style: GoogleFonts.nunito(
                       fontSize: 11,
-                      color: AppColors.textLight,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ],
@@ -463,8 +464,8 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -486,7 +487,7 @@ class _StatCard extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 7.5,
               fontWeight: FontWeight.w700,
-              color: AppColors.textLight,
+              color: context.colors.textTertiary,
               letterSpacing: 0.4,
             ),
           ),
@@ -523,8 +524,8 @@ class _HeatMapCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -550,7 +551,7 @@ class _HeatMapCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     Text(
@@ -558,7 +559,7 @@ class _HeatMapCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   ],
@@ -573,7 +574,7 @@ class _HeatMapCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: !isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: !isMeal ? AppColors.teal : context.colors.surfaceVariant,
                         borderRadius: const BorderRadius.horizontal(
                             left: Radius.circular(999)),
                       ),
@@ -582,7 +583,7 @@ class _HeatMapCard extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: !isMeal ? Colors.white : AppColors.textMid,
+                          color: !isMeal ? Colors.white : context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -593,7 +594,7 @@ class _HeatMapCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: isMeal ? AppColors.teal : context.colors.surfaceVariant,
                         borderRadius: const BorderRadius.horizontal(
                             right: Radius.circular(999)),
                       ),
@@ -602,7 +603,7 @@ class _HeatMapCard extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: isMeal ? Colors.white : AppColors.textMid,
+                          color: isMeal ? Colors.white : context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -670,9 +671,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppColors.tealLight : AppColors.white,
+          color: selected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: selected ? AppColors.teal : AppColors.borderGrey,
+            color: selected ? AppColors.teal : context.colors.border,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -682,7 +683,7 @@ class _Chip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: selected ? AppColors.teal : AppColors.textMid,
+            color: selected ? AppColors.teal : context.colors.textSecondary,
           ),
         ),
       ),
@@ -712,9 +713,10 @@ class _HeatGrid extends StatelessWidget {
     return (w - _labelW - _labelGap - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _square(int page, double sq, double r, int maxCount) {
+  Widget _square(BuildContext context, int page, double sq, double r, int maxCount) {
     final count = readings[page] ?? 0;
     final sel = selectedPage == page;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => onPageTap(page),
       child: Container(
@@ -722,9 +724,9 @@ class _HeatGrid extends StatelessWidget {
         height: sq,
         margin: const EdgeInsets.only(right: _squareGap),
         decoration: BoxDecoration(
-          color: QuranData.heatColorRelative(count, maxCount),
+          color: QuranData.heatColorRelative(count, maxCount, isDark: isDark),
           borderRadius: BorderRadius.circular(r),
-          border: sel ? Border.all(color: AppColors.textDark, width: 1) : null,
+          border: sel ? Border.all(color: context.colors.textPrimary, width: 1) : null,
         ),
       ),
     );
@@ -740,11 +742,12 @@ class _HeatGrid extends StatelessWidget {
           : readings.values.fold(0, (a, b) => a > b ? a : b);
       final fatihaCount = readings[1] ?? 0;
       final fatihaSelected = selectedPage == 0;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
 
       final labelStyle = GoogleFonts.nunito(
         fontSize: 8,
         fontWeight: FontWeight.w700,
-        color: AppColors.textLight,
+        color: context.colors.textTertiary,
       );
 
       final rows = <Widget>[];
@@ -761,10 +764,10 @@ class _HeatGrid extends StatelessWidget {
                 width: sq,
                 height: sq,
                 decoration: BoxDecoration(
-                  color: QuranData.heatColorRelative(fatihaCount, maxCount),
+                  color: QuranData.heatColorRelative(fatihaCount, maxCount, isDark: isDark),
                   borderRadius: BorderRadius.circular(r),
                   border: fatihaSelected
-                      ? Border.all(color: AppColors.textDark, width: 1)
+                      ? Border.all(color: context.colors.textPrimary, width: 1)
                       : null,
                 ),
               ),
@@ -790,7 +793,7 @@ class _HeatGrid extends StatelessWidget {
                 const SizedBox(width: _labelGap),
                 ...List.generate(
                     cuz.pageCount,
-                    (i) => _square(cuz.startPage + i, sq, r, maxCount)),
+                    (i) => _square(context, cuz.startPage + i, sq, r, maxCount)),
               ],
             ),
           ));
@@ -806,7 +809,7 @@ class _HeatGrid extends StatelessWidget {
                       textAlign: TextAlign.right, style: labelStyle),
                 ),
                 const SizedBox(width: _labelGap),
-                ...List.generate(20, (i) => _square(581 + i, sq, r, maxCount)),
+                ...List.generate(20, (i) => _square(context, 581 + i, sq, r, maxCount)),
               ],
             ),
           ));
@@ -816,7 +819,7 @@ class _HeatGrid extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(width: _labelW + _labelGap),
-                ...List.generate(4, (i) => _square(601 + i, sq, r, maxCount)),
+                ...List.generate(4, (i) => _square(context, 601 + i, sq, r, maxCount)),
                 const SizedBox(width: 3),
                 Text('İhlâs · Felak · Nâs', style: labelStyle),
               ],
@@ -850,7 +853,7 @@ class _Legend extends StatelessWidget {
           children: [
             Text('Az',
                 style: GoogleFonts.nunito(
-                    fontSize: 10, color: AppColors.textMid)),
+                    fontSize: 10, color: context.colors.textSecondary)),
             const SizedBox(width: 4),
             ...levels.map((c) => Container(
                   width: sq,
@@ -864,7 +867,7 @@ class _Legend extends StatelessWidget {
             const SizedBox(width: 1),
             Text('Çok',
                 style: GoogleFonts.nunito(
-                    fontSize: 10, color: AppColors.textMid)),
+                    fontSize: 10, color: context.colors.textSecondary)),
           ],
         ),
       );
@@ -888,14 +891,14 @@ class _DetailPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
       ),
       child: page == null
           ? Text(
               'Detay için bir sayfaya dokun',
               style:
-                  GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+                  GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary),
             )
           : _PageDetail(
               page: page!,
@@ -932,14 +935,14 @@ class _PageDetail extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               if (surahText.isNotEmpty)
                 Text(
                   surahText,
                   style:
-                      GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid),
+                      GoogleFonts.nunito(fontSize: 10, color: context.colors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -949,8 +952,8 @@ class _PageDetail extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.borderGrey),
+            color: context.colors.surface,
+            border: Border.all(color: context.colors.border),
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
@@ -959,8 +962,8 @@ class _PageDetail extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w800,
               color: count == 0
-                  ? AppColors.textLight
-                  : QuranData.heatColorRelative(count, maxCount),
+                  ? context.colors.textTertiary
+                  : QuranData.heatColorRelative(count, maxCount, isDark: Theme.of(context).brightness == Brightness.dark),
             ),
           ),
         ),

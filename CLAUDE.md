@@ -90,6 +90,33 @@ Tipler: `feat` `fix` `style` `refactor` `docs`
 
 ---
 
+## Dark Mode — Renk Kuralları
+
+Uygulama **light + dark mode** destekler. Yeni her ekran/widget bu sisteme uygun yazılmalı.
+
+**Zorunlu:** Dosyaya `import '../app_theme.dart';` ekle (ekran ise `../`, widget ise `../`).
+
+**Renk tablosu — hard-coded renk YAZMA, bunları kullan:**
+
+| Kullanım | Yaz | YAZMA |
+|---|---|---|
+| Arka plan, scaffold, kart | `context.colors.surface` | `AppColors.white`, `Colors.white`, `Color(0xFFFFFFFF)` |
+| İkincil alan, gri kutu | `context.colors.surfaceVariant` | `AppColors.lightGrey`, `Color(0xFFF7F7F7)` |
+| Çizgi, kenarlık | `context.colors.border` | `AppColors.borderGrey`, `Color(0xFFE5E5E5)` |
+| Ana metin | `context.colors.textPrimary` | `AppColors.textDark`, `Color(0xFF3C3C3C)` |
+| İkincil metin | `context.colors.textSecondary` | `AppColors.textMid`, `Color(0xFF777777)` |
+| Soluk metin, placeholder | `context.colors.textTertiary` | `AppColors.textLight`, `Color(0xFFABABAB)` |
+| Teal tonlu arka plan | `context.colors.tealSurface` | `AppColors.tealLight`, `Color(0xFFE8F5F7)` |
+
+**Değişmeyen (semantic) renkler** — bunlar her temada aynı, olduğu gibi kullan:
+`AppColors.teal`, `tealDark`, `tealSoft`, `orange`, `gold`, `errorRed`, `successGreen`, vb.
+
+**`Colors.white` istisnası:** Teal/renkli bir arka plan üzerindeki ikon veya buton metni ise `Colors.white` doğrudur — değiştirme.
+
+**`const` uyarısı:** `context.colors.*` runtime değerdir — `const` widget içinde kullanılırsa `const` kaldır.
+
+---
+
 ## Skill Kullanım (Claude Code)
 
 | Durum | Skill |

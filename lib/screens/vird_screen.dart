@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../app_assets.dart';
 import '../data/roadmap_entry.dart';
 
@@ -95,7 +96,7 @@ class _VirdScreenState extends State<VirdScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -160,7 +161,7 @@ class _VirdScreenState extends State<VirdScreen> {
           if (_entries.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text('Yükleniyor...', style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textLight)),
+              child: Text('Yükleniyor...', style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textTertiary)),
             ),
           for (final item in shownReleased)
             Padding(
@@ -179,7 +180,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 onTap: () => _showRoadmapSheet(context, published),
                 child: Text(
                   'Tüm sürüm geçmişini gör →',
-                  style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.4),
+                  style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary, fontWeight: FontWeight.w600, letterSpacing: 0.4),
                 ),
               ),
             ),
@@ -207,8 +208,8 @@ class _VirdScreenState extends State<VirdScreen> {
           const _SectionHead(kicker: 'Senin Sesin', title: 'Bir özellik öner'),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              border: Border.all(color: AppColors.borderGrey),
+              color: context.colors.surfaceVariant,
+              border: Border.all(color: context.colors.border),
               borderRadius: BorderRadius.circular(16),
             ),
             padding: const EdgeInsets.all(18),
@@ -216,27 +217,27 @@ class _VirdScreenState extends State<VirdScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Bir fikrin var mı?',
-                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                 const SizedBox(height: 4),
                 Text('Paylaşacağın bir fikir, birçok kişi için hayra vesile olabilir.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.45)),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.45)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _controller,
                   onChanged: (_) => setState(() {}),
                   maxLength: 280,
                   maxLines: 3,
-                  style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark),
+                  style: GoogleFonts.nunito(fontSize: 14.5, color: context.colors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Hangi özelliği istersin?',
-                    hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight),
-                    counterStyle: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight),
+                    hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: context.colors.textTertiary),
+                    counterStyle: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary),
                     filled: true,
-                    fillColor: AppColors.white,
+                    fillColor: context.colors.surface,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderGrey, width: 1.5),
+                      borderSide: BorderSide(color: context.colors.border, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -273,8 +274,8 @@ class _VirdScreenState extends State<VirdScreen> {
           const _SectionHead(kicker: 'Hakkında', title: 'Vird nedir?'),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              border: Border.all(color: AppColors.borderGrey),
+              color: context.colors.surfaceVariant,
+              border: Border.all(color: context.colors.border),
               borderRadius: BorderRadius.circular(16),
             ),
             padding: const EdgeInsets.all(18),
@@ -283,12 +284,12 @@ class _VirdScreenState extends State<VirdScreen> {
               children: [
                 Text(
                   'Allah\'a yaklaşmak için belirli zamanda ve belli miktarda yapılan ibadet, dua ve zikri ifade eden tasavvuf terimi.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.6, fontStyle: FontStyle.italic),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.6, fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 12),
                 RichText(
                   text: TextSpan(
-                    style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark, height: 1.6, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.nunito(fontSize: 14.5, color: context.colors.textPrimary, height: 1.6, fontWeight: FontWeight.w500),
                     children: [
                       const TextSpan(text: 'Vird, ibadetin '),
                       TextSpan(text: 'devamlı',
@@ -300,7 +301,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Bugün Kuran okuma takibiyle başlıyoruz. Yarın namaz, oruç ve diğer alışkanlıklar da burada olacak. Geliştiricinin de bu yolda kendine bir vesilesi; aynı zamanda hayra vesile olabilmek niyetiyle.',
-                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.6),
+                  style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.6),
                 ),
               ],
             ),
@@ -313,7 +314,7 @@ class _VirdScreenState extends State<VirdScreen> {
                 const SizedBox(height: 16),
                 Text(
                   _currentVersion(),
-                  style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+                  style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary, fontWeight: FontWeight.w600, letterSpacing: 0.3),
                 ),
               ],
             ),
@@ -342,7 +343,7 @@ class _SectionHead extends StatelessWidget {
             style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.teal, letterSpacing: 1.4)),
           const SizedBox(height: 4),
           Text(title,
-            style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark, letterSpacing: -0.2)),
+            style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: context.colors.textPrimary, letterSpacing: -0.2)),
         ],
       ),
     );
@@ -361,15 +362,15 @@ class _RoadmapCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isReleased = entry.type == 'released';
     final barColor  = isReleased ? _green        : AppColors.teal;
-    final badgeBg   = isReleased ? _greenBg      : AppColors.tealLight;
+    final badgeBg   = isReleased ? _greenBg      : context.colors.tealSurface;
     final badgeFg   = isReleased ? _green        : AppColors.teal;
 
     final badgeLabel = isReleased ? 'Yayında ✓' : (entry.eta ?? 'Yakında');
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surfaceVariant,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(14),
       ),
       child: IntrinsicHeight(
@@ -398,14 +399,14 @@ class _RoadmapCard extends StatelessWidget {
                         if (entry.version != null) ...[
                           Text(
                             entry.version!,
-                            style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textLight, letterSpacing: 0.3),
+                            style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textTertiary, letterSpacing: 0.3),
                           ),
                           const SizedBox(width: 6),
                         ],
                         Expanded(
                           child: Text(
                             entry.title,
-                            style: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                            style: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -421,10 +422,10 @@ class _RoadmapCard extends StatelessWidget {
                     ),
                     // Tarih (released ise)
                     if (isReleased && entry.date != null) ...[
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 2),
                       Text(
                         _formatDate(entry.date!),
-                        style: GoogleFonts.nunito(fontSize: 10.5, color: AppColors.textLight, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.nunito(fontSize: 11.5, color: context.colors.textSecondary, fontWeight: FontWeight.w600),
                       ),
                     ],
                     // Bullet listesi
@@ -435,7 +436,7 @@ class _RoadmapCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 1),
                           child: Text(
                             '· $b',
-                            style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid, height: 1.35),
+                            style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textSecondary, height: 1.35),
                           ),
                         ),
                     ],
@@ -478,9 +479,9 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bg      = widget.disabled ? AppColors.borderGrey : AppColors.teal;
+    final bg      = widget.disabled ? context.colors.border : AppColors.teal;
     final shadow  = widget.disabled ? Colors.transparent   : AppColors.tealDark;
-    final textColor = widget.disabled ? AppColors.textLight  : AppColors.white;
+    final textColor = widget.disabled ? context.colors.textTertiary  : AppColors.white;
 
     return GestureDetector(
       onTapDown: (_) { if (!widget.disabled) setState(() => _pressed = true); },
@@ -528,9 +529,9 @@ class _RoadmapSheetState extends State<_RoadmapSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
@@ -539,20 +540,20 @@ class _RoadmapSheetState extends State<_RoadmapSheet> {
               child: Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 4),
                 width: 40, height: 4,
-                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+                decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
               child: Text('Yol Haritası',
-                style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
             ),
             // Sekmeler
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Container(
                 height: 38,
-                decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
                 child: Row(
                   children: [
                     _SheetTab(
@@ -593,7 +594,7 @@ class _RoadmapSheetState extends State<_RoadmapSheet> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [AppColors.white.withValues(alpha: 0), AppColors.white],
+                            colors: [context.colors.surface.withValues(alpha: 0), context.colors.surface],
                           ),
                         ),
                       ),
@@ -632,7 +633,7 @@ class _SheetTab extends StatelessWidget {
           child: Text(
             count > 0 ? '$label ($count)' : label,
             style: GoogleFonts.nunito(
-              color: active ? Colors.white : AppColors.textMid,
+              color: active ? Colors.white : context.colors.textSecondary,
               fontWeight: FontWeight.w800,
               fontSize: 13,
             ),

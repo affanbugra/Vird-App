@@ -88,6 +88,14 @@ class AppTheme {
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal),
         textTheme: GoogleFonts.nunitoTextTheme(),
         scaffoldBackgroundColor: VirdColors.light.surface,
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+        ),
         extensions: const [VirdColors.light],
       );
 
@@ -101,6 +109,14 @@ class AppTheme {
           ThemeData(brightness: Brightness.dark).textTheme,
         ),
         scaffoldBackgroundColor: VirdColors.dark.surface,
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFF0D1E24),
+          surfaceTintColor: Colors.transparent,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFF0D1E24),
+          surfaceTintColor: Colors.transparent,
+        ),
         extensions: const [VirdColors.dark],
       );
 }

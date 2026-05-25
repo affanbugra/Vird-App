@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/hatim_model.dart';
 import '../widgets/hatim_heat_map_sheet.dart';
 import '../utils/hatim_remover.dart';
@@ -38,12 +39,12 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
     if (user == null) return const Scaffold(body: Center(child: Text('Giriş yapınız')));
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -51,7 +52,7 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
           style: GoogleFonts.nunito(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
       ),
@@ -79,13 +80,13 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.emoji_events_outlined, size: 64, color: AppColors.borderGrey),
+                  Icon(Icons.emoji_events_outlined, size: 64, color: context.colors.border),
                   const SizedBox(height: 16),
                   Text(
                     'Henüz tamamlanan hatim yok.',
                     style: GoogleFonts.nunito(
                       fontSize: 15,
-                      color: AppColors.textMid,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -93,7 +94,7 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
                     '604 sayfayı okuyunca hatim tamamlanır.',
                     style: GoogleFonts.nunito(
                       fontSize: 13,
-                      color: AppColors.textLight,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ],
@@ -129,13 +130,13 @@ class _TamamlananHatimlerScreenState extends State<TamamlananHatimlerScreen> {
                             style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
                         content: Text(
                           '"${hatim.displayName}" ve tüm okuma kayıtları silinecek.\nHasanat puanı ve okunan sayfalar geri alınır.',
-                          style: GoogleFonts.nunito(color: AppColors.textMid),
+                          style: GoogleFonts.nunito(color: ctx.colors.textSecondary),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
                             child: Text('İptal',
-                                style: GoogleFonts.nunito(color: AppColors.textMid)),
+                                style: GoogleFonts.nunito(color: ctx.colors.textSecondary)),
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
@@ -198,12 +199,12 @@ class _CompletedHatimCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF38A474).withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.4)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF38A474).withValues(alpha: 0.06),
+            color: AppColors.emeraldGreen.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -214,12 +215,12 @@ class _CompletedHatimCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: const Color(0xFF38A474).withValues(alpha: 0.12),
+              color: AppColors.emeraldGreen.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               isArapca ? Icons.menu_book : Icons.translate,
-              color: const Color(0xFF38A474),
+              color: AppColors.emeraldGreen,
               size: 20,
             ),
           ),
@@ -233,14 +234,14 @@ class _CompletedHatimCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 Text(
                   '604/604 sayfa${completedDate.isNotEmpty ? ' · $completedDate' : ''}',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ],
@@ -250,7 +251,7 @@ class _CompletedHatimCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF38A474).withValues(alpha: 0.12),
+              color: AppColors.emeraldGreen.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -258,7 +259,7 @@ class _CompletedHatimCard extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF38A474),
+                color: AppColors.emeraldGreen,
               ),
             ),
           ),
@@ -269,7 +270,7 @@ class _CompletedHatimCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: AppColors.tealLight,
+                color: context.colors.tealSurface,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.grid_view_rounded, size: 16, color: AppColors.teal),
