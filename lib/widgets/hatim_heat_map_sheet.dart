@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../app_theme.dart';
 import '../models/hatim_model.dart';
-import 'duolingo_button.dart';
 import '../data/quran_cuz.dart';
 import '../data/tilavet_secde.dart';
 import '../models/reading_log_model.dart';
 import 'log_edit_sheet.dart';
 import '../utils/hatim_calculator.dart';
 import '../utils/seri_calculator.dart';
+import '../services/streak_freeze_service.dart';
+import '../screens/streak_animation_screen.dart';
+import '../screens/streak_freeze_reward_screen.dart';
 
 String _fmtDate(DateTime dt) =>
     '${dt.day}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
@@ -57,13 +60,22 @@ class HatimHeatMapSheet extends StatefulWidget {
 
 class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
   final ValueNotifier<int?> _selectedPage = ValueNotifier<int?>(null);
+  int? _markingPage;
 
   /// page -> 'done' | 'pending' | null (not yet asked)
   Map<int, String> _secdeStatus = {};
 
+  late final Stream<QuerySnapshot> _logsStream;
+
   @override
   void initState() {
     super.initState();
+    _logsStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .collection('logs')
+        .where('hatimId', isEqualTo: widget.hatim.id)
+        .snapshots();
     _loadSecdeStatus();
   }
 
@@ -103,6 +115,169 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
       });
     } catch (e) {
       debugPrint('Secde save error: \$e');
+    }
+  }
+
+  static const _dayAbbr = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
+
+  Future<({List<bool> filled, List<bool> frozenMask, List<String> labels})> _getWeekFilled(String uid) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startDay = today.subtract(const Duration(days: 6));
+    final results = await Future.wait([
+      FirebaseFirestore.instance.collection('users').doc(uid).collection('logs')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay)).get(),
+      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+    ]);
+    final logsSnap = results[0] as QuerySnapshot;
+    final userSnap = results[1] as DocumentSnapshot;
+    final frozenDates = Set<String>.from(
+      ((userSnap.data() as Map<String, dynamic>?)?['frozenDates'] as List<dynamic>?) ?? [],
+    );
+    final readDays = <String>{};
+    for (final doc in logsSnap.docs) {
+      final d = doc.data() as Map<String, dynamic>?;
+      if (d == null) continue;
+      final t = d['type'] as String?;
+      if (t != 'arapca' && t != 'meal') continue;
+      final dt = (d['createdAt'] as Timestamp?)?.toDate().toLocal();
+      if (dt != null) readDays.add(seriDateKey(dt));
+    }
+    final loggedDays = <String>{...frozenDates, ...readDays};
+    final filled = List.generate(7, (i) => loggedDays.contains(seriDateKey(startDay.add(Duration(days: i)))));
+    final frozenMask = List.generate(7, (i) {
+      final key = seriDateKey(startDay.add(Duration(days: i)));
+      return frozenDates.contains(key) && !readDays.contains(key);
+    });
+    final labels = List.generate(7, (i) => _dayAbbr[startDay.add(Duration(days: i)).weekday - 1]);
+    return (filled: filled, frozenMask: frozenMask, labels: labels);
+  }
+
+  Future<void> _markPageAsRead(int page) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _markingPage = page);
+    try {
+      try { await StreakFreezeService.autoApplyFreezes(user.uid); } catch (_) {}
+
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final userDocSnap = await userRef.get();
+      final userData = userDocSnap.data();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final lastLogTs = userData?['lastLogDate'] as Timestamp?;
+      final lastLogDate = lastLogTs?.toDate();
+      final currentSeri = (userData?['seri'] as int?) ?? 0;
+      final displayedSeri = seriDisplayState(currentSeri, lastLogTs).value;
+
+      final Map<String, dynamic> seriUpdate;
+      bool needsSeriRecalculate = false;
+      if (lastLogDate != null && !lastLogDate.isBefore(today)) {
+        seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+      } else if (lastLogDate != null && !lastLogDate.isBefore(yesterday)) {
+        seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      } else {
+        final hadLogYesterday = lastLogDate == null
+            ? await userRef.collection('logs')
+                .where('type', whereIn: ['arapca', 'meal'])
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
+                .where('createdAt', isLessThan: Timestamp.fromDate(today))
+                .limit(1).get().then((s) => s.docs.isNotEmpty)
+            : false;
+        if (hadLogYesterday) {
+          needsSeriRecalculate = true;
+          seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+        } else {
+          seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+        }
+      }
+
+      const pagesRead = 1;
+      final weekMonday = today.subtract(Duration(days: today.weekday - 1));
+      final weekStartStr = '${weekMonday.year}-${weekMonday.month.toString().padLeft(2, '0')}-${weekMonday.day.toString().padLeft(2, '0')}';
+      final existingWeekStr = userData?['weeklyStartDate'] as String?;
+      final Map<String, dynamic> weeklyUpdate;
+      if (existingWeekStr == weekStartStr) {
+        weeklyUpdate = {'weeklyHasanat': FieldValue.increment(10), 'weeklyStartDate': weekStartStr};
+      } else if (existingWeekStr == null) {
+        final weekStartTs = Timestamp.fromDate(weekMonday);
+        final existingSnap = await userRef.collection('logs').where('createdAt', isGreaterThanOrEqualTo: weekStartTs).get();
+        int existingWeekPages = 0;
+        for (final doc in existingSnap.docs) {
+          final t = doc.data()['type'] as String?;
+          if (t != 'arapca' && t != 'meal') continue;
+          existingWeekPages += (doc.data()['pagesRead'] as int?) ?? 0;
+        }
+        weeklyUpdate = {'weeklyHasanat': (existingWeekPages + pagesRead) * 10, 'weeklyStartDate': weekStartStr};
+      } else {
+        weeklyUpdate = {
+          'weeklyHasanat': 10,
+          'weeklyStartDate': weekStartStr,
+          'prevWeeklyStartDate': existingWeekStr,
+          'prevWeeklyHasanat': (userData?['weeklyHasanat'] as int?) ?? 0,
+        };
+      }
+
+      final batch = FirebaseFirestore.instance.batch();
+      batch.set(userRef.collection('logs').doc(), ReadingLog(
+        id: '', type: widget.hatim.type, method: LogMethod.pages,
+        pagesRead: pagesRead, startPage: page, endPage: page,
+        hatimId: widget.hatim.id, createdAt: DateTime.now(),
+      ).toMap());
+      batch.set(userRef, {
+        'hasanat': FieldValue.increment(10),
+        'totalPages': FieldValue.increment(1),
+        ...seriUpdate, ...weeklyUpdate,
+      }, SetOptions(merge: true));
+      batch.update(userRef.collection('hatims').doc(widget.hatim.id),
+          {'updatedAt': FieldValue.serverTimestamp()});
+      await batch.commit();
+
+      if (needsSeriRecalculate) await SeriCalculator.recalculate(user.uid);
+      await HatimCalculator.recalculate(user.uid, widget.hatim.id);
+
+      if (mounted && TilavetSecdeData.hasSecde(page)) _showSecdeDialog(page);
+
+      if (mounted) {
+        int newSeri;
+        if (seriUpdate.containsKey('seri')) {
+          newSeri = seriUpdate['seri'] as int;
+        } else if (needsSeriRecalculate) {
+          final refreshed = await userRef.get();
+          newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
+        } else {
+          newSeri = displayedSeri;
+        }
+        final shouldShowAnimation = newSeri > displayedSeri;
+        ({List<bool> filled, List<bool> frozenMask, List<String> labels})? weekData;
+        if (shouldShowAnimation && mounted) {
+          try { weekData = await _getWeekFilled(user.uid); } catch (_) {}
+        }
+        if (mounted) {
+          final milestoneResult = await StreakFreezeService.claimMilestones(uid: user.uid, newSeri: newSeri);
+          if (shouldShowAnimation && weekData != null) {
+            final wd = weekData; final milestone = milestoneResult; final ctx = context;
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!ctx.mounted) return;
+              await StreakAnimationScreen.show(ctx, count: newSeri, prevCount: displayedSeri,
+                  filled: wd.filled, frozenMask: wd.frozenMask, dayLabels: wd.labels, todayIndex: 6);
+              if (milestone.claimed.isNotEmpty && ctx.mounted) {
+                await StreakFreezeRewardScreen.show(ctx,
+                    milestoneDays: milestone.claimed.last, freezesGranted: milestone.totalGranted);
+              }
+            });
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() => _markingPage = null);
+        _selectedPage.value = null;
+      }
+    } catch (e) {
+      debugPrint('Mark page error: $e');
+      if (mounted) setState(() => _markingPage = null);
     }
   }
 
@@ -288,12 +463,7 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
             // İçerik
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(widget.uid)
-                    .collection('logs')
-                    .where('hatimId', isEqualTo: widget.hatim.id)
-                    .snapshots(),
+                stream: _logsStream,
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(
@@ -303,14 +473,6 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                   final readPages = snap.hasData
                       ? _buildReadPages(snap.data!.docs)
                       : <int>{};
-
-                  final readCount = readPages.where((p) => p >= 1).length;
-                  final completedCuz = QuranData.cuzler.where((c) {
-                    for (int p = c.startPage; p <= c.endPage; p++) {
-                      if (!readPages.contains(p)) return false;
-                    }
-                    return true;
-                  }).length;
 
                   // Tarihe göre sıralı dökümanlar (yeniden eskiye)
                   final sortedDocs = [...snap.data!.docs]..sort((a, b) {
@@ -324,51 +486,19 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                     controller: controller,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     children: [
-                      // DEVAM ET butonu (sadece aktif hatimler için)
-                      if (widget.onDevamEt != null) ...[
-                        DuolingoButton(
-                          color: AppColors.teal,
-                          bottomColor: AppColors.tealDark,
-                          onPressed: () {
-                            Navigator.pop(context);
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              widget.onDevamEt!();
-                            });
-                          },
-                          child: Text(
-                            'DEVAM ET',
-                            style: GoogleFonts.nunito(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      // İstatistik şeridi
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: context.colors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _StatItem(value: '$readCount', label: 'SAYFA'),
-                            Container(
-                                width: 1, height: 28, color: context.colors.border),
-                            _StatItem(value: '$completedCuz/30', label: 'CÜZ'),
-                            Container(
-                                width: 1, height: 28, color: context.colors.border),
-                            _StatItem(value: '${604 - readCount}', label: 'KALAN'),
-                          ],
+                      // Detay paneli (üstte — sayfaya dokunulunca güncellenir)
+                      ValueListenableBuilder<int?>(
+                        valueListenable: _selectedPage,
+                        builder: (context, selectedPage, _) => _DetailPanel(
+                          page: selectedPage,
+                          readPages: readPages,
+                          onMarkRead: selectedPage != null && !readPages.contains(selectedPage)
+                              ? () => _markPageAsRead(selectedPage)
+                              : null,
+                          isMarking: _markingPage == selectedPage,
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       // Isı haritası + Lejant + Detay paneli
                       ValueListenableBuilder<int?>(
                         valueListenable: _selectedPage,
@@ -402,8 +532,6 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                                           fontSize: 10, color: context.colors.textSecondary)),
                                 ],
                               ),
-                              // Detay paneli
-                              _DetailPanel(page: selectedPage, readPages: readPages),
                             ],
                           );
                         },
@@ -482,31 +610,6 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
   }
 }
 
-// ─── İstatistik öğesi ────────────────────────────────────────────────────────
-
-class _StatItem extends StatelessWidget {
-  final String value;
-  final String label;
-  const _StatItem({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value,
-            style: GoogleFonts.nunito(
-                fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.teal)),
-        Text(label,
-            style: GoogleFonts.nunito(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textTertiary,
-                letterSpacing: 0.4)),
-      ],
-    );
-  }
-}
-
 // ─── Lejant noktası ───────────────────────────────────────────────────────────
 
 class _LegendDot extends StatelessWidget {
@@ -528,7 +631,14 @@ class _LegendDot extends StatelessWidget {
 class _DetailPanel extends StatelessWidget {
   final int? page;
   final Set<int> readPages;
-  const _DetailPanel({required this.page, required this.readPages});
+  final VoidCallback? onMarkRead;
+  final bool isMarking;
+  const _DetailPanel({
+    required this.page,
+    required this.readPages,
+    this.onMarkRead,
+    this.isMarking = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -542,7 +652,7 @@ class _DetailPanel extends StatelessWidget {
           border: Border.all(color: context.colors.border),
         ),
         child: Text(
-          'Detay için bir sayfaya dokun',
+          'Sayfa bilgisi görmek veya okundu işaretlemek için bir kareye dokun.',
           style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary),
         ),
       );
@@ -551,7 +661,10 @@ class _DetailPanel extends StatelessWidget {
     final p = page!;
     final surahText = p == 0 ? 'Fâtiha' : QuranData.surahsOnPage(p);
     final cuz = QuranData.cuzForPage(p);
-    final pageLabel = p == 0 ? 'Fâtiha · Cüz 1' : 'Sayfa $p · Cüz ${cuz?.cuzNo ?? '?'}';
+    final pageInCuz = cuz != null ? p - cuz.startPage + 1 : null;
+    final pageLabel = p == 0
+        ? 'Fâtiha · 1. cüz, 1. sayfa'
+        : 'Sayfa $p  —  ${cuz?.cuzNo ?? '?'}. cüz, ${pageInCuz ?? '?'}. sayfa';
     final isRead = readPages.contains(p);
 
     return Container(
@@ -562,47 +675,83 @@ class _DetailPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.colors.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  pageLabel,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      pageLabel,
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    if (surahText.isNotEmpty)
+                      Text(
+                        surahText,
+                        style: GoogleFonts.nunito(
+                            fontSize: 11, color: context.colors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isRead
+                      ? _kReadColor.withValues(alpha: 0.12)
+                      : AppColors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  isRead ? 'Okundu' : 'Okunmadı',
                   style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: context.colors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isRead ? _kReadColor : AppColors.orange,
                   ),
                 ),
-                if (surahText.isNotEmpty)
-                  Text(
-                    surahText,
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: context.colors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: isRead
-                  ? _kReadColor.withValues(alpha: 0.12)
-                  : context.colors.border,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              isRead ? 'Okundu' : 'Okunmadı',
-              style: GoogleFonts.nunito(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isRead ? _kReadColor : context.colors.textSecondary,
+          if (!isRead && onMarkRead != null) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: isMarking ? null : onMarkRead,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.teal,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: isMarking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        'Okundu Olarak İşaretle',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -671,9 +820,13 @@ class _BinaryHeatGrid extends StatelessWidget {
             height: sq,
             margin: const EdgeInsets.only(right: _squareGap),
             decoration: BoxDecoration(
-              color: isRead ? _kReadColor : context.colors.border,
+              color: isRead
+                  ? _kReadColor
+                  : (isSelected ? AppColors.orange : context.colors.border),
               borderRadius: BorderRadius.circular(radius),
-              border: isSelected ? Border.all(color: context.colors.textPrimary, width: 1.5) : null,
+              border: isSelected && isRead
+                  ? Border.all(color: context.colors.textPrimary, width: 1.5)
+                  : null,
             ),
           ),
           if (hasSecde)

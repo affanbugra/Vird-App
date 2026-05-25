@@ -6,14 +6,14 @@ class UserProvider extends ChangeNotifier {
   bool _isDeveloper = false;
   bool _isPro = false;
   bool _isHafiz = false;
-  // Üye olduğu tüm ekipler (kendi kurduğu DAHİL)
   List<String> _teamIds = const [];
-  // Lider/kurucu olduğu ekipler (teamIds'in alt kümesi)
   List<String> _adminTeamIds = const [];
-  // Bekleyen katılım isteği gönderilen ekipler
   List<String> _pendingTeamIds = const [];
   // 'hanim' veya 'bey' — kayıt sırasında seçilir
   String? _cinsiyet;
+  String? _username;
+  bool _userDataLoaded = false;
+  bool _suppressMandatorySetup = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
 
   bool get isDeveloper => _isDeveloper;
@@ -23,6 +23,21 @@ class UserProvider extends ChangeNotifier {
   List<String> get adminTeamIds => _adminTeamIds;
   List<String> get pendingTeamIds => _pendingTeamIds;
   String? get cinsiyet => _cinsiyet;
+  String? get username => _username;
+  bool get userDataLoaded => _userDataLoaded;
+
+  /// Hesap silme sırasında Firestore tetiklemesini engelle
+  void suppressSetup() {
+    _suppressMandatorySetup = true;
+    notifyListeners();
+  }
+
+  /// Cinsiyet veya kullanıcı adı eksikse zorunlu kurulum sheet'i göster
+  bool get needsMandatorySetup =>
+      !_suppressMandatorySetup &&
+      _userDataLoaded &&
+      ((_cinsiyet == null || _cinsiyet!.isEmpty) ||
+          (_username == null || _username!.isEmpty));
 
   // Sadece üye olduğu (kurmadığı) ekip sayısı — join limiti için
   int get joinedTeamCount => _teamIds.length - _adminTeamIds.length;
@@ -34,6 +49,7 @@ class UserProvider extends ChangeNotifier {
 
   void listenToUser(String? uid) {
     _sub?.cancel();
+    _userDataLoaded = false;
     if (uid == null) {
       _isDeveloper = false;
       _isPro = false;
@@ -42,6 +58,7 @@ class UserProvider extends ChangeNotifier {
       _adminTeamIds = const [];
       _pendingTeamIds = const [];
       _cinsiyet = null;
+      _username = null;
       notifyListeners();
       return;
     }
@@ -55,6 +72,7 @@ class UserProvider extends ChangeNotifier {
       _isPro = (data?['isPro'] as bool?) ?? false;
       _isHafiz = (data?['isHafiz'] as bool?) ?? false;
       _cinsiyet = data?['cinsiyet'] as String?;
+      _username = data?['username'] as String?;
       _teamIds = ((data?['teamIds']) as List?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -67,6 +85,7 @@ class UserProvider extends ChangeNotifier {
               ?.map((e) => e.toString())
               .toList() ??
           const [];
+      _userDataLoaded = true;
       notifyListeners();
     });
   }
@@ -77,3 +96,4 @@ class UserProvider extends ChangeNotifier {
     super.dispose();
   }
 }
+

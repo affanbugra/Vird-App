@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../app_colors.dart';
 import '../../app_theme.dart';
 import '../../providers/auth_provider.dart';
-import 'profile_setup_screen.dart';
 
 String _parseAuthError(dynamic e) {
   if (e is FirebaseAuthException) {
@@ -48,7 +47,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  String? _cinsiyet;
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
@@ -56,12 +54,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final password = _passwordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) return;
-    if (_cinsiyet == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen cinsiyet seçimi yapınız.')),
-      );
-      return;
-    }
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'seri': 0,
           'totalPages': 0,
           'hatimCount': 0,
-          'cinsiyet': _cinsiyet, // 'hanim' veya 'bey'
+          // cinsiyet ProfileSetupScreen'de alınır (requiresCinsiyet: true)
         });
       } catch (e) {
         debugPrint('Profil Firestore yazma hatası: $e');
@@ -114,12 +106,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProfileSetupScreen(name: name),
-        ),
-      );
+      // ProfilSetup'ı manuel pushlamak yerine AuthWrapper'a bırakıyoruz.
+      // E-posta kaydı sonrası AuthProvider'da needsProfileSetup true yapıldığı için root (AuthWrapper)
+      // otomatik olarak ProfileSetupScreen'i gösterecektir. Sadece RegisterScreen'i aradan çıkarıyoruz.
+      Navigator.popUntil(context, (route) => route.isFirst);
     }
   }
 
@@ -186,38 +176,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 24),
-              // --- CİNSİYET SEÇİMİ ---
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.info_outline, size: 11, color: Color(0xFFBBAB00)),
-                      const SizedBox(width: 4),
-                      const Expanded(
-                        child: Text(
-                          'Bu seçim yalnızca bir kez yapılabilir ve daha sonra değiştirilemez. Lütfen doğru seçeneği işaretlediğinizden emin olunuz.',
-                          style: TextStyle(fontSize: 10, color: Color(0xFFAA9000), height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _CinsiyetToggle(
-                    secili: _cinsiyet,
-                    onChanged: (val) => setState(() => _cinsiyet = val),
-                  ),
-                  if (_cinsiyet == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, left: 4),
-                      child: Text(
-                        'Lütfen bir seçenek belirtin.',
-                        style: TextStyle(fontSize: 11, color: Colors.red.shade400),
-                      ),
-                    ),
-                ],
-              ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleRegister,
@@ -250,10 +208,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         final messenger = ScaffoldMessenger.of(context);
                         try {
                           await context.read<AuthProvider>().signInWithGoogle();
+                          if (mounted) {
+                            Navigator.popUntil(context, (route) => route.isFirst);
+                          }
                         } catch (e) {
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(_parseAuthError(e))),
-                          );
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(_parseAuthError(e))),
+                            );
+                          }
                         } finally {
                           if (mounted) setState(() => _isLoading = false);
                         }
@@ -274,90 +237,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-/// Hanımefendi / Beyefendi — kayan toggle seçimi
-class _CinsiyetToggle extends StatelessWidget {
-  final String? secili;
-  final ValueChanged<String> onChanged;
-
-  const _CinsiyetToggle({required this.secili, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isHanim = secili == 'hanim';
-    final bool isBey = secili == 'bey';
-
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: context.colors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.colors.border, width: 1),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Stack(
-        children: [
-          if (secili != null)
-            AnimatedAlign(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeInOut,
-              alignment: isHanim ? Alignment.centerLeft : Alignment.centerRight,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: context.colors.surface,
-                    borderRadius: BorderRadius.circular(9),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.10),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged('hanim'),
-                  behavior: HitTestBehavior.opaque,
-                  child: Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 220),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isHanim ? FontWeight.w700 : FontWeight.w500,
-                        color: isHanim ? context.colors.textPrimary : context.colors.textTertiary,
-                      ),
-                      child: const Text('Hanımefendi'),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged('bey'),
-                  behavior: HitTestBehavior.opaque,
-                  child: Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 220),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isBey ? FontWeight.w700 : FontWeight.w500,
-                        color: isBey ? context.colors.textPrimary : context.colors.textTertiary,
-                      ),
-                      child: const Text('Beyefendi'),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}

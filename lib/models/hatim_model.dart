@@ -6,9 +6,10 @@ class Hatim {
   final String id;
   final HatimType type;
   final String? name;
-  final int currentPage;      // Okunan benzersiz sayfa sayısı (0-604)
-  final int lastReadPage;     // En yüksek okunan sayfa numarası (Devam için)
-  final int firstUnreadPage;  // 1-604 arasındaki ilk okunmamış sayfa
+  final int currentPage;         // Okunan benzersiz sayfa sayısı (0-604)
+  final int lastReadPage;        // En yüksek okunan sayfa numarası
+  final int firstUnreadPage;     // 1-604 arasındaki ilk okunmamış sayfa
+  final int lastSessionEndPage;  // En son logun bitiş sayfası (Devam başlangıcı için)
   final int totalPages;
   final bool isCompleted;
   final DateTime? completedAt;
@@ -22,6 +23,7 @@ class Hatim {
     this.currentPage = 0,
     this.lastReadPage = 0,
     this.firstUnreadPage = 1,
+    this.lastSessionEndPage = 0,
     this.totalPages = 604,
     this.isCompleted = false,
     this.completedAt,
@@ -43,6 +45,7 @@ class Hatim {
       currentPage: data['currentPage'] ?? 0,
       lastReadPage: data['lastReadPage'] ?? data['currentPage'] ?? 0,
       firstUnreadPage: data['firstUnreadPage'] ?? 1,
+      lastSessionEndPage: data['lastSessionEndPage'] ?? 0,
       totalPages: data['totalPages'] ?? 604,
       isCompleted: (data['isCompleted'] as bool?) ?? false,
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
