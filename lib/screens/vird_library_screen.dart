@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
 import '../models/vird_model.dart';
+import '../data/quran_cuz.dart';
 
 class VirdLibraryScreen extends StatefulWidget {
   const VirdLibraryScreen({super.key});
@@ -17,16 +20,29 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
   late TabController _tabController;
   final _uid = FirebaseAuth.instance.currentUser?.uid;
   final Map<String, bool> _expandedItems = {};
+  late Stream<List<VirdItem>> _virdsStream;
+  List<VirdItem> _latestVirds = [];
+  StreamSubscription<List<VirdItem>>? _virdsSub;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted && !_tabController.indexIsChanging) {
+        setState(() => _expandedItems.clear());
+      }
+    });
+    _virdsStream = _getVirdsStream();
+    _virdsSub = _virdsStream.listen((v) {
+      if (mounted) setState(() => _latestVirds = v);
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _virdsSub?.cancel();
     super.dispose();
   }
 
@@ -152,247 +168,371 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
     final descController = TextEditingController();
     final targetController = TextEditingController(text: '100');
     String category = 'zikir';
-    String time = 'Günlük';
+    String time = 'Sabah Namazı Sonrası';
+    SurahInfo? selectedSurah;
+
+    String _n(String s) => s.toLowerCase().replaceAll("'", '').replaceAll('\u2018', '').replaceAll('\u2019', '');
+    final addedSurahNames = _latestVirds
+        .where((v) => v.category == 'sure')
+        .expand((v) {
+          final tNorm = _n(v.title);
+          return QuranData.surahlar
+              .where((s) => tNorm.contains(_n(s.name)))
+              .map((s) => s.name);
+        })
+        .toSet();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (sCtx, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sCtx).viewInsets.bottom + 20,
-            top: 20,
-            left: 20,
-            right: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2)),
+        builder: (sCtx, setModalState) {
+          InputDecoration field(String hint) => InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.nunito(fontSize: 14, color: AppColors.textLight),
+            contentPadding: const EdgeInsets.only(bottom: 8),
+            isDense: true,
+            enabledBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.borderGrey, width: 1),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.teal, width: 1.5),
+            ),
+          );
+
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sCtx).viewInsets.bottom + 24,
+              top: 12,
+              left: 20,
+              right: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36, height: 3,
+                      decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2)),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Yeni Özel Vird Ekle',
-                      style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.pop(sCtx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                // Kategori Seçimi
-                Text('Kategori', style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _buildCategoryChip(sCtx, 'Zikir', 'zikir', category, (val) {
-                      setModalState(() {
-                        category = val;
-                        if (targetController.text == '1') targetController.text = '100';
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _buildCategoryChip(sCtx, 'Sure', 'sure', category, (val) {
-                      setModalState(() {
-                        category = val;
-                        targetController.text = '1';
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _buildCategoryChip(sCtx, 'Dua', 'dua', category, (val) {
-                      setModalState(() {
-                        category = val;
-                        targetController.text = '1';
-                      });
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Başlık
-                TextField(
-                  controller: titleController,
-                  style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark),
-                  decoration: _buildInputDecoration('Vird Başlığı (örn: Kelime-i Tevhid)'),
-                ),
-                const SizedBox(height: 12),
-
-                // Arapça Başlık (Opsiyonel)
-                TextField(
-                  controller: arabicController,
-                  style: GoogleFonts.amiri(fontSize: 16, color: AppColors.textDark),
-                  textAlign: TextAlign.right,
-                  decoration: _buildInputDecoration('Arapça Yazılışı (Opsiyonel)').copyWith(
-                    hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Yeni vird ekle',
+                        style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(sCtx),
+                        child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textLight),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                // Hedef Sayısı ve Önerilen Vakit
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: targetController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark),
-                        decoration: _buildInputDecoration('Hedef Adeti'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.lightGrey,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderGrey),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: time,
-                            icon: const Icon(Icons.arrow_drop_down, color: AppColors.textMid),
-                            items: [
-                              'Günlük',
-                              'Sabah Namazı Sonrası',
-                              'İkindi Sonrası',
-                              'Akşam Sonrası',
-                              'Yatsı Sonrası',
-                              'Cuma Gününe Özel',
-                              'Her Zaman'
-                            ].map((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value, style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textDark)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setModalState(() => time = val);
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Açıklama / Fazilet
-                TextField(
-                  controller: descController,
-                  maxLines: 2,
-                  style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textDark),
-                  decoration: _buildInputDecoration('Açıklama / Fazileti (Opsiyonel)'),
-                ),
-                const SizedBox(height: 24),
-
-                // Ekle Butonu
-                GestureDetector(
-                  onTap: () async {
-                    final title = titleController.text.trim();
-                    final target = int.tryParse(targetController.text) ?? 1;
-                    if (title.isEmpty || _uid == null) return;
-                    final customId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
-                    try {
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(_uid)
-                          .update({
-                        'virdPreferences.$customId': {
-                          'title': title,
-                          'arabicTitle': arabicController.text.trim().isEmpty ? null : arabicController.text.trim(),
-                          'description': descController.text.trim().isEmpty ? 'Özel tanımlanmış vird.' : descController.text.trim(),
-                          'category': category,
-                          'targetCount': target,
-                          'recommendedTime': time,
-                          'active': true,
-                          'isCustom': true,
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        }
-                      });
-
-                      HapticFeedback.mediumImpact();
-                      if (sCtx.mounted) Navigator.pop(sCtx);
-                    } catch (e) {
-                      debugPrint('Error saving custom vird: $e');
-                      if (sCtx.mounted) {
-                        ScaffoldMessenger.of(sCtx).showSnackBar(
-                          SnackBar(
-                            content: Text('Vird kaydedilemedi: yetki yetersiz veya bağlantı hatası.'),
-                            backgroundColor: AppColors.errorRed,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: Container(
-                    height: 52,
+                  // Segmented kategori seçimi — kayan indicator
+                  Container(
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.teal,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.tealDark.withValues(alpha: 0.3),
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        )
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Kayan beyaz pill
+                        AnimatedAlign(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
+                          alignment: category == 'sure'
+                              ? Alignment.centerLeft
+                              : category == 'zikir'
+                                  ? Alignment.center
+                                  : Alignment.centerRight,
+                          child: FractionallySizedBox(
+                            widthFactor: 1 / 3,
+                            child: Container(
+                              margin: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(7),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 4, offset: const Offset(0, 1)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Etiketler
+                        Row(
+                          children: [
+                            _buildSegmentTab('Sure', 'sure', category, (val) => setModalState(() {
+                              category = val;
+                              targetController.text = '1';
+                            })),
+                            _buildSegmentTab('Zikir', 'zikir', category, (val) => setModalState(() {
+                              category = val;
+                              if (targetController.text == '1') targetController.text = '100';
+                            })),
+                            _buildSegmentTab('Dua', 'dua', category, (val) => setModalState(() {
+                              category = val;
+                              targetController.text = '1';
+                            })),
+                          ],
+                        ),
                       ],
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'LİSTEME EKLE',
-                      style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.0),
+                  ),
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    height: 220,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        if (category == 'sure')
+                          DropdownSearch<SurahInfo>(
+                            items: (filter, _) => QuranData.surahlar,
+                            itemAsString: (s) => '${s.id}. ${s.name}',
+                            filterFn: (s, filter) {
+                              final q = filter.toLowerCase();
+                              return s.name.toLowerCase().contains(q) || s.id.toString().contains(q);
+                            },
+                            compareFn: (a, b) => a.id == b.id,
+                            selectedItem: selectedSurah,
+                            onSelected: (s) => setModalState(() => selectedSurah = s),
+                            popupProps: PopupProps.menu(
+                              showSearchBox: true,
+                              disabledItemFn: (s) => addedSurahNames.contains(s.name),
+                              searchFieldProps: const TextFieldProps(
+                                decoration: InputDecoration(
+                                  hintText: 'Sure ara...',
+                                  prefixIcon: Icon(Icons.search),
+                                ),
+                              ),
+                              itemBuilder: (ctx, s, isDisabled, isSelected) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                  color: Colors.transparent,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 26, height: 26,
+                                        decoration: BoxDecoration(
+                                          color: isDisabled
+                                              ? AppColors.borderGrey.withValues(alpha: 0.4)
+                                              : AppColors.teal.withValues(alpha: 0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '${s.id}',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              color: isDisabled ? AppColors.textLight : AppColors.teal,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          s.name,
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDisabled ? AppColors.textLight : AppColors.textDark,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isDisabled)
+                                        Text(
+                                          'Eklendi',
+                                          style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            decoratorProps: DropDownDecoratorProps(
+                              decoration: InputDecoration(
+                                hintText: 'Sure seç',
+                                hintStyle: GoogleFonts.nunito(fontSize: 14, color: AppColors.textLight),
+                                contentPadding: const EdgeInsets.only(bottom: 8),
+                                isDense: true,
+                                enabledBorder: const UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.borderGrey, width: 1),
+                                ),
+                                focusedBorder: const UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.teal, width: 1.5),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          TextField(
+                            controller: titleController,
+                            style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                            decoration: field(category == 'zikir' ? 'Zikir adı (örn: Sübhanallah)' : 'Dua adı'),
+                          ),
+                        if (category != 'sure')
+                          TextField(
+                            controller: arabicController,
+                            style: GoogleFonts.amiri(fontSize: 16, color: AppColors.textDark),
+                            textAlign: TextAlign.right,
+                            decoration: field('Arapça yazılışı (opsiyonel)'),
+                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (category != 'sure') ...[
+                              SizedBox(
+                                width: 72,
+                                child: TextField(
+                                  controller: targetController,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                                  decoration: field('Hedef'),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                            ],
+                            Expanded(
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  border: Border(bottom: BorderSide(color: AppColors.borderGrey, width: 1)),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: time,
+                                    isExpanded: true,
+                                    isDense: true,
+                                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textLight),
+                                    style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textDark),
+                                    items: [
+                                      'Sabah Namazı Sonrası',
+                                      'Öğle Namazı Sonrası',
+                                      'İkindi Namazı Sonrası',
+                                      'Akşam Namazı Sonrası',
+                                      'Yatsı Namazı Sonrası',
+                                      'Cuma Gününe Özel',
+                                      'Günlük',
+                                      'Her Zaman',
+                                    ].map((v) => DropdownMenuItem(
+                                      value: v,
+                                      child: Text(v, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark)),
+                                    )).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) setModalState(() => time = val);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextField(
+                          controller: descController,
+                          maxLines: 2,
+                          style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                          decoration: field('Açıklama / fazileti (opsiyonel)'),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-              ],
+                  const SizedBox(height: 20),
+
+                  GestureDetector(
+                    onTap: () async {
+                      final title = category == 'sure'
+                          ? (selectedSurah != null ? '${selectedSurah!.name} Suresi' : '')
+                          : titleController.text.trim();
+                      final arabicTitle = category == 'sure'
+                          ? (selectedSurah != null ? 'سورة ${selectedSurah!.arabicName}' : null)
+                          : (arabicController.text.trim().isEmpty ? null : arabicController.text.trim());
+                      final target = int.tryParse(targetController.text) ?? 1;
+                      if (title.isEmpty || _uid == null) return;
+                      final customId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(_uid)
+                            .update({
+                          'virdPreferences.$customId': {
+                            'title': title,
+                            'arabicTitle': arabicTitle,
+                            'description': descController.text.trim().isEmpty ? 'Özel tanımlanmış vird.' : descController.text.trim(),
+                            'category': category,
+                            'targetCount': target,
+                            'recommendedTime': time,
+                            'active': true,
+                            'isCustom': true,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          }
+                        });
+                        HapticFeedback.mediumImpact();
+                        if (sCtx.mounted) Navigator.pop(sCtx);
+                      } catch (e) {
+                        debugPrint('Error saving custom vird: $e');
+                        if (sCtx.mounted) {
+                          ScaffoldMessenger.of(sCtx).showSnackBar(
+                            SnackBar(
+                              content: Text('Vird kaydedilemedi: yetki yetersiz veya bağlantı hatası.'),
+                              backgroundColor: AppColors.errorRed,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: AppColors.teal,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'EKLE',
+                        style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCategoryChip(BuildContext ctx, String label, String value, String selectedValue, ValueChanged<String> onTap) {
+  Widget _buildSegmentTab(String label, String value, String selectedValue, ValueChanged<String> onTap) {
     final active = value == selectedValue;
-    return GestureDetector(
-      onTap: () => onTap(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? AppColors.teal : AppColors.lightGrey,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: active ? AppColors.teal : AppColors.borderGrey),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.nunito(
-            fontSize: 13,
-            fontWeight: active ? FontWeight.bold : FontWeight.w600,
-            color: active ? Colors.white : AppColors.textMid,
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(value),
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? AppColors.teal : AppColors.textMid,
+            ),
           ),
         ),
       ),
@@ -490,12 +630,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
             Tab(text: 'Sureler'),
             Tab(text: 'Zikirler'),
             Tab(text: 'Dualar'),
-            Tab(text: 'Özel'),
           ],
         ),
       ),
       body: StreamBuilder<List<VirdItem>>(
-        stream: _getVirdsStream(),
+        stream: _virdsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: AppColors.teal));
@@ -505,18 +644,22 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           }
 
           final allVirds = snapshot.data!;
-          final sures = allVirds.where((e) => e.category == 'sure').toList();
-          final zikirs = allVirds.where((e) => e.category == 'zikir' && !e.isCustom).toList();
-          final duas = allVirds.where((e) => e.category == 'dua').toList();
-          final customs = allVirds.where((e) => e.isCustom).toList();
+          
+          final suresDefault = allVirds.where((e) => e.category == 'sure' && !e.isCustom).toList();
+          final suresCustom = allVirds.where((e) => e.category == 'sure' && e.isCustom).toList();
+          
+          final zikirsDefault = allVirds.where((e) => e.category == 'zikir' && !e.isCustom).toList();
+          final zikirsCustom = allVirds.where((e) => e.category == 'zikir' && e.isCustom).toList();
+          
+          final duasDefault = allVirds.where((e) => e.category == 'dua' && !e.isCustom).toList();
+          final duasCustom = allVirds.where((e) => e.category == 'dua' && e.isCustom).toList();
 
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildVirdList(sures),
-              _buildVirdList(zikirs),
-              _buildVirdList(duas),
-              _buildVirdList(customs, isCustomTab: true),
+              _buildVirdList(defaultItems: suresDefault, customItems: suresCustom),
+              _buildVirdList(defaultItems: zikirsDefault, customItems: zikirsCustom),
+              _buildVirdList(defaultItems: duasDefault, customItems: duasCustom),
             ],
           );
         },
@@ -540,206 +683,328 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
     );
   }
 
-  Widget _buildVirdList(List<VirdItem> items, {bool isCustomTab = false}) {
-    if (items.isEmpty) {
+  Widget _buildVirdList({
+    required List<VirdItem> defaultItems,
+    required List<VirdItem> customItems,
+  }) {
+    if (defaultItems.isEmpty && customItems.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                isCustomTab ? 'Henüz özel bir vird eklemediniz.' : 'Bu kategoride vird bulunamadı.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight, height: 1.5),
-              ),
-              if (isCustomTab) ...[
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.teal,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                  onPressed: _showAddCustomVirdDialog,
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  label: Text('Özel Vird Ekle', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              ],
-            ],
+          child: Text(
+            'Bu kategoride vird bulunamadı.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight, height: 1.5),
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isExpanded = _expandedItems[item.id] ?? false;
+    final List<Widget> children = [];
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: AppColors.lightGrey,
-            border: Border.all(color: AppColors.borderGrey),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
+    // Sistem virdleri
+    for (int i = 0; i < defaultItems.length; i++) {
+      final item = defaultItems[i];
+      final isLast = i == defaultItems.length - 1;
+      children.add(_buildVirdTile(item, isLast: isLast));
+    }
+
+    // Özel kullanıcı virdleri ve ayırıcı çizgi
+    if (customItems.isNotEmpty) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
             children: [
-              // Ana Başlık Satırı
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                title: Row(
-                  children: [
-                    Expanded(
+              Expanded(
+                child: Divider(
+                  color: AppColors.borderGrey.withValues(alpha: 0.8),
+                  thickness: 1.2,
+                  endIndent: 12,
+                ),
+              ),
+              Text(
+                'KENDİ EKLEDİKLERİM',
+                style: GoogleFonts.nunito(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textLight,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: AppColors.borderGrey.withValues(alpha: 0.8),
+                  thickness: 1.2,
+                  indent: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      for (int i = 0; i < customItems.length; i++) {
+        final item = customItems[i];
+        final isLast = i == customItems.length - 1;
+        children.add(_buildVirdTile(item, isLast: isLast));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: children,
+    );
+  }
+
+  Widget _buildVirdTile(VirdItem item, {required bool isLast}) {
+    final isExpanded = _expandedItems[item.id] ?? false;
+
+    IconData categoryIcon;
+    Color categoryColor;
+    
+    switch (item.category) {
+      case 'sure':
+        categoryIcon = Icons.auto_stories_rounded;
+        categoryColor = AppColors.teal;
+        break;
+      case 'zikir':
+        categoryIcon = Icons.repeat_one_rounded;
+        categoryColor = AppColors.orange;
+        break;
+      case 'dua':
+        categoryIcon = Icons.bookmark_added_rounded;
+        categoryColor = AppColors.infoBlue;
+        break;
+      default:
+        categoryIcon = Icons.bookmark_rounded;
+        categoryColor = AppColors.textMid;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: isLast ? null : Border(
+          bottom: BorderSide(
+            color: AppColors.borderGrey.withValues(alpha: 0.5),
+            width: 1.0,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                final wasOpen = _expandedItems[item.id] ?? false;
+                _expandedItems.clear();
+                if (!wasOpen) _expandedItems[item.id] = true;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  // Sol Kategori İkonu
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: categoryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      categoryIcon,
+                      color: categoryColor,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Orta Bilgi (Başlık + Alt Bilgi)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          item.title,
+                          style: GoogleFonts.nunito(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(
+                              item.recommendedTime,
+                              style: GoogleFonts.nunito(
+                                  fontSize: 10.0,
+                                  color: AppColors.textLight,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                            ),
+                            if (item.arabicTitle != null) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '•',
+                                style: TextStyle(fontSize: 8, color: AppColors.textLight.withValues(alpha: 0.5)),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                item.arabicTitle!,
+                                style: GoogleFonts.amiri(
+                                  fontSize: 12.0,
+                                  color: AppColors.textLight,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Sağ Taraf: Hedef badge + Switch + Chevron
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (item.category != 'sure') ...[
+                        GestureDetector(
+                          onTap: () => _showEditTargetDialog(item),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.tealLight,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Hedef: ${item.targetCount}',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.teal,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.edit, size: 8, color: AppColors.teal),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: item.active,
+                          activeColor: AppColors.teal,
+                          activeTrackColor: AppColors.tealLight,
+                          inactiveThumbColor: AppColors.textLight,
+                          inactiveTrackColor: AppColors.borderGrey,
+                          onChanged: (active) => _toggleVird(item, active),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textLight,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Genişletilebilir Bilgi & Silme Satırı
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(44, 0, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.description,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12.5,
+                      color: AppColors.textMid,
+                      height: 1.45,
+                    ),
+                  ),
+                  if (item.hadith != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.lightGrey,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.borderGrey.withValues(alpha: 0.5)),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.title,
-                            style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                            'Fazileti & Kaynağı:',
+                            style: GoogleFonts.nunito(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.teal,
+                            ),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                                child: Text(
-                                  item.recommendedTime,
-                                  style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textLight),
-                                ),
-                              ),
-                              if (item.category == 'zikir') ...[
-                                const SizedBox(width: 6),
-                                GestureDetector(
-                                  onTap: () => _showEditTargetDialog(item),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.tealLight,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          'Hedef: ${item.targetCount}',
-                                          style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.teal),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        const Icon(Icons.edit, size: 9, color: AppColors.teal),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                          const SizedBox(height: 4),
+                          Text(
+                            item.hadith!,
+                            style: GoogleFonts.nunito(
+                              fontSize: 11.5,
+                              color: AppColors.textDark,
+                              height: 1.4,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    if (item.arabicTitle != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        item.arabicTitle!,
-                        style: GoogleFonts.amiri(fontSize: 16, color: AppColors.textMid, fontWeight: FontWeight.bold),
-                      ),
-                    ],
                   ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Switch(
-                      value: item.active,
-                      activeColor: AppColors.teal,
-                      activeTrackColor: AppColors.tealLight,
-                      inactiveThumbColor: AppColors.textLight,
-                      inactiveTrackColor: AppColors.borderGrey,
-                      onChanged: (active) => _toggleVird(item, active),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textLight,
+                  if (item.isCustom) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.errorRed,
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _deleteCustomVird(item),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        label: Text(
+                          'Bu Virdi Sil',
+                          style: GoogleFonts.nunito(fontSize: 11.5, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _expandedItems[item.id] = !isExpanded;
-                        });
-                      },
                     ),
                   ],
-                ),
+                ],
               ),
-
-              // Genişletilebilir Bilgi & Silme Satırı
-              AnimatedCrossFade(
-                firstChild: const SizedBox.shrink(),
-                secondChild: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: Colors.white, width: 1.5)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Text(
-                        item.description,
-                        style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textMid, height: 1.5),
-                      ),
-                      if (item.hadith != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.borderGrey.withValues(alpha: 0.5)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Fazileti & Kaynağı:',
-                                style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.teal),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.hadith!,
-                                style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textDark, height: 1.45, fontStyle: FontStyle.italic),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (item.isCustom) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(foregroundColor: AppColors.errorRed),
-                            onPressed: () => _deleteCustomVird(item),
-                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                            label: Text('Bu Virdi Sil', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
-              ),
-            ],
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

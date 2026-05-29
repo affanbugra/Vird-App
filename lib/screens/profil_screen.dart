@@ -180,37 +180,13 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     onSettingsTap: () => _showSettings(context, data ?? {}, user),
                     onHafizTap: isHafiz ? () => _showHafizSheetDirectly(context, data ?? {}, user) : null,
                     onDevTap: isDeveloper ? () => DevPanelScreen.show(context) : null,
-                    onVirdTap: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => SizedBox(
-                        height: MediaQuery.of(ctx).size.height * 0.93,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                          child: MediaQuery.removePadding(
-                            context: ctx,
-                            removeTop: true,
-                            child: const VirdScreen(),
-                          ),
-                        ),
-                      ),
+                    onVirdTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VirdScreen()),
                     ),
-                    onVirdlerimTap: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => SizedBox(
-                        height: MediaQuery.of(ctx).size.height * 0.93,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                          child: MediaQuery.removePadding(
-                            context: ctx,
-                            removeTop: true,
-                            child: const VirdlerimScreen(),
-                          ),
-                        ),
-                      ),
+                    onVirdlerimTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VirdlerimScreen()),
                     ),
                   ),
                   Padding(
