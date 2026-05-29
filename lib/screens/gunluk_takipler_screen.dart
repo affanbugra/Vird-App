@@ -4,10 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../app_colors.dart';
 import '../providers/user_provider.dart';
 import '../widgets/habit_tracker_widget.dart';
 import '../widgets/regl_calendar_sheet.dart';
+import 'virdlerim_screen.dart';
 
 enum PrayerStatus { none, onTime, kaza, cemaat, regl }
 enum PrayerTime { sabah, ogle, ikindi, aksam, yatsi }
@@ -28,28 +30,50 @@ class GunlukTakiplerScreen extends StatefulWidget {
   State<GunlukTakiplerScreen> createState() => _GunlukTakiplerScreenState();
 }
 
-class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
+class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
+    with TickerProviderStateMixin {
   final Map<DateTime, DayRecord> _allRecords = {};
-  bool _isLoading = false;
 
   late final PageController _pageController;
   final int _initialPage = 10000;
   int _currentPage = 10000;
 
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _initialPage);
-    
-    // Uygulama ilk açıldığında mevcut haftayı (offset = 0) ve önceki haftayı (offset = -1) önden yükleyelim
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _saveTab(_tabController.index);
+      }
+    });
     _fetchWeekData(0);
     _fetchWeekData(-1);
+    _loadSavedTab();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedTab() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('takipler_tab_index') ?? 0;
+    if (mounted && saved != 0) {
+      _tabController.animateTo(saved, duration: Duration.zero);
+    }
+  }
+
+  void _saveTab(int index) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt('takipler_tab_index', index);
+    });
   }
 
   int get _weekOffset => _currentPage - _initialPage;
@@ -984,196 +1008,242 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
           ),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-        : SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Haftalık Namaz Takibi',
-                    style: GoogleFonts.nunito(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'Haftalık Namaz Takibi',
+                        style: GoogleFonts.nunito(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _showKerahatInfoSheet(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.tealLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppColors.teal,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showKerahatInfoSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppColors.tealLight,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: AppColors.teal,
-                      ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(4, 12, 4, 20),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.borderGrey),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left, color: AppColors.textDark),
+                                onPressed: () {
+                                  _pageController.previousPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                },
+                              ),
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Text(
+                                    currentMonthText,
+                                    key: ValueKey(currentMonthText),
+                                    textAlign: TextAlign.right,
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textMid,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_weekOffset < 0)
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right, color: AppColors.textDark),
+                                  onPressed: () {
+                                    _pageController.nextPage(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                )
+                              else
+                                const SizedBox(width: 48),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 100,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: _initialPage + 1,
+                            onPageChanged: (page) {
+                              setState(() {
+                                _currentPage = page;
+                              });
+                              _fetchWeekData(_weekOffset);
+                            },
+                            itemBuilder: (context, index) {
+                              final pageOffset = index - _initialPage;
+                              final pageRecords = _getWeekRecordsForOffset(pageOffset);
+
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: pageRecords.map((record) {
+                                  final now = DateTime.now();
+                                  final todayDate = DateTime(now.year, now.month, now.day);
+                                  final recDate = DateTime(record.date.year, record.date.month, record.date.day);
+
+                                  final isToday = recDate.isAtSameMomentAs(todayDate);
+                                  final isFuture = recDate.isAfter(todayDate);
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      if (isFuture) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Henüz bu güne gelmediniz!',
+                                              style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                                            ),
+                                            backgroundColor: AppColors.orange,
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      } else {
+                                        _showPrayerPopup(record);
+                                      }
+                                    },
+                                    child: Opacity(
+                                      opacity: isFuture ? 0.4 : 1.0,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _getDayName(record.date),
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 12,
+                                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                              color: isToday ? AppColors.teal : AppColors.textMid,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: 46,
+                                            height: 46,
+                                            child: CustomPaint(
+                                              painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${record.date.day}',
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 12,
+                                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                              color: isToday ? AppColors.teal : AppColors.textLight,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.fromLTRB(4, 12, 4, 20),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.borderGrey),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left, color: AppColors.textDark),
-                            onPressed: () {
-                              _pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            },
-                          ),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              child: Text(
-                                currentMonthText,
-                                key: ValueKey(currentMonthText),
-                                textAlign: TextAlign.right,
-                                style: GoogleFonts.nunito(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textMid,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (_weekOffset < 0)
-                            IconButton(
-                              icon: const Icon(Icons.chevron_right, color: AppColors.textDark),
-                              onPressed: () {
-                                _pageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                            )
-                          else
-                            const SizedBox(width: 48),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 100, // Daireler ve metinler için yeterli yükseklik (overflow'u önlemek için artırıldı)
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: _initialPage + 1, // Max sayfa _initialPage (geleceğe gidiş yok)
-                        onPageChanged: (page) {
-                          setState(() {
-                            _currentPage = page;
-                          });
-                          _fetchWeekData(_weekOffset);
-                        },
-                        itemBuilder: (context, index) {
-                          final pageOffset = index - _initialPage;
-                          final pageRecords = _getWeekRecordsForOffset(pageOffset);
-
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: pageRecords.map((record) {
-                              final now = DateTime.now();
-                              final todayDate = DateTime(now.year, now.month, now.day);
-                              final recDate = DateTime(record.date.year, record.date.month, record.date.day);
-                              
-                              final isToday = recDate.isAtSameMomentAs(todayDate);
-                              final isFuture = recDate.isAfter(todayDate);
-
-                              return GestureDetector(
-                                onTap: () {
-                                  if (isFuture) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Henüz bu güne gelmediniz!',
-                                          style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
-                                        ),
-                                        backgroundColor: AppColors.orange,
-                                        duration: const Duration(seconds: 2),
-                                      ),
-                                    );
-                                  } else {
-                                    _showPrayerPopup(record);
-                                  }
-                                },
-                                child: Opacity(
-                                  opacity: isFuture ? 0.4 : 1.0,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _getDayName(record.date),
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                          color: isToday ? AppColors.teal : AppColors.textMid,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        width: 46,
-                                        height: 46,
-                                        child: CustomPaint(
-                                          painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${record.date.day}',
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                          color: isToday ? AppColors.teal : AppColors.textLight,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              HabitTrackerWidget(),
-            ],
+            ),
           ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.teal,
+                labelColor: AppColors.teal,
+                unselectedLabelColor: AppColors.textMid,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800),
+                unselectedLabelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'Alışkanlıklarım'),
+                  Tab(text: 'Virdlerim'),
+                ],
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: HabitTrackerWidget(),
+            ),
+            const VirdlerimContentWidget(),
+          ],
         ),
       ),
     );
   }
+}
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  _TabBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(color: AppColors.white, child: tabBar);
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate oldDelegate) => tabBar != oldDelegate.tabBar;
 }
 
 class PrayerPieChartPainter extends CustomPainter {

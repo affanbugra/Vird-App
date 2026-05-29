@@ -16,7 +16,6 @@ import '../widgets/seri_calendar_sheet.dart';
 import '../widgets/seri_fire_effect.dart';
 import '../widgets/hasanat_star_effect.dart';
 import 'vird_screen.dart';
-import 'virdlerim_screen.dart';
 import 'dev_panel_screen.dart';
 import '../utils/seri_calculator.dart';
 import '../utils/text_utils.dart';
@@ -184,10 +183,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       context,
                       MaterialPageRoute(builder: (_) => const VirdScreen()),
                     ),
-                    onVirdlerimTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const VirdlerimScreen()),
-                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -262,7 +257,6 @@ class _ProfileHeader extends StatelessWidget {
   final bool isDeveloper;
   final VoidCallback onSettingsTap;
   final VoidCallback onVirdTap;
-  final VoidCallback onVirdlerimTap;
   final VoidCallback? onHafizTap;
   final VoidCallback? onDevTap;
 
@@ -277,7 +271,6 @@ class _ProfileHeader extends StatelessWidget {
     required this.isDeveloper,
     required this.onSettingsTap,
     required this.onVirdTap,
-    required this.onVirdlerimTap,
     this.onHafizTap,
     this.onDevTap,
   });
@@ -311,22 +304,6 @@ class _ProfileHeader extends StatelessWidget {
               right: 12,
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: onVirdlerimTap,
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_circle_outline_rounded,
-                        color: Colors.white,
-                        size: 19,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: onVirdTap,
                     child: Container(

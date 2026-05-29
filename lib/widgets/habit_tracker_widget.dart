@@ -50,7 +50,10 @@ class HabitTrackerWidget extends StatefulWidget {
   State<HabitTrackerWidget> createState() => _HabitTrackerWidgetState();
 }
 
-class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
+class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   bool _isLoading = true;
   List<HabitDef> _habits = [];
   
@@ -116,6 +119,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
       debugPrint("Error fetching habits: \$e");
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -349,6 +353,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
     setState(() => _habits.removeWhere((h) => h.id == habit.id));
     try {
       await FirebaseFirestore.instance
@@ -408,6 +413,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
     );
     ctrl.dispose();
     if (newName == null || newName.isEmpty) return;
+    if (!mounted) return;
     final idx = _habits.indexWhere((h) => h.id == habit.id);
     if (idx == -1) return;
     setState(() {
@@ -451,6 +457,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_isLoading) {
       return const Padding(
         padding: EdgeInsets.all(32.0),

@@ -10,14 +10,17 @@ import '../models/vird_model.dart';
 import 'vird_library_screen.dart';
 import '../widgets/zikirmatik_modal.dart';
 
-class VirdlerimScreen extends StatefulWidget {
-  const VirdlerimScreen({super.key});
+class VirdlerimContentWidget extends StatefulWidget {
+  const VirdlerimContentWidget({super.key});
 
   @override
-  State<VirdlerimScreen> createState() => _VirdlerimScreenState();
+  State<VirdlerimContentWidget> createState() => _VirdlerimContentWidgetState();
 }
 
-class _VirdlerimScreenState extends State<VirdlerimScreen> {
+class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   final _uid = FirebaseAuth.instance.currentUser?.uid;
   bool _showCompletedSures = false;
   bool _showCompletedZikirs = false;
@@ -245,33 +248,10 @@ class _VirdlerimScreenState extends State<VirdlerimScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Günlük Virdlerim',
-          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, color: AppColors.teal, size: 24),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const VirdLibraryScreen()),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: StreamBuilder<Map<String, dynamic>>(
+    super.build(context);
+    return Material(
+      color: Colors.white,
+      child: StreamBuilder<Map<String, dynamic>>(
         stream: _combinedStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -286,7 +266,7 @@ class _VirdlerimScreenState extends State<VirdlerimScreen> {
 
           if (activeVirds.isEmpty) {
             return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               children: [
                 _buildProgressCard(0, 0, 0.0, VirdLog(date: _todayDateStr(), completions: {})),
                 const SizedBox(height: 16),
@@ -450,7 +430,7 @@ class _VirdlerimScreenState extends State<VirdlerimScreen> {
           othersAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
 
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             children: [
               _buildLibraryShowcaseCard(activeVirds),
               const SizedBox(height: 16),
@@ -1344,6 +1324,42 @@ class _VirdlerimScreenState extends State<VirdlerimScreen> {
     );
   }
 
+}
+
+class VirdlerimScreen extends StatelessWidget {
+  const VirdlerimScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Günlük Virdlerim',
+          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: AppColors.teal, size: 24),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VirdLibraryScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: const VirdlerimContentWidget(),
+    );
+  }
 }
 
 class _PieCirclePainter extends CustomPainter {
