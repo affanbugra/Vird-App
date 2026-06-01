@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +8,8 @@ import '../app_colors.dart';
 import '../models/vird_model.dart';
 import 'vird_library_screen.dart';
 import '../widgets/zikirmatik_modal.dart';
+import '../widgets/habit_tracker_widget.dart';
+import '../widgets/habit_heat_map_sheet.dart';
 
 class VirdlerimContentWidget extends StatefulWidget {
   const VirdlerimContentWidget({super.key});
@@ -26,112 +27,49 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
   bool _showCompletedZikirs = false;
   bool _showCompletedDuas = false;
   bool _showCompletedOthers = false;
-  final Map<String, double> _weeklyStatus = {};
-  int _currentWeekOffset = 0;
-  static const int _kCurrentWeekPage = 500;
-  late final PageController _weekPageController;
+  late DateTime _selectedDate;
+  
+  // dateStr -> { virdId: count }
+  final Map<String, Map<String, int>> _selectedWeekLogs = {};
 
-  late Stream<Map<String, dynamic>> _combinedStream;
+  List<VirdItem> _activeVirds = [];
+  VirdLog? _currentLog;
+  bool _loadingPreferences = true;
+  StreamSubscription? _prefsSub;
+  StreamSubscription? _logSub;
 
   @override
   void initState() {
     super.initState();
-    _weekPageController = PageController(initialPage: _kCurrentWeekPage);
-    _combinedStream = _getCombinedStream();
-    _fetchWeekData(0);
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    _fetchSelectedWeekLogs();
+    
+    _listenPreferences();
+    _listenLog();
   }
 
   @override
   void dispose() {
-    _weekPageController.dispose();
+    _prefsSub?.cancel();
+    _logSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchWeekData(int weekOffset) async {
-    if (_uid == null) return;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final currentMonday = today.subtract(Duration(days: now.weekday - 1));
-    final monday = currentMonday.add(Duration(days: 7 * weekOffset));
-
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(_uid).get();
-    final prefsMap = (userDoc.data()?['virdPreferences'] as Map<String, dynamic>?) ?? {};
-    final allVirds = VirdItem.defaultVirds.map((e) => e.copyWith()).toList();
-    prefsMap.forEach((id, val) {
-      final map = Map<String, dynamic>.from(val as Map);
-      if (map['isCustom'] == true) {
-        allVirds.add(VirdItem.fromMap({...map, 'id': id}));
-      } else {
-        final idx = allVirds.indexWhere((e) => e.id == id);
-        if (idx != -1) allVirds[idx] = VirdItem.fromMap({...allVirds[idx].toMap(), ...map});
-      }
-    });
-    final activeVirds = allVirds.where((e) => e.active).toList();
-
-    // Geçmiş haftalar için 7 gün, bu hafta için bugüne kadar olan günler
-    final daysToFetch = weekOffset == 0 ? (now.weekday - 1) : 7;
-    final updates = <String, double>{};
-    for (int i = 0; i < daysToFetch; i++) {
-      final d = monday.add(Duration(days: i));
-      final key = "vird_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-      if (_weeklyStatus.containsKey(key)) continue;
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('users').doc(_uid)
-            .collection('logs').doc(key).get();
-        if (!doc.exists || activeVirds.isEmpty) {
-          updates[key] = 0.0;
-        } else {
-          final log = VirdLog.fromDoc(doc);
-          double total = 0.0;
-          for (final v in activeVirds) {
-            total += ((log.completions[v.id] ?? 0) / v.targetCount).clamp(0.0, 1.0);
-          }
-          updates[key] = total / activeVirds.length;
-        }
-      } catch (_) {
-        updates[key] = 0.0;
-      }
-    }
-    if (mounted && updates.isNotEmpty) setState(() => _weeklyStatus.addAll(updates));
-  }
-
-  String _todayDateStr() {
-    final now = DateTime.now();
-    return "vird_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-  }
-
-  // Cuma günü kontrolü
-  bool _isFriday() {
-    return DateTime.now().weekday == DateTime.friday;
-  }
-
-  // Kullanıcı tercihlerini ve bugünün logunu birleştirip listeyi döner
-  Stream<Map<String, dynamic>> _getCombinedStream() {
+  void _listenPreferences() {
     if (_uid == null) {
-      return Stream.value({'virds': <VirdItem>[], 'log': VirdLog(date: _todayDateStr(), completions: {})});
+      if (mounted) setState(() => _loadingPreferences = false);
+      return;
     }
-
-    final prefsStream = FirebaseFirestore.instance
+    _prefsSub?.cancel();
+    _prefsSub = FirebaseFirestore.instance
         .collection('users')
         .doc(_uid)
-        .snapshots();
-
-    final logStream = FirebaseFirestore.instance
-        .collection('users')
-        .doc(_uid)
-        .collection('logs')
-        .doc(_todayDateStr())
-        .snapshots();
-
-    return StreamZip([prefsStream, logStream]).stream.map((results) {
-      final userSnap = results[0] as DocumentSnapshot<Map<String, dynamic>>;
-      final logSnap = results[1] as DocumentSnapshot<Map<String, dynamic>>;
-
-      // 1. Kütüphaneden başla
+        .snapshots()
+        .listen((userSnap) {
+      if (!mounted) return;
+      
       final List<VirdItem> allVirds = VirdItem.defaultVirds.map((e) => e.copyWith()).toList();
-
-      // 2. Tercihleri uygula (Custom ekle / Default üzerine yaz)
       final userData = userSnap.data() ?? {};
       final prefsMap = userData['virdPreferences'] as Map<String, dynamic>? ?? {};
 
@@ -160,31 +98,117 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         activeVirds.removeWhere((e) => e.id == 'kehf');
       }
 
-      // 3. Günün log verisini çek
-      final log = VirdLog.fromDoc(logSnap);
-
-      return {
-        'virds': activeVirds,
-        'log': log,
-      };
+      setState(() {
+        _activeVirds = activeVirds;
+        _loadingPreferences = false;
+      });
+    }, onError: (e) {
+      debugPrint("Error listening to preferences: $e");
+      if (mounted) setState(() => _loadingPreferences = false);
     });
+  }
+
+  void _listenLog() {
+    if (_uid == null) return;
+    _logSub?.cancel();
+    final dateKey = _todayDateStr();
+    _logSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('logs')
+        .doc(dateKey)
+        .snapshots()
+        .listen((logSnap) {
+      if (!mounted) return;
+      final log = VirdLog.fromDoc(logSnap);
+      setState(() {
+        _currentLog = log;
+      });
+    }, onError: (e) {
+      debugPrint("Error listening to log: $e");
+    });
+  }
+
+  Future<void> _fetchSelectedWeekLogs() async {
+    if (_uid == null) return;
+    try {
+      final monday = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+      final List<String> dateKeys = [];
+      for (int i = 0; i < 7; i++) {
+        final d = monday.add(Duration(days: i));
+        dateKeys.add("vird_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}");
+      }
+      
+      final snaps = await Future.wait(
+        dateKeys.map((key) => FirebaseFirestore.instance
+            .collection('users')
+            .doc(_uid)
+            .collection('logs')
+            .doc(key)
+            .get()
+        )
+      );
+      
+      final Map<String, Map<String, int>> newLogs = {};
+      for (var snap in snaps) {
+        if (snap.exists) {
+          final data = snap.data() ?? {};
+          final comps = data['completions'] as Map<String, dynamic>? ?? {};
+          final dateKey = snap.id;
+          newLogs[dateKey] = comps.map((k, v) => MapEntry(k, v as int));
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _selectedWeekLogs.addAll(newLogs);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching selected week logs: $e");
+    }
+  }
+
+
+  String _todayDateStr() {
+    return "vird_${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+  }
+
+  // Cuma günü kontrolü
+  bool _isFriday() {
+    return DateTime.now().weekday == DateTime.friday;
   }
 
   Future<void> _updateVirdProgress(String virdId, int newCount) async {
     if (_uid == null) return;
+    
+    // Optimistic Update for 7-dot tracker
+    final dateKey = _todayDateStr();
+    setState(() {
+      if (_selectedWeekLogs[dateKey] == null) {
+        _selectedWeekLogs[dateKey] = {};
+      }
+      _selectedWeekLogs[dateKey]![virdId] = newCount;
+      
+      // Update local _currentLog as well for immediate UI response
+      if (_currentLog != null) {
+        _currentLog!.completions[virdId] = newCount;
+      }
+    });
+
     try {
       final docRef = FirebaseFirestore.instance
           .collection('users')
           .doc(_uid)
           .collection('logs')
-          .doc(_todayDateStr());
+          .doc(dateKey);
 
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final snapshot = await transaction.get(docRef);
         if (!snapshot.exists) {
           transaction.set(docRef, {
             'type': 'vird',
-            'date': _todayDateStr(),
+            'date': dateKey,
             'completions': {virdId: newCount},
             'updatedAt': FieldValue.serverTimestamp(),
           });
@@ -249,462 +273,301 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Material(
-      color: Colors.white,
-      child: StreamBuilder<Map<String, dynamic>>(
-        stream: _combinedStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.teal));
-          }
-          if (!snapshot.hasData) {
-            return _buildEmptyState();
-          }
 
-          final activeVirds = snapshot.data!['virds'] as List<VirdItem>;
-          final log = snapshot.data!['log'] as VirdLog;
+    if (_loadingPreferences) {
+      return const Material(
+        color: Colors.white,
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.teal),
+        ),
+      );
+    }
 
-          if (activeVirds.isEmpty) {
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    final activeVirds = _activeVirds;
+    final log = _currentLog ?? VirdLog(date: _todayDateStr(), completions: {});
+
+    if (activeVirds.isEmpty) {
+      return Material(
+        color: Colors.white,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          children: [
+            _buildProgressCard(0, 0, 0.0, VirdLog(date: _todayDateStr(), completions: {})),
+            const SizedBox(height: 16),
+            _buildLibraryShowcaseCard(const []),
+            const SizedBox(height: 24),
+            _buildEmptyStateExploreNotice(),
+            const SizedBox(height: 48),
+          ],
+        ),
+      );
+    }
+
+    final List<VirdItem> uncompleted = [];
+    final List<VirdItem> completed = [];
+
+    for (final item in activeVirds) {
+      final count = log.completions[item.id] ?? 0;
+      if (count >= item.targetCount) {
+        completed.add(item);
+      } else {
+        uncompleted.add(item);
+      }
+    }
+
+    final double totalProgress = activeVirds.isNotEmpty
+        ? ((completed.length) / activeVirds.length)
+        : 0.0;
+
+    // Helper function to build a categorized box with dynamic inline finished list and badge counter
+    Widget buildCategoryGroup(
+      String title,
+      Color color,
+      List<VirdItem> allItems,
+      bool isExpanded,
+      ValueSetter<bool> onToggle,
+    ) {
+      if (allItems.isEmpty) return const SizedBox.shrink();
+
+      final List<VirdItem> todo = [];
+      final List<VirdItem> done = [];
+
+      for (final item in allItems) {
+        final count = log.completions[item.id] ?? 0;
+        if (count >= item.targetCount) {
+          done.add(item);
+        } else {
+          todo.add(item);
+        }
+      }
+
+      final total = allItems.length;
+      final completedCount = done.length;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Kategori Başlığı + Sayaç
+          Padding(
+            padding: const EdgeInsets.only(top: 20, bottom: 6, left: 4),
+            child: Row(
               children: [
-                _buildProgressCard(0, 0, 0.0, VirdLog(date: _todayDateStr(), completions: {})),
-                const SizedBox(height: 16),
-                _buildLibraryShowcaseCard(const []),
-                const SizedBox(height: 24),
-                _buildEmptyStateExploreNotice(),
-                const SizedBox(height: 48),
-              ],
-            );
-          }
-
-          final List<VirdItem> uncompleted = [];
-          final List<VirdItem> completed = [];
-
-          for (final item in activeVirds) {
-            final count = log.completions[item.id] ?? 0;
-            if (count >= item.targetCount) {
-              completed.add(item);
-            } else {
-              uncompleted.add(item);
-            }
-          }
-
-          final double totalProgress = activeVirds.isNotEmpty
-              ? ((completed.length) / activeVirds.length)
-              : 0.0;
-
-          // Helper function to build a categorized box with dynamic inline finished list and badge counter
-          Widget buildCategoryGroup(
-            String title,
-            Color color,
-            List<VirdItem> allItems,
-            bool isExpanded,
-            ValueSetter<bool> onToggle,
-          ) {
-            if (allItems.isEmpty) return const SizedBox.shrink();
-
-            final List<VirdItem> todo = [];
-            final List<VirdItem> done = [];
-
-            for (final item in allItems) {
-              final count = log.completions[item.id] ?? 0;
-              if (count >= item.targetCount) {
-                done.add(item);
-              } else {
-                todo.add(item);
-              }
-            }
-
-            final total = allItems.length;
-            final completedCount = done.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Kategori Başlığı + Sayaç
-                Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 6, left: 4),
-                  child: Row(
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.nunito(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: color,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '$completedCount/$total',
-                          style: GoogleFonts.outfit(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
-                            color: color,
-                          ),
-                        ),
-                      ),
-                    ],
+                Text(
+                  title,
+                  style: GoogleFonts.nunito(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: 1.2,
                   ),
                 ),
-                
-                // Yapılacaklar (todo) listesi
-                if (todo.isNotEmpty)
-                  ...todo.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final item = entry.value;
-                    // Eğer tamamlanan listesi boşsa veya kapalıysa, son todo elemanı alt çizgi çizmemeli
-                    final isLast = idx == todo.length - 1 && (done.isEmpty || !isExpanded);
-                    return _buildVirdCard(item, log.completions[item.id] ?? 0, isLast: isLast);
-                  }),
-                  
-                // Tamamlananlar (done) varsa göster/gizle butonu
-                if (done.isNotEmpty) ...[
-                  GestureDetector(
-                    onTap: () => onToggle(!isExpanded),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                      color: Colors.transparent,
-                      child: Row(
-                        children: [
-                          Icon(
-                            isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                            color: AppColors.successGreen,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tamamlananlar (${done.length})',
-                            style: GoogleFonts.nunito(
-                              fontSize: 10.5,
-                              color: AppColors.successGreen,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '$completedCount/$total',
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: color,
                     ),
                   ),
-                  if (isExpanded)
-                    ...done.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final item = entry.value;
-                      final isLast = idx == done.length - 1;
-                      return _buildVirdCard(item, log.completions[item.id] ?? 0, isDone: true, isLast: isLast);
-                    }),
-                ],
+                ),
               ],
-            );
-          }
-
-          final suresAll = activeVirds.where((e) => e.category == 'sure').toList();
-          final zikirsAll = activeVirds.where((e) => e.category == 'zikir').toList();
-          final duasAll = activeVirds.where((e) => e.category == 'dua').toList();
-          final othersAll = activeVirds.where((e) => e.category != 'sure' && e.category != 'zikir' && e.category != 'dua').toList();
-
-          // Namaz vakti sırasına göre sıralama haritası
-          const timeOrder = {
-            'Sabah Namazı Sonrası': 1,
-            'Öğle Namazı Sonrası': 2,
-            'İkindi Namazı Sonrası': 3,
-            'Akşam Namazı Sonrası': 4,
-            'Yatsı Namazı Sonrası': 5,
-            'Cuma Gününe Özel': 6,
-          };
-
-          int getTimeSortOrder(VirdItem item) {
-            return timeOrder[item.recommendedTime] ?? 99;
-          }
-
-          suresAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
-          zikirsAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
-          duasAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
-          othersAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            children: [
-              _buildLibraryShowcaseCard(activeVirds),
-              const SizedBox(height: 16),
-              _buildProgressCard(completed.length, activeVirds.length, totalProgress, log),
-              const SizedBox(height: 16),
-
-              if (_isFriday()) _buildFridayBanner(),
-
-              buildCategoryGroup(
-                'SURELER',
-                AppColors.teal,
-                suresAll,
-                _showCompletedSures,
-                (val) => setState(() => _showCompletedSures = val),
+            ),
+          ),
+          
+          // Yapılacaklar (todo) listesi
+          if (todo.isNotEmpty)
+            ...todo.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final item = entry.value;
+              // Eğer tamamlanan listesi boşsa veya kapalıysa, son todo elemanı alt çizgi çizmemeli
+              final isLast = idx == todo.length - 1 && (done.isEmpty || !isExpanded);
+              return _buildVirdCard(item, log.completions[item.id] ?? 0, isLast: isLast);
+            }),
+            
+          // Tamamlananlar (done) varsa göster/gizle butonu
+          if (done.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () => onToggle(!isExpanded),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                color: Colors.transparent,
+                child: Row(
+                  children: [
+                    Icon(
+                      isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.successGreen,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tamamlananlar (${done.length})',
+                      style: GoogleFonts.nunito(
+                        fontSize: 10.5,
+                        color: AppColors.successGreen,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ),
+            if (isExpanded)
+              ...done.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                final isLast = idx == done.length - 1;
+                return _buildVirdCard(item, log.completions[item.id] ?? 0, isDone: true, isLast: isLast);
+              }),
+          ],
+        ],
+      );
+    }
 
-              buildCategoryGroup(
-                'ZİKİRLER',
-                AppColors.orange,
-                zikirsAll,
-                _showCompletedZikirs,
-                (val) => setState(() => _showCompletedZikirs = val),
-              ),
+    final suresAll = activeVirds.where((e) => e.category == 'sure').toList();
+    final zikirsAll = activeVirds.where((e) => e.category == 'zikir').toList();
+    final duasAll = activeVirds.where((e) => e.category == 'dua').toList();
+    final othersAll = activeVirds.where((e) => e.category != 'sure' && e.category != 'zikir' && e.category != 'dua').toList();
 
-              buildCategoryGroup(
-                'DUALAR',
-                AppColors.infoBlue,
-                duasAll,
-                _showCompletedDuas,
-                (val) => setState(() => _showCompletedDuas = val),
-              ),
+    // Namaz vakti sırasına göre sıralama haritası
+    const timeOrder = {
+      'Sabah Namazı Sonrası': 1,
+      'Öğle Namazı Sonrası': 2,
+      'İkindi Namazı Sonrası': 3,
+      'Akşam Namazı Sonrası': 4,
+      'Yatsı Namazı Sonrası': 5,
+      'Cuma Gününe Özel': 6,
+    };
 
-              buildCategoryGroup(
-                'DİĞER',
-                AppColors.textMid,
-                othersAll,
-                _showCompletedOthers,
-                (val) => setState(() => _showCompletedOthers = val),
-              ),
-              const SizedBox(height: 48),
-            ],
-          );
-        },
+    int getTimeSortOrder(VirdItem item) {
+      return timeOrder[item.recommendedTime] ?? 99;
+    }
+
+    suresAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
+    zikirsAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
+    duasAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
+    othersAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
+
+    return Material(
+      color: Colors.white,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        children: [
+          _buildLibraryShowcaseCard(activeVirds),
+          const SizedBox(height: 16),
+          _buildProgressCard(completed.length, activeVirds.length, totalProgress, log),
+          const SizedBox(height: 16),
+          _buildDateSelector(),
+          const SizedBox(height: 16),
+
+          if (_isFriday()) _buildFridayBanner(),
+
+          buildCategoryGroup(
+            'SURELER',
+            AppColors.teal,
+            suresAll,
+            _showCompletedSures,
+            (val) => setState(() => _showCompletedSures = val),
+          ),
+
+          buildCategoryGroup(
+            'ZİKİRLER',
+            AppColors.orange,
+            zikirsAll,
+            _showCompletedZikirs,
+            (val) => setState(() => _showCompletedZikirs = val),
+          ),
+
+          buildCategoryGroup(
+            'DUALAR',
+            AppColors.infoBlue,
+            duasAll,
+            _showCompletedDuas,
+            (val) => setState(() => _showCompletedDuas = val),
+          ),
+
+          buildCategoryGroup(
+            'DİĞER',
+            AppColors.textMid,
+            othersAll,
+            _showCompletedOthers,
+            (val) => setState(() => _showCompletedOthers = val),
+          ),
+          const SizedBox(height: 48),
+        ],
       ),
     );
   }
 
   Widget _buildProgressCard(int done, int total, double progress, VirdLog todayLog) {
-    final now = DateTime.now();
-    final months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
-                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-    final dateLabel = '${now.day} ${months[now.month - 1]} ${now.year}';
-    final todayKey = _todayDateStr();
-
     return Container(
+      margin: const EdgeInsets.only(bottom: 16, top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2A7F8C), Color(0xFF1E6370)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.tealDark.withValues(alpha: 0.22),
-            offset: const Offset(0, 6),
-            blurRadius: 14,
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGrey),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Başlık + Tarih
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'GÜNLÜK RUTİNİM',
-                style: GoogleFonts.nunito(
-                  fontSize: 10, fontWeight: FontWeight.w800,
-                  color: AppColors.goldSoft, letterSpacing: 1.5,
+          SizedBox(
+            width: 50, height: 50,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 6,
+                  backgroundColor: AppColors.lightGrey,
+                  color: progress == 1.0 ? AppColors.successGreen : AppColors.gold,
                 ),
-              ),
-              Text(
-                dateLabel,
-                style: GoogleFonts.nunito(
-                  fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // İlerleme satırı
-          Row(
-            children: [
-              Text(
-                '$done / $total',
-                style: GoogleFonts.outfit(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'tamamlandı',
-                style: GoogleFonts.nunito(
-                  fontSize: 11, color: Colors.white60, fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: GoogleFonts.outfit(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: Colors.white12,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                progress >= 1.0 ? AppColors.successGreen : AppColors.gold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Hadis
-          Text(
-            '"Az da olsa devamlı olanıdır." (Müslim, Müsâfirîn 215)',
-            style: GoogleFonts.nunito(
-              fontSize: 11, color: Colors.white54,
-              fontStyle: FontStyle.italic, height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Ayırıcı
-          Divider(color: Colors.white12, height: 1),
-          const SizedBox(height: 10),
-
-          // Haftalık takip — kaydırılabilir
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _currentWeekOffset == 0
-                    ? 'Bu Hafta'
-                    : _currentWeekOffset == -1
-                        ? 'Geçen Hafta'
-                        : _weekRangeLabel(_currentWeekOffset),
-                style: GoogleFonts.nunito(
-                  fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (_currentWeekOffset < 0)
-                GestureDetector(
-                  onTap: () => _weekPageController.animateToPage(
-                    _kCurrentWeekPage,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  ),
+                Center(
                   child: Text(
-                    'Bugün →',
-                    style: GoogleFonts.nunito(
-                      fontSize: 10, color: AppColors.gold, fontWeight: FontWeight.w700,
+                    "$done/$total",
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRect(
-            child: SizedBox(
-              height: 52,
-              child: PageView.builder(
-                controller: _weekPageController,
-                itemCount: _kCurrentWeekPage + 1,
-                onPageChanged: (page) {
-                  final offset = page - _kCurrentWeekPage;
-                  setState(() => _currentWeekOffset = offset);
-                  _fetchWeekData(offset);
-                },
-                itemBuilder: (context, page) {
-                  final offset = page - _kCurrentWeekPage;
-                  return _buildWeekRow(offset, progress, todayKey);
-                },
-              ),
+                )
+              ],
             ),
           ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  total == 0
+                      ? 'Bu tarih için aktif vird yok'
+                      : (progress == 1.0 ? 'Harika! Hepsini tamamladın 🎉' : 'Günlük Rutinim'),
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  '"Az da olsa devamlı olanıdır." (Müslim, Müsâfirîn 215)',
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    color: AppColors.textMid,
+                  ),
+                )
+              ],
+            ),
+          )
         ],
       ),
     );
-  }
-
-  String _weekRangeLabel(int weekOffset) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final currentMonday = today.subtract(Duration(days: now.weekday - 1));
-    final wMonday = currentMonday.add(Duration(days: 7 * weekOffset));
-    final wSunday = wMonday.add(const Duration(days: 6));
-    const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-    return '${wMonday.day} ${months[wMonday.month-1]} – ${wSunday.day} ${months[wSunday.month-1]}';
-  }
-
-  Widget _buildWeekRow(int weekOffset, double todayProgress, String todayKey) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final currentMonday = today.subtract(Duration(days: now.weekday - 1));
-    final monday = currentMonday.add(Duration(days: 7 * weekOffset));
-    const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(7, (i) {
-        final d = monday.add(Duration(days: i));
-        final key = "vird_${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}";
-        final isToday = key == todayKey;
-        final isFuture = d.isAfter(today);
-        final ratio = isToday ? todayProgress : (isFuture ? 0.0 : (_weeklyStatus[key] ?? 0.0));
-
-        return Column(
-          children: [
-            Text(
-              dayNames[i],
-              style: GoogleFonts.nunito(
-                fontSize: 9,
-                color: isToday ? Colors.white : Colors.white38,
-                fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 28, height: 28,
-              child: Stack(
-                children: [
-                  CustomPaint(
-                    size: const Size(28, 28),
-                    painter: _PieCirclePainter(
-                      ratio: isFuture ? 0.0 : ratio.clamp(0.0, 1.0),
-                      fillColor: AppColors.gold.withValues(alpha: 0.8),
-                      borderColor: isFuture || ratio == 0
-                          ? Colors.white24
-                          : AppColors.gold.withValues(alpha: 0.8),
-                    ),
-                  ),
-                  if (!isFuture && ratio > 0)
-                    Center(
-                      child: Text(
-                        ratio >= 1.0 ? '100' : '${(ratio * 100).toInt()}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        );
-      }),
-    ),
-  );
   }
 
   Widget _buildFridayBanner() {
@@ -740,6 +603,67 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     );
   }
 
+  Widget _buildDateSelector() {
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
+    final monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    final dateDisplay = "${_selectedDate.day} ${monthNames[_selectedDate.month - 1]}";
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.lightGrey,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGrey),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textDark, size: 22),
+            onPressed: () {
+              setState(() {
+                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+              });
+              _listenLog();
+              _fetchSelectedWeekLogs();
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          Text(
+            _selectedDate == todayClean ? "Bugün ($dateDisplay)" : dateDisplay,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.teal,
+            ),
+          ),
+          if (_selectedDate.isBefore(todayClean))
+            IconButton(
+              icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textDark, size: 22),
+              onPressed: () {
+                final next = _selectedDate.add(const Duration(days: 1));
+                if (!next.isAfter(todayClean)) {
+                  setState(() {
+                    _selectedDate = next;
+                    _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+                  });
+                  _listenLog();
+                  _fetchSelectedWeekLogs();
+                }
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            )
+          else
+            const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVirdCard(VirdItem item, int currentCount, {bool isDone = false, bool isLast = false}) {
     final isZikir = item.category == 'zikir';
     final progress = item.targetCount > 0 ? (currentCount / item.targetCount).clamp(0.0, 1.0) : 0.0;
@@ -766,6 +690,57 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         categoryColor = AppColors.textMid;
     }
 
+    // Son 7 günlük haftalık gösterge
+    final List<Widget> dotWidgets = [];
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
+    final monday = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+    
+    for (int i = 0; i < 7; i++) {
+      final d = monday.add(Duration(days: i));
+      final dClean = DateTime(d.year, d.month, d.day);
+      final dateKey = "vird_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+      
+      final comps = _selectedWeekLogs[dateKey] ?? {};
+      final count = comps[item.id] ?? 0;
+      
+      final isSelectedDay = dClean.year == _selectedDate.year &&
+                            dClean.month == _selectedDate.month &&
+                            dClean.day == _selectedDate.day;
+      
+      Color dotColor;
+      if (dClean.isAfter(todayClean)) {
+        dotColor = Colors.transparent;
+      } else if (count >= item.targetCount) {
+        dotColor = const Color(0xFF52B788); // Yeşil (Tamamlandı)
+      } else if (count > 0) {
+        dotColor = categoryColor.withValues(alpha: 0.6); // İlerleme var
+      } else {
+        if (dClean == todayClean) {
+          dotColor = AppColors.borderGrey.withValues(alpha: 0.6);
+        } else {
+          dotColor = const Color(0xFFF28482).withValues(alpha: 0.7);
+        }
+      }
+      
+      dotWidgets.add(
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: dotColor,
+            shape: BoxShape.circle,
+            border: isSelectedDay
+                ? Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2)
+                : (dClean.isAfter(todayClean)
+                    ? Border.all(color: AppColors.borderGrey, width: 1.0)
+                    : null),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         border: isLast ? null : Border(
@@ -776,13 +751,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         ),
       ),
       child: InkWell(
-        onTap: () {
-          if (isZikir) {
-            _openZikirmatik(item, currentCount);
-          } else {
-            _toggleSureDua(item, currentCount);
-          }
-        },
+        onTap: () => _showVirdHistoryHeatMap(item, categoryColor),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           child: Row(
@@ -811,28 +780,15 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            item.title,
-                            style: GoogleFonts.nunito(
-                              fontSize: 14.0,
-                              fontWeight: FontWeight.w700,
-                              color: isDone ? AppColors.textLight : AppColors.textDark,
-                              decoration: isDone ? TextDecoration.lineThrough : null,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (item.hadith != null) ...[
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => _showHadithDialog(item),
-                            child: const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textLight),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      item.title,
+                      style: GoogleFonts.nunito(
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.w700,
+                        color: isDone ? AppColors.textLight : AppColors.textDark,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -896,6 +852,13 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
               ),
               const SizedBox(width: 12),
               
+              // Son 5 Gün Form Takip Noktaları
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: dotWidgets,
+              ),
+              const SizedBox(width: 10),
+              
               // Sağ Aksiyon Butonu
               if (isZikir) ...[
                 if (isDone)
@@ -931,9 +894,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDone ? AppColors.successGreen : Colors.white,
+                      color: isDone ? categoryColor : Colors.white,
                       border: Border.all(
-                        color: isDone ? AppColors.successGreen : AppColors.borderGrey,
+                        color: isDone ? categoryColor : AppColors.borderGrey,
                         width: 1.8,
                       ),
                     ),
@@ -943,6 +906,54 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   ),
                 ),
               ],
+              const SizedBox(width: 4),
+
+              // Seçenekler Menüsü (Üç Nokta)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (value) {
+                  if (value == 'hadith') _showHadithDialog(item);
+                  if (value == 'calendar') _showVirdHistoryHeatMap(item, categoryColor);
+                  if (value == 'zikirmatik') _openZikirmatik(item, currentCount);
+                },
+                itemBuilder: (_) => [
+                  if (item.hadith != null || item.description.isNotEmpty)
+                    PopupMenuItem(
+                      value: 'hadith',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textMid),
+                          const SizedBox(width: 10),
+                          Text('Fazileti & Önemi', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  PopupMenuItem(
+                    value: 'calendar',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textMid),
+                        const SizedBox(width: 10),
+                        Text('Detaylı Takvim', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                  if (isZikir)
+                    PopupMenuItem(
+                      value: 'zikirmatik',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.touch_app_rounded, size: 18, color: AppColors.orange),
+                          const SizedBox(width: 10),
+                          Text('Zikirmatik Aç', style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.orange)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
@@ -982,21 +993,86 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.sync_problem_rounded, size: 54, color: AppColors.borderGrey),
-          const SizedBox(height: 12),
-          Text(
-            'Veriler yüklenemedi.',
-            style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textMid),
-          ),
-        ],
+  Future<void> _showVirdHistoryHeatMap(VirdItem item, Color categoryColor) async {
+    if (_uid == null) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: AppColors.teal),
       ),
     );
+    
+    try {
+      final logsSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .collection('logs')
+          .where('type', isEqualTo: 'vird')
+          .get();
+          
+      if (mounted) Navigator.pop(context); // Dismiss loading dialog
+      
+      final Map<String, Map<String, dynamic>> allVirdLogs = {};
+      final Set<String> completedDateStrs = {};
+      
+      for (var doc in logsSnap.docs) {
+        final data = doc.data();
+        final dateKey = data['date'] as String; // e.g. "vird_2026-06-01"
+        allVirdLogs[dateKey] = data;
+        
+        final comps = data['completions'] as Map<String, dynamic>? ?? {};
+        final count = comps[item.id] as int? ?? 0;
+        if (count >= item.targetCount) {
+          completedDateStrs.add(dateKey.replaceAll('vird_', ''));
+        }
+      }
+      
+      final streak = _calculateVirdStreak(item.id, item.targetCount, allVirdLogs);
+      
+      final startRecent = DateTime.now().subtract(const Duration(days: 30));
+
+      final fakeHabit = HabitDef(
+        id: item.id,
+        title: item.title,
+        color: categoryColor,
+        createdAt: startRecent,
+      );
+      
+      if (!mounted) return;
+      
+      HabitHeatMapSheet.show(
+        context,
+        habit: fakeHabit,
+        completedDateStrs: completedDateStrs,
+        currentStreak: streak,
+        createdAt: startRecent,
+      );
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Dismiss loading dialog in case of error
+      debugPrint("Error loading vird history: $e");
+    }
   }
+  
+  int _calculateVirdStreak(String itemId, int targetCount, Map<String, Map<String, dynamic>> allVirdLogs) {
+    int streak = 0;
+    final today = DateTime.now();
+    for (int i = 0; i < 30; i++) {
+      final d = today.subtract(Duration(days: i));
+      final dateStr = "vird_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+      final completions = allVirdLogs[dateStr]?['completions'] as Map<String, dynamic>? ?? {};
+      final count = completions[itemId] as int? ?? 0;
+      if (count >= targetCount) {
+        streak++;
+      } else {
+        if (i == 0) continue;
+        break;
+      }
+    }
+    return streak;
+  }
+
 
   Widget _buildEmptyStateExploreNotice() {
     return Padding(
@@ -1105,27 +1181,17 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       {'id': 'nebe', 'title': 'Nebe', 'arabic': 'سورة النبأ'},
       {'id': 'ayetel_kursi', 'title': 'Ayetel Kürsi', 'arabic': 'آية الكرسي'},
       {'id': 'salavat', 'title': 'Salavat', 'arabic': 'صلوات'},
-      {'id': 'istigfar', 'title': 'İstiğfar', 'arabic': 'استغفار'},
+      {'id': 'istigfar', 'title': 'İstiğfar', 'arabic': 'استغfar'},
     ];
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1B4D54), Color(0xFF113038)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF113038).withValues(alpha: 0.25),
-            offset: const Offset(0, 8),
-            blurRadius: 16,
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGrey),
       ),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1138,9 +1204,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   Text(
                     'VİRD KÜTÜPHANESİ',
                     style: GoogleFonts.nunito(
-                      fontSize: 10,
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.goldSoft,
+                      color: AppColors.teal,
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -1148,9 +1214,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   Text(
                     'Kütüphaneyi Keşfet',
                     style: GoogleFonts.nunito(
-                      fontSize: 15.5,
+                      fontSize: 14.0,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: AppColors.textDark,
                     ),
                   ),
                 ],
@@ -1163,37 +1229,36 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: AppColors.lightGrey,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: Colors.white,
-                    size: 14,
+                    color: AppColors.textDark,
+                    size: 10,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Günlük rutininize ekleyebileceğiniz sure, dua ve zikirler kütüphanesini inceleyin.',
             style: GoogleFonts.nunito(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 11.0,
+              color: AppColors.textMid,
               fontWeight: FontWeight.w500,
-              height: 1.4,
+              height: 1.35,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 112,
+            height: 90,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final availableWidth = constraints.maxWidth;
-                // We want to show ~4.12 items in the visible area to indicate scrollability without showing text.
                 final double visibleItems = 4.12;
                 final double spacing = 8.0;
                 final double itemWidth = (availableWidth - (visibleItems - 1) * spacing) / visibleItems;
@@ -1201,7 +1266,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                 return ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   itemCount: showcasedVirds.length + 1,
                   itemBuilder: (context, idx) {
                     if (idx == showcasedVirds.length) {
@@ -1213,16 +1278,16 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                           );
                         },
                         child: Container(
-                          width: 52,
+                          width: 44,
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
+                            color: AppColors.lightGrey,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.2),
+                            border: Border.all(color: AppColors.borderGrey, width: 1.2),
                           ),
                           child: const Icon(
                             Icons.arrow_forward_rounded,
-                            color: Colors.white,
+                            color: AppColors.teal,
                             size: 20,
                           ),
                         ),
@@ -1235,33 +1300,36 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                     final isSpecial = vird['isSpecial'] == 'true';
                     final isHighlight = isSpecial && !isAdded;
 
+                    Color itemBgColor;
+                    Color itemBorderColor;
+                    double itemBorderWidth = 1.2;
+
+                    if (isHighlight) {
+                      itemBgColor = const Color(0xFFFDF0D5); // Soft gold
+                      itemBorderColor = AppColors.gold.withValues(alpha: 0.6);
+                      itemBorderWidth = 1.6;
+                    } else if (isAdded) {
+                      itemBgColor = const Color(0xFFE8F5E9); // Soft success green
+                      itemBorderColor = AppColors.successGreen.withValues(alpha: 0.5);
+                    } else {
+                      itemBgColor = AppColors.lightGrey.withValues(alpha: 0.7);
+                      itemBorderColor = AppColors.borderGrey.withValues(alpha: 0.8);
+                    }
+
                     return GestureDetector(
                       onTap: () => _quickToggleVird(id, isAdded),
                       child: Container(
                         width: itemWidth,
                         margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          color: isHighlight 
-                              ? Colors.amber.withValues(alpha: 0.2) 
-                              : Colors.white.withValues(alpha: 0.1),
+                          color: itemBgColor,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isHighlight 
-                                ? AppColors.gold 
-                                : (isAdded 
-                                    ? AppColors.successGreen.withValues(alpha: 0.5) 
-                                    : Colors.white.withValues(alpha: 0.18)), 
-                            width: isHighlight ? 1.8 : 1.2
+                            color: itemBorderColor,
+                            width: itemBorderWidth,
                           ),
-                          boxShadow: isHighlight ? [
-                            BoxShadow(
-                              color: AppColors.gold.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            )
-                          ] : null,
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1269,9 +1337,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                               Text(
                                 '🕌 CUMA ÖZEL',
                                 style: GoogleFonts.nunito(
-                                  fontSize: 7.5,
+                                  fontSize: 6.5,
                                   fontWeight: FontWeight.w900,
-                                  color: AppColors.goldSoft,
+                                  color: const Color(0xFFD4A373),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -1280,9 +1348,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                             Text(
                               vird['title']!,
                               style: GoogleFonts.nunito(
-                                fontSize: isSpecial ? 12.0 : 12.5,
+                                fontSize: isSpecial ? 10.5 : 11.0,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: AppColors.textDark,
                               ),
                               textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
@@ -1290,24 +1358,24 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                             Text(
                               vird['arabic']!,
                               style: GoogleFonts.amiri(
-                                fontSize: 10.5,
+                                fontSize: 9.0,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: AppColors.textMid,
                               ),
                               textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             Container(
-                              padding: const EdgeInsets.all(3),
+                              padding: const EdgeInsets.all(2.5),
                               decoration: BoxDecoration(
-                                color: isAdded ? AppColors.successGreen : Colors.white.withValues(alpha: 0.15),
+                                color: isAdded ? AppColors.successGreen : AppColors.teal.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 isAdded ? Icons.check_rounded : Icons.add_rounded,
-                                color: Colors.white,
-                                size: 11,
+                                color: isAdded ? Colors.white : AppColors.teal,
+                                size: 8.5,
                               ),
                             ),
                           ],
@@ -1362,47 +1430,6 @@ class VirdlerimScreen extends StatelessWidget {
   }
 }
 
-class _PieCirclePainter extends CustomPainter {
-  final double ratio;
-  final Color fillColor;
-  final Color borderColor;
-
-  _PieCirclePainter({
-    required this.ratio,
-    required this.fillColor,
-    required this.borderColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    // Arka plan
-    canvas.drawCircle(center, radius, Paint()..color = Colors.white12);
-
-    // Pasta dilimi dolumu
-    if (ratio > 0) {
-      final fillPaint = Paint()..color = fillColor;
-      canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * ratio, true, fillPaint);
-    }
-
-    // Kenarlık
-    canvas.drawCircle(
-      center,
-      radius - 0.75,
-      Paint()
-        ..color = borderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_PieCirclePainter old) =>
-      old.ratio != ratio || old.fillColor != fillColor || old.borderColor != borderColor;
-}
 
 class StreamZip {
   final List<Stream<dynamic>> streams;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:math' as math;
 import '../app_colors.dart';
 import 'habit_heat_map_sheet.dart';
 
@@ -56,6 +55,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
   bool get wantKeepAlive => true;
   bool _isLoading = true;
   List<HabitDef> _habits = [];
+  bool _showCompletedHabits = false;
   
   // dateStr -> { habitId: bool }
   final Map<String, Map<String, bool>> _logs = {};
@@ -94,9 +94,6 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
       }
 
       // 2. Fetch Logs for last 30 days
-      final startDate = _selectedDate.subtract(const Duration(days: 30));
-      final startDateStr = "${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}";
-
       final logsSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(_uid)
@@ -161,7 +158,37 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
   void _showAddHabitSheet() {
     String newTitle = '';
     Color selectedColor = AppColors.teal;
-    final colors = [AppColors.teal, AppColors.orange, AppColors.gold, Colors.blueAccent, Colors.pinkAccent, Colors.purpleAccent];
+    final colors = [
+      // 1. Kırmızı & Mercan Tonları
+      const Color(0xFFE63946), // Premium Kırmızı
+      const Color(0xFFD63031), // Klasik Koyu Kırmızı
+      const Color(0xFFF07167), // Pastel Mercan
+      const Color(0xFFE07A5F), // Sıcak Kiremit
+
+      // 2. Turuncu & Altın Tonları
+      AppColors.orange,        // Canlı Turuncu
+      const Color(0xFFF4A261), // Pastel Şeftali
+      AppColors.gold,          // Canlı Altın
+      const Color(0xFFE9C46A), // Hardal Kum Sarısı
+
+      // 3. Yeşil Tonları
+      AppColors.emeraldGreen,  // Zümrüt Yeşili
+      const Color(0xFF2A9D8F), // Çam Yeşili
+      const Color(0xFF4CAF50), // Doğa Yeşili
+      const Color(0xFF81B29A), // Adaçayı Yeşili
+
+      // 4. Mavi & Turkuaz Tonları
+      AppColors.teal,          // Uygulama Teali
+      const Color(0xFF00B4D8), // Okyanus Mavisi
+      AppColors.infoBlue,      // Gökyüzü Mavisi
+      const Color(0xFF4361EE), // Kraliyet Mavisi
+
+      // 5. Mor & Pembe Tonları
+      const Color(0xFF7209B7), // Premium Mor
+      const Color(0xFF9B5DE5), // Lavanta
+      const Color(0xFFB5179E), // Canlı Magenta
+      const Color(0xFFFF85A1), // Gül Pembesi
+    ];
 
     showModalBottomSheet(
       context: context,
@@ -224,14 +251,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: colors.map((c) {
-                      final isSelected = c == selectedColor;
+                      final isSelected = c.value == selectedColor.value;
                       return GestureDetector(
                         onTap: () => setModalState(() => selectedColor = c),
                         child: Container(
-                          width: 40, height: 40,
+                          width: 36, height: 36,
                           decoration: BoxDecoration(
                             color: c,
                             shape: BoxShape.circle,
@@ -303,27 +331,6 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
     }
   }
 
-  Future<void> _reorderHabits(int oldIndex, int newIndex) async {
-    if (_uid == null) return;
-    setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
-      final item = _habits.removeAt(oldIndex);
-      _habits.insert(newIndex, item);
-    });
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_uid)
-          .collection('logs')
-          .doc('habit_defs')
-          .set({
-            'type': 'habit_defs',
-            'items': _habits.map((e) => e.toMap()).toList()
-          });
-    } catch (e) {
-      debugPrint("Error reordering habits: \$e");
-    }
-  }
 
   Future<void> _deleteHabit(HabitDef habit) async {
     if (_uid == null) return;
@@ -434,6 +441,123 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
     }
   }
 
+  Future<void> _changeHabitColor(HabitDef habit) async {
+    if (_uid == null) return;
+    Color selectedColor = habit.color;
+    final colors = [
+      // 1. Kırmızı & Mercan Tonları
+      const Color(0xFFE63946), // Premium Kırmızı
+      const Color(0xFFD63031), // Klasik Koyu Kırmızı
+      const Color(0xFFF07167), // Pastel Mercan
+      const Color(0xFFE07A5F), // Sıcak Kiremit
+
+      // 2. Turuncu & Altın Tonları
+      AppColors.orange,        // Canlı Turuncu
+      const Color(0xFFF4A261), // Pastel Şeftali
+      AppColors.gold,          // Canlı Altın
+      const Color(0xFFE9C46A), // Hardal Kum Sarısı
+
+      // 3. Yeşil Tonları
+      AppColors.emeraldGreen,  // Zümrüt Yeşili
+      const Color(0xFF2A9D8F), // Çam Yeşili
+      const Color(0xFF4CAF50), // Doğa Yeşili
+      const Color(0xFF81B29A), // Adaçayı Yeşili
+
+      // 4. Mavi & Turkuaz Tonları
+      AppColors.teal,          // Uygulama Teali
+      const Color(0xFF00B4D8), // Okyanus Mavisi
+      AppColors.infoBlue,      // Gökyüzü Mavisi
+      const Color(0xFF4361EE), // Kraliyet Mavisi
+
+      // 5. Mor & Pembe Tonları
+      const Color(0xFF7209B7), // Premium Mor
+      const Color(0xFF9B5DE5), // Lavanta
+      const Color(0xFFB5179E), // Canlı Magenta
+      const Color(0xFFFF85A1), // Gül Pembesi
+    ];
+
+    final newColor = await showDialog<Color>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Renk Seçin', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '"${habit.title}" için yeni bir renk belirleyin.',
+                style: GoogleFonts.nunito(color: AppColors.textMid, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: colors.map((c) {
+                  final isSelected = c.value == selectedColor.value;
+                  return GestureDetector(
+                    onTap: () => setModalState(() => selectedColor = c),
+                    child: Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: isSelected ? Border.all(color: AppColors.textDark, width: 2.5) : null,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('İptal', style: GoogleFonts.nunito(color: AppColors.textMid)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, selectedColor),
+              child: Text('Kaydet', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (newColor == null) return;
+    if (!mounted) return;
+
+    final idx = _habits.indexWhere((h) => h.id == habit.id);
+    if (idx == -1) return;
+
+    setState(() {
+      _habits[idx] = HabitDef(
+        id: habit.id,
+        title: habit.title,
+        color: newColor,
+        createdAt: habit.createdAt,
+      );
+    });
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .collection('logs')
+          .doc('habit_defs')
+          .set({
+            'type': 'habit_defs',
+            'items': _habits.map((e) => e.toMap()).toList()
+          });
+    } catch (e) {
+      debugPrint('Error updating habit color: $e');
+    }
+  }
+
   int _calculateStreak(String habitId) {
     int streak = 0;
     final today = DateTime.now();
@@ -453,6 +577,260 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
       }
     }
     return streak;
+  }
+
+  Widget _buildHabitRow(
+    HabitDef habit, {
+    required bool isLast,
+    required bool isDoneToday,
+    required DateTime selDay,
+    required DateTime today,
+    required String selectedStr,
+  }) {
+    final createdDay = DateTime(habit.createdAt.year, habit.createdAt.month, habit.createdAt.day);
+    final isInactive = selDay.isBefore(createdDay);
+    final streak = _calculateStreak(habit.id);
+    final todayClean = DateTime(today.year, today.month, today.day);
+
+    int weekCompletions = 0;
+    final monday = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+    for (int i = 0; i < 7; i++) {
+      final d = monday.add(Duration(days: i));
+      final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+      if (_logs[dStr]?[habit.id] == true) weekCompletions++;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: isLast ? null : Border(
+          bottom: BorderSide(
+            color: AppColors.borderGrey.withValues(alpha: 0.5),
+            width: 1.0,
+          ),
+        ),
+      ),
+      child: Opacity(
+        opacity: isInactive ? 0.38 : 1.0,
+        child: InkWell(
+          onTap: () {
+            final Set<String> completedStrs = {};
+            _logs.forEach((date, comps) {
+              if (comps[habit.id] == true) completedStrs.add(date);
+            });
+            HabitHeatMapSheet.show(
+              context,
+              habit: habit,
+              completedDateStrs: completedStrs,
+              currentStreak: streak,
+              createdAt: habit.createdAt,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            child: Row(
+              children: [
+                // Yuvarlak Habit İkonu (virdlerim stili)
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isDoneToday
+                        ? habit.color.withValues(alpha: 0.05)
+                        : habit.color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.star_rounded,
+                    color: isDoneToday
+                        ? habit.color.withValues(alpha: 0.45)
+                        : habit.color,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Orta Kısım: Başlık ve İstatistikler
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        habit.title,
+                        style: GoogleFonts.nunito(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w700,
+                          color: isDoneToday ? AppColors.textLight : AppColors.textDark,
+                          decoration: isDoneToday ? TextDecoration.lineThrough : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      if (isInactive)
+                        Text(
+                          'Bu gün henüz eklenmemişti',
+                          style: GoogleFonts.nunito(
+                            fontSize: 10.0,
+                            color: AppColors.textLight,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Text(
+                              "Bu Hafta: $weekCompletions/7",
+                              style: GoogleFonts.nunito(
+                                fontSize: 10.0,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textLight,
+                              ),
+                            ),
+                            if (streak > 0) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '•',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AppColors.textLight.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "🔥 $streak",
+                                style: GoogleFonts.nunito(
+                                  fontSize: 10.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.orange,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 7 günlük haftalık takip noktaları
+                if (!isInactive) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(7, (index) {
+                      final d = monday.add(Duration(days: index));
+                      final createdDayOnDot = DateTime(habit.createdAt.year, habit.createdAt.month, habit.createdAt.day);
+                      final dCleanOnDot = DateTime(d.year, d.month, d.day);
+                      final isInactiveOnDay = dCleanOnDot.isBefore(createdDayOnDot);
+                      
+                      final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+                      final isDone = !isInactiveOnDay && (_logs[dStr]?[habit.id] ?? false);
+                      
+                      final isSelectedDay = dCleanOnDot.year == _selectedDate.year &&
+                                            dCleanOnDot.month == _selectedDate.month &&
+                                            dCleanOnDot.day == _selectedDate.day;
+                      
+                      Color dotColor;
+                      if (isInactiveOnDay) {
+                        dotColor = Colors.transparent;
+                      } else if (dCleanOnDot.isAfter(todayClean)) {
+                        dotColor = Colors.transparent;
+                      } else if (isDone) {
+                        dotColor = const Color(0xFF52B788); // Yeşil
+                      } else {
+                        if (dCleanOnDot == todayClean) {
+                          dotColor = AppColors.borderGrey.withValues(alpha: 0.6); // Bugün
+                        } else {
+                          dotColor = const Color(0xFFF28482).withValues(alpha: 0.7); // Geçmiş yapılmamış
+                        }
+                      }
+                      
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: dotColor,
+                          shape: BoxShape.circle,
+                          border: isSelectedDay
+                              ? Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2)
+                              : (isInactiveOnDay || dCleanOnDot.isAfter(todayClean)
+                                  ? Border.all(color: AppColors.borderGrey, width: 1.0)
+                                  : null),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                // İşaretleme butonu (virdlerim stili)
+                if (!isInactive)
+                  GestureDetector(
+                    onTap: () => _toggleHabit(habit),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDoneToday ? habit.color : Colors.white,
+                        border: Border.all(
+                          color: isDoneToday ? habit.color : AppColors.borderGrey,
+                          width: 1.8,
+                        ),
+                      ),
+                      child: isDoneToday
+                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                        : null,
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                // Üç nokta menüsü
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  onSelected: (value) {
+                    if (value == 'rename') _renameHabit(habit);
+                    if (value == 'change_color') _changeHabitColor(habit);
+                    if (value == 'delete') _deleteHabit(habit);
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'rename',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMid),
+                          const SizedBox(width: 10),
+                          Text('Adı Düzenle', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'change_color',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.palette_outlined, size: 18, color: AppColors.textMid),
+                          const SizedBox(width: 10),
+                          Text('Renk Değiştir', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_outline, size: 18, color: AppColors.errorRed),
+                          const SizedBox(width: 10),
+                          Text('Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.errorRed)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -475,6 +853,18 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
       final c = DateTime(h.createdAt.year, h.createdAt.month, h.createdAt.day);
       return !c.isAfter(selDay);
     }).toList();
+
+    // Virdlerim tarzı yapılacak/tamamlanan ayrımı
+    final List<HabitDef> todo = [];
+    final List<HabitDef> done = [];
+    for (var habit in activeHabits) {
+      final isDoneToday = (_logs[selectedStr]?[habit.id] ?? false);
+      if (isDoneToday) {
+        done.add(habit);
+      } else {
+        todo.add(habit);
+      }
+    }
 
     int completedToday = 0;
     for (var habit in activeHabits) {
@@ -627,258 +1017,66 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
             ),
           ),
 
-        // Habit Cards — ReorderableListView ile sürükle-bırak
-        if (_habits.isNotEmpty)
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: _habits.length,
-            onReorder: _reorderHabits,
-            proxyDecorator: (child, index, animation) {
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (ctx, _) {
-                  final double elevation = animation.value * 8;
-                  return Material(
-                    elevation: elevation,
-                    borderRadius: BorderRadius.circular(16),
-                    shadowColor: Colors.black26,
-                    child: child,
-                  );
-                },
-              );
-            },
-            itemBuilder: (context, habitIndex) {
-              final habit = _habits[habitIndex];
-              final createdDay = DateTime(habit.createdAt.year, habit.createdAt.month, habit.createdAt.day);
-              final isInactive = selDay.isBefore(createdDay); // Bu tarihte henüz eklenmemişti
-              
-              if (isInactive) {
-                return SizedBox.shrink(key: ValueKey(habit.id));
-              }
-
-              final isDoneToday = !isInactive && (_logs[selectedStr]?[habit.id] ?? false);
-              final streak = _calculateStreak(habit.id);
-
-              int weekCompletions = 0;
-              final monday = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
-              for (int i = 0; i < 7; i++) {
-                final d = monday.add(Duration(days: i));
-                final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-                if (_logs[dStr]?[habit.id] == true) weekCompletions++;
-              }
-
-              return GestureDetector(
-                key: ValueKey(habit.id),
-                onTap: () {
-                  final Set<String> completedStrs = {};
-                  _logs.forEach((date, comps) {
-                    if (comps[habit.id] == true) completedStrs.add(date);
-                  });
-                  HabitHeatMapSheet.show(
-                    context,
-                    habit: habit,
-                    completedDateStrs: completedStrs,
-                    currentStreak: streak,
-                    createdAt: habit.createdAt,
-                  );
-                },
-                child: Opacity(
-                  opacity: isInactive ? 0.38 : 1.0,
-                  child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isInactive
-                        ? AppColors.lightGrey
-                        : (isDoneToday ? habit.color.withValues(alpha: 0.1) : AppColors.white),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isInactive
-                          ? AppColors.borderGrey
-                          : (isDoneToday ? habit.color.withValues(alpha: 0.5) : AppColors.borderGrey),
-                      width: isDoneToday ? 2 : 1,
+        // Habit Cards — Virdlerim ile Birebir Aynı Bölünmüş Liste Yapısı (Yapılacaklar & Tamamlananlar)
+        if (_habits.isNotEmpty) ...[
+          // Todo list
+          ...todo.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final habit = entry.value;
+            final isLast = idx == todo.length - 1 && (done.isEmpty || !_showCompletedHabits);
+            return _buildHabitRow(
+              habit,
+              isLast: isLast,
+              isDoneToday: false,
+              selDay: selDay,
+              today: today,
+              selectedStr: selectedStr,
+            );
+          }),
+          
+          // Collapsible Completed list
+          if (done.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () => setState(() => _showCompletedHabits = !_showCompletedHabits),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                color: Colors.transparent,
+                child: Row(
+                  children: [
+                    Icon(
+                      _showCompletedHabits ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.successGreen,
+                      size: 14,
                     ),
-                    boxShadow: (isInactive || isDoneToday) ? [] : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          // Sürükleme tutamacı
-                          ReorderableDragStartListener(
-                            index: habitIndex,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Icon(
-                                Icons.drag_handle,
-                                color: AppColors.textLight,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 4, height: 24,
-                            decoration: BoxDecoration(
-                              color: habit.color,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  habit.title,
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: isInactive ? AppColors.textLight : AppColors.textDark,
-                                    decoration: isDoneToday ? TextDecoration.lineThrough : null,
-                                  ),
-                                ),
-                                if (isInactive)
-                                  Text(
-                                    'Bu gün henüz eklenmemişti',
-                                    style: GoogleFonts.nunito(
-                                      fontSize: 11,
-                                      color: AppColors.textLight,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  )
-                                else
-                                  Row(
-                                    children: [
-                                      if (streak > 0)
-                                        Padding(
-                                          padding: const EdgeInsets.only(right: 8.0),
-                                          child: Text(
-                                            "🔥 $streak",
-                                            style: GoogleFonts.nunito(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.orange,
-                                            ),
-                                          ),
-                                        ),
-                                      Text(
-                                        "Bu Hafta: $weekCompletions/7",
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textMid,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                          // İşaretleme butonu — sadece aktif alışkanlıklar için
-                          if (!isInactive)
-                          GestureDetector(
-                            onTap: () => _toggleHabit(habit),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(
-                                color: isDoneToday ? habit.color : Colors.transparent,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isDoneToday ? habit.color : AppColors.borderGrey,
-                                  width: 2,
-                                ),
-                              ),
-                              child: isDoneToday
-                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            onSelected: (value) {
-                              if (value == 'rename') _renameHabit(habit);
-                              if (value == 'delete') _deleteHabit(habit);
-                            },
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                value: 'rename',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMid),
-                                    const SizedBox(width: 10),
-                                    Text('Adı Düzenle', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.delete_outline, size: 18, color: AppColors.errorRed),
-                                    const SizedBox(width: 10),
-                                    Text('Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.errorRed)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tamamlananlar (${done.length})',
+                      style: GoogleFonts.nunito(
+                        fontSize: 10.5,
+                        color: AppColors.successGreen,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(height: 12),
-                      // Mini 7 day graph
-                      Row(
-                        children: List.generate(7, (index) {
-                          final monday2 = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
-                          final d = monday2.add(Duration(days: index));
-                          final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-                          final isDone = _logs[dStr]?[habit.id] ?? false;
-                          final isSelected = dStr == selectedStr;
-
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                if (!d.isAfter(today)) {
-                                  setState(() => _selectedDate = d);
-                                }
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 2),
-                                height: isSelected ? 10 : 6,
-                                decoration: BoxDecoration(
-                                  color: isDone
-                                      ? habit.color
-                                      : habit.color.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(isSelected ? 6 : 4),
-                                  border: isSelected
-                                      ? Border.all(color: habit.color.withValues(alpha: 0.5), width: 1)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                ),
-              );
-            },
-          ),
+              ),
+            ),
+            if (_showCompletedHabits)
+              ...done.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final habit = entry.value;
+                final isLast = idx == done.length - 1;
+                return _buildHabitRow(
+                  habit,
+                  isLast: isLast,
+                  isDoneToday: true,
+                  selDay: selDay,
+                  today: today,
+                  selectedStr: selectedStr,
+                );
+              }),
+          ],
+        ],
       ],
     );
   }
