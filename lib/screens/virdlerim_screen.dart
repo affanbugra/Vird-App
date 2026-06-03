@@ -23,16 +23,14 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
   @override
   bool get wantKeepAlive => true;
   final _uid = FirebaseAuth.instance.currentUser?.uid;
-  bool _showCompletedSures = false;
-  bool _showCompletedZikirs = false;
-  bool _showCompletedDuas = false;
-  bool _showCompletedOthers = false;
   late DateTime _selectedDate;
   
   // dateStr -> { virdId: count }
   final Map<String, Map<String, int>> _selectedWeekLogs = {};
 
   List<VirdItem> _activeVirds = [];
+  // Kullanıcının kategori bazlı özel sıralaması — boşsa zaman sırasına düşer
+  Map<String, List<String>> _virdOrder = {};
   VirdLog? _currentLog;
   bool _loadingPreferences = true;
   StreamSubscription? _prefsSub;
@@ -98,14 +96,40 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         activeVirds.removeWhere((e) => e.id == 'kehf');
       }
 
+      // Kullanıcı özel kategori sıralaması
+      final orderRaw = userData['virdOrder'] as Map<String, dynamic>? ?? {};
+      final Map<String, List<String>> parsedOrder = {};
+      orderRaw.forEach((k, v) {
+        if (v is List) parsedOrder[k] = v.map((e) => e.toString()).toList();
+      });
+
       setState(() {
         _activeVirds = activeVirds;
+        _virdOrder = parsedOrder;
         _loadingPreferences = false;
       });
     }, onError: (e) {
       debugPrint("Error listening to preferences: $e");
       if (mounted) setState(() => _loadingPreferences = false);
     });
+  }
+
+  Future<void> _saveCategoryOrder(String categoryKey, List<String> orderedIds) async {
+    // Optimistic local update; snapshot listener doğrulayacak
+    setState(() {
+      _virdOrder = {..._virdOrder, categoryKey: orderedIds};
+    });
+    if (_uid == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .set({
+        'virdOrder': {categoryKey: orderedIds},
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error saving vird order: $e');
+    }
   }
 
   void _listenLog() {
@@ -319,30 +343,21 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         ? ((completed.length) / activeVirds.length)
         : 0.0;
 
-    // Helper function to build a categorized box with dynamic inline finished list and badge counter
+    // Helper function to build a categorized box — tek liste, tamamlanan kendi yerinde renklenir
     Widget buildCategoryGroup(
       String title,
       Color color,
       List<VirdItem> allItems,
-      bool isExpanded,
-      ValueSetter<bool> onToggle,
+      String categoryKey,
     ) {
       if (allItems.isEmpty) return const SizedBox.shrink();
 
-      final List<VirdItem> todo = [];
-      final List<VirdItem> done = [];
-
+      int completedCount = 0;
       for (final item in allItems) {
         final count = log.completions[item.id] ?? 0;
-        if (count >= item.targetCount) {
-          done.add(item);
-        } else {
-          todo.add(item);
-        }
+        if (count >= item.targetCount) completedCount++;
       }
-
       final total = allItems.length;
-      final completedCount = done.length;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,52 +395,55 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
               ],
             ),
           ),
-          
-          // Yapılacaklar (todo) listesi
-          if (todo.isNotEmpty)
-            ...todo.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final item = entry.value;
-              // Eğer tamamlanan listesi boşsa veya kapalıysa, son todo elemanı alt çizgi çizmemeli
-              final isLast = idx == todo.length - 1 && (done.isEmpty || !isExpanded);
-              return _buildVirdCard(item, log.completions[item.id] ?? 0, isLast: isLast);
-            }),
-            
-          // Tamamlananlar (done) varsa göster/gizle butonu
-          if (done.isNotEmpty) ...[
-            GestureDetector(
-              onTap: () => onToggle(!isExpanded),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                color: Colors.transparent,
-                child: Row(
-                  children: [
-                    Icon(
-                      isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.successGreen,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Tamamlananlar (${done.length})',
-                      style: GoogleFonts.nunito(
-                        fontSize: 10.5,
-                        color: AppColors.successGreen,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+
+          // Tek liste — tamamlanan satır kendi konumunda renklenir; uzun bas-sürükle ile sıralanabilir
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            proxyDecorator: (child, index, animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, _) {
+                  final t = Curves.easeInOut.transform(animation.value);
+                  return Material(
+                    color: Colors.transparent,
+                    elevation: t * 8,
+                    shadowColor: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(12),
+                    child: child,
+                  );
+                },
+                child: child,
+              );
+            },
+            itemCount: allItems.length,
+            itemBuilder: (context, idx) {
+              final item = allItems[idx];
+              final count = log.completions[item.id] ?? 0;
+              final isDone = count >= item.targetCount;
+              return RepaintBoundary(
+                key: ValueKey(item.id),
+                child: ReorderableDelayedDragStartListener(
+                  index: idx,
+                  child: _buildVirdCard(
+                    item,
+                    count,
+                    isDone: isDone,
+                    isLast: idx == allItems.length - 1,
+                  ),
                 ),
-              ),
-            ),
-            if (isExpanded)
-              ...done.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final item = entry.value;
-                final isLast = idx == done.length - 1;
-                return _buildVirdCard(item, log.completions[item.id] ?? 0, isDone: true, isLast: isLast);
-              }),
-          ],
+              );
+            },
+            onReorder: (oldIdx, newIdx) {
+              if (newIdx > oldIdx) newIdx -= 1;
+              if (oldIdx == newIdx) return;
+              final newList = List<VirdItem>.from(allItems);
+              final moved = newList.removeAt(oldIdx);
+              newList.insert(newIdx, moved);
+              _saveCategoryOrder(categoryKey, newList.map((e) => e.id).toList());
+            },
+          ),
         ],
       );
     }
@@ -449,10 +467,30 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       return timeOrder[item.recommendedTime] ?? 99;
     }
 
+    // Önce zaman sırasına göre dizilim; sonra kullanıcı özel sırası uygulanır
     suresAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
     zikirsAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
     duasAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
     othersAll.sort((a, b) => getTimeSortOrder(a).compareTo(getTimeSortOrder(b)));
+
+    List<VirdItem> applyCustomOrder(List<VirdItem> items, String categoryKey) {
+      final saved = _virdOrder[categoryKey];
+      if (saved == null || saved.isEmpty) return items;
+      final byId = {for (final it in items) it.id: it};
+      final ordered = <VirdItem>[];
+      for (final id in saved) {
+        final item = byId.remove(id);
+        if (item != null) ordered.add(item);
+      }
+      // Kayıtlı sırada olmayan yeni virdleri sona ekle (zaman sırası korunur)
+      ordered.addAll(items.where((it) => byId.containsKey(it.id)));
+      return ordered;
+    }
+
+    final sures = applyCustomOrder(suresAll, 'sure');
+    final zikirs = applyCustomOrder(zikirsAll, 'zikir');
+    final duas = applyCustomOrder(duasAll, 'dua');
+    final others = applyCustomOrder(othersAll, 'other');
 
     return Material(
       color: Colors.white,
@@ -468,37 +506,10 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
 
           if (_isFriday()) _buildFridayBanner(),
 
-          buildCategoryGroup(
-            'SURELER',
-            AppColors.teal,
-            suresAll,
-            _showCompletedSures,
-            (val) => setState(() => _showCompletedSures = val),
-          ),
-
-          buildCategoryGroup(
-            'ZİKİRLER',
-            AppColors.orange,
-            zikirsAll,
-            _showCompletedZikirs,
-            (val) => setState(() => _showCompletedZikirs = val),
-          ),
-
-          buildCategoryGroup(
-            'DUALAR',
-            AppColors.infoBlue,
-            duasAll,
-            _showCompletedDuas,
-            (val) => setState(() => _showCompletedDuas = val),
-          ),
-
-          buildCategoryGroup(
-            'DİĞER',
-            AppColors.textMid,
-            othersAll,
-            _showCompletedOthers,
-            (val) => setState(() => _showCompletedOthers = val),
-          ),
+          buildCategoryGroup('SURELER', AppColors.teal, sures, 'sure'),
+          buildCategoryGroup('ZİKİRLER', AppColors.orange, zikirs, 'zikir'),
+          buildCategoryGroup('DUALAR', AppColors.infoBlue, duas, 'dua'),
+          buildCategoryGroup('DİĞER', AppColors.textMid, others, 'other'),
           const SizedBox(height: 48),
         ],
       ),
@@ -609,62 +620,86 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     final monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     final dateDisplay = "${_selectedDate.day} ${monthNames[_selectedDate.month - 1]}";
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGrey),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textDark, size: 22),
-            onPressed: () {
-              setState(() {
-                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-                _currentLog = VirdLog(date: _todayDateStr(), completions: {});
-              });
-              _listenLog();
-              _fetchSelectedWeekLogs();
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          Text(
-            _selectedDate == todayClean ? "Bugün ($dateDisplay)" : dateDisplay,
-            style: GoogleFonts.nunito(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppColors.teal,
-            ),
-          ),
-          if (_selectedDate.isBefore(todayClean))
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragEnd: (details) {
+        final v = details.primaryVelocity ?? 0;
+        if (v > 250) {
+          setState(() {
+            _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+            _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+          });
+          _listenLog();
+          _fetchSelectedWeekLogs();
+        } else if (v < -250) {
+          final next = _selectedDate.add(const Duration(days: 1));
+          if (!next.isAfter(todayClean)) {
+            setState(() {
+              _selectedDate = next;
+              _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+            });
+            _listenLog();
+            _fetchSelectedWeekLogs();
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderGrey),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
             IconButton(
-              icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textDark, size: 22),
+              icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textDark, size: 22),
               onPressed: () {
-                final next = _selectedDate.add(const Duration(days: 1));
-                if (!next.isAfter(todayClean)) {
-                  setState(() {
-                    _selectedDate = next;
-                    _currentLog = VirdLog(date: _todayDateStr(), completions: {});
-                  });
-                  _listenLog();
-                  _fetchSelectedWeekLogs();
-                }
+                setState(() {
+                  _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                  _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+                });
+                _listenLog();
+                _fetchSelectedWeekLogs();
               },
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-            )
-          else
-            const SizedBox(width: 40),
-        ],
+            ),
+            Text(
+              _selectedDate == todayClean ? "Bugün ($dateDisplay)" : dateDisplay,
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.teal,
+              ),
+            ),
+            if (_selectedDate.isBefore(todayClean))
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textDark, size: 22),
+                onPressed: () {
+                  final next = _selectedDate.add(const Duration(days: 1));
+                  if (!next.isAfter(todayClean)) {
+                    setState(() {
+                      _selectedDate = next;
+                      _currentLog = VirdLog(date: _todayDateStr(), completions: {});
+                    });
+                    _listenLog();
+                    _fetchSelectedWeekLogs();
+                  }
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              )
+            else
+              const SizedBox(width: 40),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildVirdCard(VirdItem item, int currentCount, {bool isDone = false, bool isLast = false}) {
+  Widget _buildVirdCard(VirdItem item, int currentCount, {Key? key, bool isDone = false, bool isLast = false}) {
     final isZikir = item.category == 'zikir';
     final progress = item.targetCount > 0 ? (currentCount / item.targetCount).clamp(0.0, 1.0) : 0.0;
 
@@ -682,7 +717,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         categoryColor = AppColors.orange;
         break;
       case 'dua':
-        categoryIcon = Icons.bookmark_added_rounded;
+        categoryIcon = Icons.volunteer_activism_rounded;
         categoryColor = AppColors.infoBlue;
         break;
       default:
@@ -742,15 +777,22 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     }
 
     return Container(
+      key: key,
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        border: isLast ? null : Border(
-          bottom: BorderSide(
-            color: AppColors.borderGrey.withValues(alpha: 0.5),
-            width: 1.0,
-          ),
+        color: isDone ? categoryColor.withValues(alpha: 0.1) : AppColors.white,
+        border: Border.all(
+          color: isDone
+              ? categoryColor.withValues(alpha: 0.5)
+              : AppColors.borderGrey,
+          width: isDone ? 1.5 : 1.0,
         ),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: InkWell(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
         onTap: () => _showVirdHistoryHeatMap(item, categoryColor),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
@@ -956,6 +998,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
               ),
             ],
           ),
+        ),
         ),
       ),
     );

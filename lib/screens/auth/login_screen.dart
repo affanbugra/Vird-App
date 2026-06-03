@@ -299,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                "Düzenli okumalarla Hasanat biriktirir,\nkalıcı bir alışkanlık kazanırsın.",
+                "Düzenli okumalarla Hasanat biriktir,\nkalıcı bir alışkanlık kazan.",
                 style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
                 textAlign: TextAlign.center,
               ),

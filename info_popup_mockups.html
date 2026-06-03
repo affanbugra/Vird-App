@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vird — Info Popup Mockup Karşılaştırması</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Amiri:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --teal: #2A7F8C;
+    --teal-dark: #1F6370;
+    --teal-light: #E8F5F7;
+    --teal-soft: #63A5AB;
+    --orange: #FF9600;
+    --gold: #FFC200;
+    --gold-soft: #FFD166;
+    --white: #FFFFFF;
+    --light-grey: #F7F7F7;
+    --border-grey: #E5E5E5;
+    --text-dark: #3C3C3C;
+    --text-mid: #777;
+    --text-light: #ABABAB;
+    --success-green: #58CC02;
+    --success-bg: #D7FFB8;
+    --error-red: #FF4B4B;
+    --error-bg: #FFDFE0;
+    --info-blue: #1CB0F6;
+    --gold-bg: rgba(255, 194, 0, 0.12);
+  }
+  * { box-sizing: border-box; font-family: 'Nunito', sans-serif; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: #EFEFEF;
+    color: var(--text-dark);
+  }
+  h1 {
+    text-align: center;
+    font-weight: 800;
+    margin: 0 0 28px;
+    font-size: 22px;
+  }
+  h1 small {
+    display: block;
+    font-size: 13px;
+    color: var(--text-mid);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+  @media (max-width: 1080px) { .grid { grid-template-columns: 1fr; } }
+  .col {
+    background: #FAFAFA;
+    border-radius: 18px;
+    padding: 18px;
+    border: 1px solid var(--border-grey);
+  }
+  .col-title {
+    text-align: center;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--teal-dark);
+    margin: 0 0 4px;
+  }
+  .col-desc {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-mid);
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 340px;
+    max-width: 100%;
+    margin: 0 auto;
+    background: var(--white);
+    border-radius: 24px 24px 8px 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-grey);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    height: 580px;
+    display: flex;
+    flex-direction: column;
+  }
+  .grip {
+    width: 40px;
+    height: 4px;
+    background: var(--border-grey);
+    border-radius: 2px;
+    margin: 10px auto 6px;
+  }
+  .phone-head {
+    padding: 6px 16px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-grey);
+  }
+  .phone-head .title {
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .phone-head .x {
+    color: var(--text-mid);
+    font-size: 16px;
+  }
+  .phone-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+  }
+  .phone-body::-webkit-scrollbar { width: 4px; }
+  .phone-body::-webkit-scrollbar-thumb { background: var(--border-grey); border-radius: 4px; }
+
+  /* ================= A: Kategori Sekmeleri ================= */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-grey);
+    overflow-x: auto;
+    background: var(--white);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 10px 14px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-mid);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--teal);
+    border-bottom-color: var(--teal);
+    font-weight: 800;
+  }
+  .panel { padding: 14px; }
+  .topic-A {
+    margin-bottom: 14px;
+  }
+  .topic-A .head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .topic-A .head .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .topic-A .head .ttl {
+    font-weight: 800;
+    font-size: 13px;
+  }
+  .hadith {
+    background: var(--light-grey);
+    border-left: 3px solid var(--teal);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 11.5px;
+    color: var(--text-dark);
+    line-height: 1.5;
+  }
+  .hadith .src {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-mid);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .arabic { font-family: 'Amiri', serif; font-size: 16px; color: var(--teal-dark); text-align: center; margin: 4px 0 8px; }
+
+  /* ================= B: Akordeon ================= */
+  .chart-mini {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .chart-mini .ring-chart {
+    width: 130px; height: 130px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background:
+      conic-gradient(
+        var(--error-red) 0% 6%,
+        var(--success-green) 6% 41%,
+        var(--gold) 41% 53%,
+        var(--error-red) 53% 59%,
+        var(--success-green) 59% 75%,
+        var(--error-red) 75% 80%,
+        var(--success-green) 80% 92%,
+        var(--teal) 92% 100%
+      );
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .chart-mini .ring-chart::after {
+    content: 'NAMAZ ve\AKERAHAT\AVAKİTLERİ';
+    white-space: pre;
+    width: 76px; height: 76px;
+    background: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 7.5px;
+    font-weight: 800;
+    line-height: 1.3;
+    color: var(--text-dark);
+  }
+  .chart-mini .hint {
+    font-size: 10px;
+    color: var(--text-mid);
+    margin-top: 8px;
+    font-weight: 600;
+  }
+  .accordion {
+    margin-bottom: 8px;
+    border: 1px solid var(--border-grey);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--white);
+  }
+  .accordion.open { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .acc-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 12px;
+    cursor: pointer;
+  }
+  .acc-head .ic {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 13px;
+  }
+  .acc-head .ttl {
+    flex: 1;
+    font-weight: 800;
+    font-size: 12.5px;
+  }
+  .acc-head .chev { color: var(--text-mid); transform: rotate(0deg); transition: 0.2s; }
+  .accordion.open .acc-head .chev { transform: rotate(180deg); }
+  .acc-body {
+    padding: 0 12px 12px;
+    font-size: 11.5px;
+    color: var(--text-dark);
+    line-height: 1.55;
+  }
+  .accordion.collapsed .acc-body { display: none; }
+  .acc-body .ar { font-family: 'Amiri', serif; font-size: 15px; color: var(--teal-dark); text-align: center; margin: 4px 0 8px; }
+  .acc-body .src { font-size: 10px; color: var(--text-mid); font-weight: 700; margin-top: 4px; }
+  .acc-body .hadis {
+    background: var(--light-grey);
+    border-left: 3px solid currentColor;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 6px 0;
+  }
+
+  /* ================= C: Hub + Detay ================= */
+  .hub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .hub-card {
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  }
+  .hub-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(0,0,0,0.0));
+  }
+  .hub-card .em {
+    font-size: 22px;
+    z-index: 1;
+  }
+  .hub-card .ttl {
+    font-weight: 800;
+    font-size: 12.5px;
+    z-index: 1;
+  }
+  .hub-card .sub {
+    font-size: 9.5px;
+    font-weight: 600;
+    opacity: 0.85;
+    margin-top: 2px;
+    z-index: 1;
+  }
+
+  .hub-card.k1 { background: linear-gradient(135deg, #FF7B7B, #E04545); }
+  .hub-card.k2 { background: linear-gradient(135deg, #FFD166, #FF9600); }
+  .hub-card.k3 { background: linear-gradient(135deg, #FFC200, #DB9000); }
+  .hub-card.k4 { background: linear-gradient(135deg, #2A7F8C, #1F6370); }
+  .hub-card.k5 { background: linear-gradient(135deg, #1CB0F6, #1488C8); }
+  .hub-card.k6 { background: linear-gradient(135deg, #58CC02, #3FA901); }
+  .hub-card.k7 { background: linear-gradient(135deg, #B47EFF, #7C46D9); }
+  .hub-card.k8 { background: linear-gradient(135deg, #FF85A1, #E0577A); }
+  .hub-card.k9 { background: linear-gradient(135deg, #63A5AB, #3F7A85); }
+  .hub-card.k0 { background: linear-gradient(135deg, #777, #555); }
+
+  .hub-section-title {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 4px 0 10px;
+  }
+
+  .detail-preview {
+    margin-top: 18px;
+    border-top: 1px dashed var(--border-grey);
+    padding-top: 14px;
+  }
+  .detail-preview p {
+    font-size: 10.5px;
+    color: var(--text-mid);
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .detail-card {
+    border-radius: 14px;
+    padding: 14px;
+    background: linear-gradient(135deg, #2A7F8C, #1F6370);
+    color: white;
+    margin-bottom: 10px;
+  }
+  .detail-card .label {
+    font-size: 11px;
+    opacity: 0.85;
+    font-weight: 700;
+  }
+  .detail-card .name {
+    font-size: 18px;
+    font-weight: 900;
+    margin: 2px 0 8px;
+  }
+  .detail-card .ar {
+    font-family: 'Amiri', serif;
+    font-size: 19px;
+    text-align: center;
+    margin: 6px 0;
+    opacity: 0.95;
+  }
+  .detail-card .hadis-c {
+    background: rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.55;
+    margin-top: 10px;
+    border-left: 3px solid rgba(255,255,255,0.6);
+  }
+  .detail-card .src {
+    font-size: 9.5px;
+    opacity: 0.7;
+    margin-top: 4px;
+    font-weight: 700;
+  }
+
+  .note {
+    text-align: center;
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+
+  /* small helpers */
+  .ic-r { background: var(--error-red); }
+  .ic-t { background: var(--teal); }
+  .ic-g { background: var(--gold); }
+  .ic-o { background: var(--orange); }
+  .ic-s { background: var(--success-green); }
+  .ic-b { background: var(--info-blue); }
+  .ic-p { background: #B47EFF; }
+</style>
+</head>
+<body>
+
+<h1>Info Popup Mockup'ları
+  <small>Kerahat + Namaz/Cemaat/Tesbihat/Sünnet faziletleri için 3 yaklaşım</small>
+</h1>
+
+<div class="grid">
+
+  <!-- ================== A: SEKMELER ================== -->
+  <div class="col">
+    <p class="col-title">A — Kategori Sekmeleri (TabBar)</p>
+    <p class="col-desc">Üstte 4 sekme. Her sekme kendi konusu. Hızlı geçiş, az kaydırma. Yapısı klasik ve net.</p>
+    <div class="phone">
+      <div class="grip"></div>
+      <div class="phone-head">
+        <span class="title">Namaz Bilgisi</span>
+        <span class="x">✕</span>
+      </div>
+      <div class="tabs">
+        <div class="tab">Kerahat</div>
+        <div class="tab active">Vakit Faziletleri</div>
+        <div class="tab">Cemaat</div>
+        <div class="tab">Tesbihat</div>
+        <div class="tab">Sünnetler</div>
+      </div>
+      <div class="phone-body" style="padding-top:8px;">
+        <div class="panel">
+          <div class="topic-A">
+            <div class="head">
+              <span class="dot" style="background:var(--orange);"></span>
+              <span class="ttl">Sabah Namazı</span>
+            </div>
+            <div class="arabic">صَلَاةُ الْفَجْرِ</div>
+            <div class="hadith">
+              "Kim sabah namazını cemaatle kılarsa, Allah'ın güvencesi altına girer."
+              <span class="src">— Müslim, Mesâcid, 261</span>
+            </div>
+            <div class="hadith">
+              "Sabah namazının iki rekat sünneti, dünya ve içindekilerden hayırlıdır."
+              <span class="src">— Müslim, Salât, 96</span>
+            </div>
+          </div>
+
+          <div class="topic-A">
+            <div class="head">
+              <span class="dot" style="background:var(--gold);"></span>
+              <span class="ttl">Öğle Namazı</span>
+            </div>
+            <div class="hadith">
+              "Öğleden önce ve sonra dört rekat kılan kimseye Allah cehennem ateşini haram kılar."
+              <span class="src">— Tirmizî, Salât, 200</span>
+            </div>
+          </div>
+
+          <div class="topic-A">
+            <div class="head">
+              <span class="dot" style="background:var(--teal);"></span>
+              <span class="ttl">İkindi Namazı</span>
+            </div>
+            <div class="hadith">
+              "İkindi namazını kaçıran kimse, ailesini ve malını kaybetmiş gibidir."
+              <span class="src">— Buhârî, Mevâkıt, 14</span>
+            </div>
+          </div>
+
+          <div class="topic-A">
+            <div class="head">
+              <span class="dot" style="background:var(--info-blue);"></span>
+              <span class="ttl">Yatsı Namazı</span>
+            </div>
+            <div class="hadith">
+              "Yatsı namazını cemaatle kılan, gecenin yarısını ibadetle geçirmiş gibidir."
+              <span class="src">— Müslim, Mesâcid, 260</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== B: AKORDEON ================== -->
+  <div class="col">
+    <p class="col-title">B — Akordeon Kartlar (genişleyen)</p>
+    <p class="col-desc">Tek sayfa, kapalı kartlar. Tıklayınca açılır. Üstte küçültülmüş kerahat çarkı. Kullanıcı ilgilendiğini açar.</p>
+    <div class="phone">
+      <div class="grip"></div>
+      <div class="phone-head">
+        <span class="title">Namaz Bilgisi</span>
+        <span class="x">✕</span>
+      </div>
+      <div class="phone-body">
+        <div class="chart-mini">
+          <div class="ring-chart"></div>
+          <div class="hint">Kerahat vakitleri — kırmızı bölümler</div>
+        </div>
+
+        <div class="accordion open">
+          <div class="acc-head">
+            <span class="ic ic-r">🚫</span>
+            <span class="ttl">Kerahat Kuralları</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body" style="color: var(--error-red);">
+            <div class="hadis">
+              <div style="color: var(--text-dark);">
+                Güneş doğduktan sonraki ilk 40-45 dakikada hiçbir namaz kılınmaz. Aynı şekilde öğle vaktinden önceki 40-45 dakika ve akşam vaktinden hemen önceki süre de kerahattir.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion collapsed">
+          <div class="acc-head">
+            <span class="ic ic-o">🌅</span>
+            <span class="ttl">Sabah Namazı Fazileti</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body"></div>
+        </div>
+
+        <div class="accordion open">
+          <div class="acc-head">
+            <span class="ic ic-g">🕌</span>
+            <span class="ttl">Cemaat ile Namaz</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body" style="color: var(--gold);">
+            <div class="ar">صَلَاةُ الْجَمَاعَةِ</div>
+            <div class="hadis">
+              <div style="color: var(--text-dark);">
+                "Cemaatle kılınan namaz, tek başına kılınan namazdan <b>yirmi yedi derece</b> daha üstündür."
+                <div class="src">— Buhârî, Ezân, 30; Müslim, Mesâcid, 249</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion collapsed">
+          <div class="acc-head">
+            <span class="ic ic-t">📿</span>
+            <span class="ttl">Tesbihat Fazileti</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body"></div>
+        </div>
+
+        <div class="accordion collapsed">
+          <div class="acc-head">
+            <span class="ic ic-b">✨</span>
+            <span class="ttl">Sünnetlerin Önemi</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body"></div>
+        </div>
+
+        <div class="accordion collapsed">
+          <div class="acc-head">
+            <span class="ic ic-p">🌙</span>
+            <span class="ttl">Vitir Namazı</span>
+            <span class="chev">⌃</span>
+          </div>
+          <div class="acc-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== C: HUB + DETAY ================== -->
+  <div class="col">
+    <p class="col-title">C — Hub Sayfası + Detay</p>
+    <p class="col-desc">Ana sayfada renkli grid kartlar (her konu bir kart). Tıklayınca o konunun tam sayfa detay görünümü. En etkileyici, mobil-first.</p>
+    <div class="phone">
+      <div class="grip"></div>
+      <div class="phone-head">
+        <span class="title">Namaz Bilgisi</span>
+        <span class="x">✕</span>
+      </div>
+      <div class="phone-body">
+        <div class="hub-section-title">5 Vakit Namaz</div>
+        <div class="hub-grid">
+          <div class="hub-card k2">
+            <div class="em">🌅</div>
+            <div>
+              <div class="ttl">Sabah</div>
+              <div class="sub">Sünnet 2 + Farz 2</div>
+            </div>
+          </div>
+          <div class="hub-card k3">
+            <div class="em">☀️</div>
+            <div>
+              <div class="ttl">Öğle</div>
+              <div class="sub">4 + 4 + 2</div>
+            </div>
+          </div>
+          <div class="hub-card k4">
+            <div class="em">⛅</div>
+            <div>
+              <div class="ttl">İkindi</div>
+              <div class="sub">4 + 4</div>
+            </div>
+          </div>
+          <div class="hub-card k1">
+            <div class="em">🌆</div>
+            <div>
+              <div class="ttl">Akşam</div>
+              <div class="sub">3 + 2</div>
+            </div>
+          </div>
+          <div class="hub-card k5" style="grid-column: span 2; aspect-ratio: 2 / 1;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="em">🌙</div>
+              <div style="text-align: right;">
+                <div class="ttl">Yatsı</div>
+                <div class="sub">4 + 4 + 2 + Vitir 3</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hub-section-title" style="margin-top:14px;">Ek Konular</div>
+        <div class="hub-grid">
+          <div class="hub-card k6">
+            <div class="em">🕌</div>
+            <div>
+              <div class="ttl">Cemaat</div>
+              <div class="sub">27 kat sevap</div>
+            </div>
+          </div>
+          <div class="hub-card k9">
+            <div class="em">📿</div>
+            <div>
+              <div class="ttl">Tesbihat</div>
+              <div class="sub">100 zikir</div>
+            </div>
+          </div>
+          <div class="hub-card k7">
+            <div class="em">🌙</div>
+            <div>
+              <div class="ttl">Vitir</div>
+              <div class="sub">Vacib namaz</div>
+            </div>
+          </div>
+          <div class="hub-card k0">
+            <div class="em">🚫</div>
+            <div>
+              <div class="ttl">Kerahat</div>
+              <div class="sub">Yasak vakitler</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-preview">
+          <p>↓ Bir karta tıklayınca açılan detay sayfası örneği</p>
+          <div class="detail-card">
+            <div class="label">5 VAKİT NAMAZ</div>
+            <div class="name">Sabah Namazı</div>
+            <div class="ar">صَلَاةُ الْفَجْرِ</div>
+            <div style="font-size: 11px; opacity: 0.9; line-height: 1.55;">
+              Müminin günü, Allah'ın huzurunda başlar. Sabah namazı imanın kuvvetinin ölçüsüdür.
+            </div>
+            <div class="hadis-c">
+              "Kim sabah namazını cemaatle kılarsa, Allah'ın güvencesi altındadır."
+              <div class="src">— Müslim, Mesâcid, 261</div>
+            </div>
+            <div class="hadis-c">
+              "Sabah namazının iki rekat sünneti, dünya ve içindekilerden hayırlıdır."
+              <div class="src">— Müslim, Salât, 96</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">A: hızlı keşif · B: tek sayfa, isteğe bağlı detay · C: en zengin görsel deneyim, biraz daha fazla geliştirme eforu gerektirir.</p>
+
+</body>
+</html>

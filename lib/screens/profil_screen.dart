@@ -1140,6 +1140,15 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     });
   }
 
+  void _showKaynakcaSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _KaynakcaSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1201,6 +1210,18 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             icon: Icons.menu_book_outlined,
             title: 'Hafız Doğrulaması',
             onTap: () => _showHafizSheet(context),
+          ),
+          const SizedBox(height: 12),
+          _SettingsItem(
+            icon: Icons.bookmark_border_rounded,
+            title: 'Kaynakça',
+            onTap: () {
+              final navContext = context;
+              Navigator.pop(context);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _showKaynakcaSheet(navContext);
+              });
+            },
           ),
           const SizedBox(height: 20),
           Text(
@@ -2773,4 +2794,268 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
       ),
     );
   }
+}
+
+// ─── Kaynakça Bottom Sheet ────────────────────────────────────────────────────
+class _KaynakcaSheet extends StatelessWidget {
+  const _KaynakcaSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
+      ),
+      padding: const EdgeInsets.only(top: 12, bottom: 24),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.borderGrey,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Kaynakça',
+                  style: GoogleFonts.nunito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textMid, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.tealLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: AppColors.teal.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.shield_outlined,
+                                color: AppColors.tealDark, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Metin ve Kaynak Güvencesi',
+                              style: GoogleFonts.nunito(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.tealDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Uygulama içindeki tüm ayet ve hadis alıntıları; Diyanet İşleri Başkanlığı yayınları, Kütüb-i Sitte ve TDV İslam Ansiklopedisi referans alınarak hazırlanmıştır. Şahsi hükümler için ehlinden istifade edilmesi tavsiye olunur.',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textDark,
+                            height: 1.55,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _kaynakSection(
+                    'Hadis Kaynakları',
+                    [
+                      _Kaynak('Sahîh-i Buhârî',
+                          'Ezân, Mevâkıt, Megâzî bölümleri (Cemaat hadisleri, Tesbihat hadisi, vd.)'),
+                      _Kaynak('Sahîh-i Müslim',
+                          'Mesâcid, Salât, Müsâfirîn, Tahâret bölümleri (Cemaat, Sabah sünneti, Tesbihat hadisleri)'),
+                      _Kaynak('Sünen-i Ebû Dâvûd',
+                          'Vitir bölümü (Tesbihat hadisi)'),
+                      _Kaynak('Sünen-i İbn Mâce',
+                          'Mesâcid bölümü (Cemaat hadisi takviyesi)'),
+                      _Kaynak('Sünen-i Tirmizî',
+                          'Salât bölümü (genel referans)'),
+                      _Kaynak('Sünen-i Nesâî',
+                          'Sehv bölümü (genel referans)'),
+                    ],
+                  ),
+                  _kaynakSection(
+                    'Fıkıh & Fetva',
+                    [
+                      _Kaynak('Diyanet İşleri Başkanlığı',
+                          'Din İşleri Yüksek Kurulu — Mekruh ve Kerahat Vakitleri Fetvaları'),
+                      _Kaynak('TDV İslam Ansiklopedisi',
+                          '"Vakit" ve "Kerahat" maddeleri — fıkhî dayanaklar'),
+                    ],
+                  ),
+                  _kaynakSection(
+                    'Kur\'an-ı Kerim',
+                    [
+                      _Kaynak('Diyanet Meali',
+                          'Kur\'an-ı Kerim Türkçe meali, Nisâ Sûresi 103. âyet (Tesbihat bölümünde)'),
+                    ],
+                  ),
+                  _kaynakSection(
+                    'Web Referansları',
+                    [
+                      _Kaynak('islamveihsan.com',
+                          'Cemaatle namaz faziletleri içeriği için referans alındı'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            size: 14, color: AppColors.textMid),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Mezhep odağı: Hanefi fıkhı esas alınmış; ihtilaflı meselelerde Diyanet İşleri Başkanlığı görüşü tercih edilmiştir.',
+                            style: GoogleFonts.nunito(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMid,
+                              height: 1.5,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kaynakSection(String title, List<_Kaynak> items) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              title.toUpperCase(),
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.teal,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderGrey),
+            ),
+            child: Column(
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.teal,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                items[i].name,
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                items[i].desc,
+                                style: GoogleFonts.nunito(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMid,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i < items.length - 1)
+                    Divider(
+                      height: 1,
+                      color: AppColors.borderGrey.withValues(alpha: 0.6),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Kaynak {
+  final String name;
+  final String desc;
+  const _Kaynak(this.name, this.desc);
 }
