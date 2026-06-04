@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../app_colors.dart';
 import '../../providers/auth_provider.dart';
-import 'profile_setup_screen.dart';
+
 
 String _parseAuthError(dynamic e) {
   if (e is FirebaseAuthException) {
@@ -113,12 +113,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProfileSetupScreen(name: name),
-        ),
-      );
+      // AuthWrapper otomatik olarak MainScreen'e yönlendirecek
+      // username eksikse MandatorySetupSheet gösterilecek
+      Navigator.popUntil(context, (route) => route.isFirst);
     }
   }
 
@@ -249,6 +246,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         final messenger = ScaffoldMessenger.of(context);
                         try {
                           await context.read<AuthProvider>().signInWithGoogle();
+                          // Başarılı — AuthWrapper otomatik olarak MainScreen'e yönlendirecek
+                          if (mounted) {
+                            Navigator.popUntil(context, (route) => route.isFirst);
+                          }
                         } catch (e) {
                           messenger.showSnackBar(
                             SnackBar(content: Text(_parseAuthError(e))),

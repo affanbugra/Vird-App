@@ -9,12 +9,13 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
+import 'app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/profile_setup_screen.dart';
+import 'widgets/mandatory_setup_sheet.dart';
 import 'screens/auth/magic_link_confirm_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
@@ -130,6 +131,7 @@ class VirdApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal),
         textTheme: GoogleFonts.nunitoTextTheme(),
         scaffoldBackgroundColor: AppColors.white,
+        extensions: const [VirdColors.light],
       ),
       home: AuthWrapper(initialShowHome: showHome, pendingMagicLink: pendingMagicLink),
     );
@@ -162,9 +164,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, auth, child) {
         if (auth.isLoading) return const SplashScreen();
         if (auth.isAuthenticated) {
-          if (auth.needsProfileSetup) {
-            return ProfileSetupScreen(name: auth.user?.displayName ?? '');
-          }
           return const MainScreen();
         }
         // Farklı cihazdan açılan magic link
@@ -199,11 +198,64 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ProfilScreen(),
   ];
 
+  bool _mandatorySheetShown = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _triggerAutoFreeze();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkMandatorySetup());
+  }
+
+  Future<void> _checkMandatorySetup() async {
+    if (_mandatorySheetShown) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final doc = await docRef.get();
+      Map<String, dynamic> data;
+
+      if (!doc.exists || doc.data() == null) {
+        // Google ile giriş yapılmış ama Firestore'a profil yazılamamış
+        final user = FirebaseAuth.instance.currentUser!;
+        data = {
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'city': '',
+          'university': '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isPro': false,
+          'proExpiresAt': null,
+          'hasanat': 0,
+          'seri': 0,
+          'totalPages': 0,
+          'hatimCount': 0,
+        };
+        await docRef.set(data, SetOptions(merge: true));
+      } else {
+        data = doc.data()!;
+      }
+
+      final cinsiyet = data['cinsiyet'] as String?;
+      final username = data['username'] as String?;
+
+      final missingCinsiyet = cinsiyet == null || cinsiyet.isEmpty;
+      final missingUsername = username == null || username.isEmpty;
+
+      if (missingCinsiyet || missingUsername) {
+        if (!mounted) return;
+        _mandatorySheetShown = true;
+        await MandatorySetupSheet.show(context, data);
+        // Sheet kapandıktan sonra tekrar kontrol et (belki kullanıcı tamamlamadı)
+        _mandatorySheetShown = false;
+        if (mounted) _checkMandatorySetup();
+      }
+    } catch (e) {
+      debugPrint('Mandatory setup check error: $e');
+    }
   }
 
   @override

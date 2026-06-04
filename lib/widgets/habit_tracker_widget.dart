@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -619,7 +620,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
     final today = DateTime.now();
     
     // Geçmişe doğru kontrol et
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 365; i++) {
       final d = today.subtract(Duration(days: i));
       final dateStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
       
@@ -662,12 +663,12 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
       margin: const EdgeInsets.symmetric(vertical: 3),
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: isDoneToday ? habit.color.withValues(alpha: 0.1) : AppColors.white,
+        color: isDoneToday ? habit.color.withValues(alpha: 0.18) : AppColors.white,
         border: Border.all(
           color: isDoneToday
-              ? habit.color.withValues(alpha: 0.5)
+              ? habit.color.withValues(alpha: 0.33)
               : AppColors.borderGrey,
-          width: isDoneToday ? 1.5 : 1.0,
+          width: 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -698,16 +699,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: isDoneToday
-                        ? habit.color.withValues(alpha: 0.05)
-                        : habit.color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
+                    color: isDoneToday ? habit.color : habit.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: isDoneToday
+                        ? [BoxShadow(color: habit.color.withValues(alpha: 0.27), blurRadius: 10, offset: const Offset(0, 4))]
+                        : null,
                   ),
                   child: Icon(
                     resolveHabitIcon(habit.iconCode),
-                    color: isDoneToday
-                        ? habit.color.withValues(alpha: 0.45)
-                        : habit.color,
+                    color: isDoneToday ? Colors.white : habit.color,
                     size: 16,
                   ),
                 ),
@@ -723,8 +723,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         style: GoogleFonts.nunito(
                           fontSize: 14.0,
                           fontWeight: FontWeight.w700,
-                          color: isDoneToday ? AppColors.textLight : AppColors.textDark,
-                          decoration: isDoneToday ? TextDecoration.lineThrough : null,
+                          color: AppColors.textDark,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -773,8 +772,8 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                // 7 günlük haftalık takip noktaları
+                const SizedBox(width: 8),
+                // 7 günlük haftalık takip noktaları — onay butonunun solunda
                 if (!isInactive) ...[
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -792,20 +791,27 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                                             dCleanOnDot.day == _selectedDate.day;
                       
                       Color dotColor;
+                      Border? dotBorder;
+
                       if (isInactiveOnDay) {
                         dotColor = Colors.transparent;
+                        dotBorder = Border.all(color: AppColors.borderGrey, width: 1.0);
                       } else if (dCleanOnDot.isAfter(todayClean)) {
-                        dotColor = Colors.transparent;
+                        dotColor = const Color(0xFFE5ECEE);
                       } else if (isDone) {
-                        dotColor = const Color(0xFF52B788); // Yeşil
+                        dotColor = habit.color;
+                      } else if (dCleanOnDot == todayClean) {
+                        dotColor = Colors.white;
+                        dotBorder = Border.all(color: habit.color, width: 2.4);
                       } else {
-                        if (dCleanOnDot == todayClean) {
-                          dotColor = AppColors.borderGrey.withValues(alpha: 0.6); // Bugün
-                        } else {
-                          dotColor = const Color(0xFFF28482).withValues(alpha: 0.7); // Geçmiş yapılmamış
-                        }
+                        dotColor = const Color(0xFFFF8C7A).withValues(alpha: 0.5);
                       }
-                      
+
+                      // Seçili gün göstergesi — bugün+tamamlanmamış stilini bozmuyor
+                      if (isSelectedDay && !(dCleanOnDot == todayClean && !isDone)) {
+                        dotBorder = Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2);
+                      }
+
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 1.5),
                         width: 8,
@@ -813,35 +819,34 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         decoration: BoxDecoration(
                           color: dotColor,
                           shape: BoxShape.circle,
-                          border: isSelectedDay
-                              ? Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2)
-                              : (isInactiveOnDay || dCleanOnDot.isAfter(todayClean)
-                                  ? Border.all(color: AppColors.borderGrey, width: 1.0)
-                                  : null),
+                          border: dotBorder,
                         ),
                       );
                     }),
                   ),
-                  const SizedBox(width: 10),
                 ],
-                // İşaretleme butonu (virdlerim stili)
+                const SizedBox(width: 8),
+                // Onay butonu — en sağda
                 if (!isInactive)
                   GestureDetector(
-                    onTap: () => _toggleHabit(habit),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _toggleHabit(habit);
+                    },
                     child: Container(
-                      width: 24,
-                      height: 24,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isDoneToday ? habit.color : Colors.white,
-                        border: Border.all(
-                          color: isDoneToday ? habit.color : AppColors.borderGrey,
-                          width: 1.8,
-                        ),
+                        border: isDoneToday
+                            ? Border.all(color: habit.color, width: 2.0)
+                            : Border.all(color: const Color(0xFFD0D9DD), width: 2.0),
                       ),
                       child: isDoneToday
-                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
-                        : null,
+                          ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                          : null,
                     ),
                   ),
                 const SizedBox(width: 4),
@@ -1020,11 +1025,16 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 6,
-                        backgroundColor: AppColors.lightGrey,
-                        color: progress == 1.0 ? AppColors.teal : AppColors.orange,
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: progress),
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, animVal, _) => CircularProgressIndicator(
+                          value: animVal,
+                          strokeWidth: 6,
+                          backgroundColor: AppColors.lightGrey,
+                          color: progress == 1.0 ? AppColors.teal : AppColors.orange,
+                        ),
                       ),
                       Center(
                         child: Text(
@@ -1047,7 +1057,9 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       Text(
                         activeHabits.isEmpty
                             ? 'Bu tarih için aktif alışkanlık yok'
-                            : (progress == 1.0 ? 'Harika! Hepsini tamamladın 🎉' : 'Bugün nasılız?'),
+                            : (progress == 1.0
+                                ? 'Harika! Hepsini tamamladın 🎉'
+                                : selDay == todayClean ? 'Bugün nasılız?' : 'Geçmiş Gün'),
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -1093,7 +1105,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
             proxyDecorator: (child, index, animation) {
               return AnimatedBuilder(
                 animation: animation,
-                builder: (context, _) {
+                builder: (context, child) {
                   final t = Curves.easeInOut.transform(animation.value);
                   return Material(
                     color: Colors.transparent,

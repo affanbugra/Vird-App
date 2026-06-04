@@ -34,6 +34,10 @@ class GunlukTakiplerScreen extends StatefulWidget {
 class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     with TickerProviderStateMixin {
   final Map<DateTime, DayRecord> _allRecords = {};
+  // Hangi hafta/ay periyodunun Firestore'dan çekildiğini tutar.
+  // _allRecords.containsKey yerine bunu kullanmak, build sırasında
+  // _getRecordForDate'in oluşturduğu boş kayıtların fetch'i atlatmasını önler.
+  final Set<String> _fetchedPeriods = {};
 
   late final PageController _pageController;
   final int _initialPage = 10000;
@@ -124,12 +128,17 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
     final targetMonday = currentMonday.add(Duration(days: targetOffset * 7));
 
-    // 7 günün verilerini paralel olarak çekelim — cache'te olmayanları
+    // Aynı haftayı tekrar çekme — _allRecords.containsKey kullanmıyoruz çünkü
+    // build sırasında _getRecordForDate boş kayıt oluşturarak fetch'i atlatabiliyor.
+    final weekKey = 'week_${targetMonday.year}-${targetMonday.month}-${targetMonday.day}';
+    if (_fetchedPeriods.contains(weekKey)) return;
+    _fetchedPeriods.add(weekKey);
+
     final daysToFetch = <DateTime>[];
     for (int i = 0; i < 7; i++) {
       final d = targetMonday.add(Duration(days: i));
       if (d.isAfter(todayClean)) break;
-      if (!_allRecords.containsKey(d)) daysToFetch.add(d);
+      daysToFetch.add(d);
     }
     if (daysToFetch.isEmpty) return;
 
@@ -362,13 +371,12 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           onSelected: (val) {
                             if (val == 'all') {
-                              setModalState(() {
-                                for (var time in PrayerTime.values) {
-                                  record.prayers[time] = PrayerStatus.regl;
-                                  _updatePrayer(record, time, PrayerStatus.regl);
-                                }
-                              });
+                              for (var time in PrayerTime.values) {
+                                record.prayers[time] = PrayerStatus.regl;
+                              }
+                              setModalState(() {});
                               setState(() {});
+                              _updatePrayer(record, PrayerTime.sabah, PrayerStatus.regl);
                             } else if (val == 'current') {
                               final newStatus = isRegl ? PrayerStatus.none : PrayerStatus.regl;
                               setModalState(() { record.prayers[selectedTime] = newStatus; });
@@ -485,7 +493,14 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                             activeTextColor: AppColors.tealDark,
                             onTap: () {
                               final next = isKaza ? PrayerStatus.none : PrayerStatus.kaza;
-                              setModalState(() { record.prayers[selectedTime] = next; });
+                              setModalState(() {
+                                record.prayers[selectedTime] = next;
+                                // Kaza seçilince o vaktin sünnetlerini sıfırla —
+                                // aksi halde stats'a yanlış sünnet tamamlandı sayılır.
+                                if (next == PrayerStatus.kaza) {
+                                  record.sunnahs[selectedTime] = _defaultSunnahs(selectedTime);
+                                }
+                              });
                               setState(() {});
                               _updatePrayer(record, selectedTime, next);
                             },
@@ -1317,35 +1332,35 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    // Sadece cache'te olmayan günleri çekiyoruz (Firestore okuma maliyetini düşürür)
+    // Aynı ayı tekrar çekme
+    final monthKey = 'month_$year-$month';
+    if (_fetchedPeriods.contains(monthKey)) return;
+    _fetchedPeriods.add(monthKey);
+
     final today = DateTime.now();
     final todayClean = DateTime(today.year, today.month, today.day);
-    final daysToFetch = <int>[];
-    for (int i = 1; i <= daysInMonth; i++) {
-      final d = DateTime(year, month, i);
-      // Bugün ve önceki günler dahil, gelecek günler atla
-      if (d.isAfter(todayClean)) break;
-      if (!_allRecords.containsKey(d)) daysToFetch.add(i);
-    }
-    if (daysToFetch.isEmpty) return;
+    if (DateTime(year, month, 1).isAfter(todayClean)) return;
 
     try {
-      final futures = daysToFetch.map((i) {
-        final d = DateTime(year, month, i);
-        final dateStr = "prayer_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-        return FirebaseFirestore.instance
-            .collection('users').doc(uid)
-            .collection('logs').doc(dateStr).get();
-      }).toList();
-      final snapshots = await Future.wait(futures);
+      // 30 ayrı read yerine tek range sorgusu — çok daha hızlı
+      final monthStr = '$year-${month.toString().padLeft(2, '0')}';
+      final querySnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .where(FieldPath.documentId, isGreaterThanOrEqualTo: 'prayer_${monthStr}-01')
+          .where(FieldPath.documentId, isLessThanOrEqualTo: 'prayer_${monthStr}-31')
+          .get();
       bool hasChanges = false;
-      for (var doc in snapshots) {
-        if (!doc.exists) continue;
-        final data = doc.data()!;
-        final dateStr = (data['date'] as String).replaceAll('prayer_', '');
+      for (var doc in querySnap.docs) {
+        final data = doc.data();
+        final rawDate = data['date'] as String? ?? '';
+        final dateStr = rawDate.replaceAll('prayer_', '');
+        if (dateStr.isEmpty) continue;
         final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
         final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        if (d.isAfter(todayClean)) continue;
         final Map<String, dynamic> pMap = data['prayers'] ?? {};
         final Map<String, dynamic> tMap = data['tesbihats'] ?? {};
         final Map<String, dynamic> sMap = data['sunnahs'] ?? {};
@@ -1946,7 +1961,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                   }
                 },
                 child: Container(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -2078,7 +2093,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                     ),
                     const SizedBox(height: 10),
                         SizedBox(
-                          height: 100,
+                          height: 78,
                           child: PageView.builder(
                             controller: _pageController,
                             itemCount: _initialPage + 1,
@@ -2139,15 +2154,6 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                             height: 46,
                                             child: CustomPaint(
                                               painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            '${record.date.day}',
-                                            style: GoogleFonts.nunito(
-                                              fontSize: 12,
-                                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                              color: isToday ? AppColors.teal : AppColors.textLight,
                                             ),
                                           ),
                                         ],

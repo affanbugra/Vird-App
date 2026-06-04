@@ -144,7 +144,7 @@ class HabitHeatMapSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: SizedBox(
-              height: 180,
+              height: 160,
               child: _HabitHeatGrid(
                 habitColor: habit.color,
                 completedDateStrs: completedDateStrs,
@@ -227,22 +227,43 @@ class _HabitHeatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Harita alışkanlığın oluşturulduğu aydan başlar
-    final startOfMonth = DateTime(createdAt.year, createdAt.month, 1);
-    // Grid'i Pazartesi'den başlatmak için o haftanın Pazartesi'sini bul
-    final startMonday = startOfMonth.subtract(Duration(days: startOfMonth.weekday - 1));
-    // Alışkanlığın oluşturulduğu gün (saat sıfırlanmış)
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
     final createdDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
-    
-    // 52 hafta (1 yıl) ileriye doğru
-    const int totalWeeks = 52;
-    const double squareSize = 14;
-    const double gap = 4;
+
+    final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
+    final startMonday = createdDay.subtract(Duration(days: createdDay.weekday - 1));
+    final totalWeeks = (currentMonday.difference(startMonday).inDays ~/ 7) + 1;
+
+    const double squareSize = 16;
+    const double gap = 3;
+    const List<String> monthNames = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+
+    // Ay etiketlerini önceden hesapla — çakışmayı önlemek için min 2 kolon boşluk
+    final Map<int, String> labelMap = {};
+    int lastLabelCol = -10;
+    String? pendingLabel;
+    for (int i = 0; i < totalWeeks; i++) {
+      final wm = currentMonday.subtract(Duration(days: i * 7));
+      if (i == 0) {
+        labelMap[0] = monthNames[wm.month - 1];
+        lastLabelCol = 0;
+      } else {
+        final prevWm = currentMonday.subtract(Duration(days: (i - 1) * 7));
+        if (prevWm.month != wm.month) {
+          pendingLabel = monthNames[wm.month - 1];
+        }
+        if (pendingLabel != null && (i - lastLabelCol) >= 2) {
+          labelMap[i] = pendingLabel;
+          lastLabelCol = i;
+          pendingLabel = null;
+        }
+      }
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Y-axis labels (Days of week)
         Padding(
           padding: const EdgeInsets.only(top: 14.0, right: 8.0),
           child: Column(
@@ -259,27 +280,18 @@ class _HabitHeatGrid extends StatelessWidget {
             ],
           ),
         ),
-        
-        // Heatmap Grid
+
         Expanded(
           child: ListView.builder(
-            reverse: false, // Soldan sağa doğru
             scrollDirection: Axis.horizontal,
             itemCount: totalWeeks,
             itemBuilder: (context, index) {
-              final weekMonday = startMonday.add(Duration(days: index * 7));
-              
-              // Only show month label if it's the first week of a month
-              String? monthLabel;
-              if (weekMonday.day <= 7) {
-                final monthNames = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-                monthLabel = monthNames[weekMonday.month - 1];
-              }
+              final weekMonday = currentMonday.subtract(Duration(days: index * 7));
+              final monthLabel = labelMap[index];
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Month Label Header
                   SizedBox(
                     height: 14,
                     width: squareSize + gap,
@@ -296,34 +308,41 @@ class _HabitHeatGrid extends StatelessWidget {
                           )
                         : null,
                   ),
-                  
-                  // 7 days of the week
                   ...List.generate(7, (dayIndex) {
                     final d = weekMonday.add(Duration(days: dayIndex));
                     final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
                     final isDone = completedDateStrs.contains(dStr);
-                    final today = DateTime.now();
-                    final todayClean = DateTime(today.year, today.month, today.day);
                     final isFuture = d.isAfter(todayClean);
                     final isBeforeCreation = d.isBefore(createdDay);
+                    final isActive = !isBeforeCreation && !isFuture;
 
                     return Container(
                       width: squareSize,
                       height: squareSize,
                       margin: const EdgeInsets.only(bottom: gap, right: gap),
                       decoration: BoxDecoration(
-                        color: isBeforeCreation
-                            ? Colors.transparent
-                            : isFuture
-                                ? Colors.transparent
-                                : (isDone ? habitColor : AppColors.borderGrey.withValues(alpha: 0.3)),
+                        color: isActive
+                            ? (isDone ? habitColor : AppColors.borderGrey.withValues(alpha: 0.3))
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(3),
-                        border: isBeforeCreation || isFuture
-                            ? Border.all(color: AppColors.borderGrey.withValues(alpha: 0.08))
-                            : Border.all(
-                                color: isDone ? habitColor.withValues(alpha: 0.5) : Colors.transparent,
-                              )
+                        border: isActive
+                            ? Border.all(color: isDone ? habitColor.withValues(alpha: 0.5) : Colors.transparent)
+                            : Border.all(color: AppColors.borderGrey.withValues(alpha: 0.08)),
                       ),
+                      child: isActive
+                          ? Center(
+                              child: Text(
+                                '${d.day}',
+                                style: TextStyle(
+                                  fontSize: 6.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDone
+                                      ? Colors.white.withValues(alpha: 0.5)
+                                      : AppColors.textDark.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            )
+                          : null,
                     );
                   }),
                 ],

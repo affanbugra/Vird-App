@@ -18,8 +18,8 @@ class MandatorySetupSheet extends StatefulWidget {
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false, // Kapatılamaz yap
+      builder: (context) => PopScope(
+        canPop: false, // Kapatılamaz yap
         child: Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: MandatorySetupSheet(userData: userData),
@@ -36,6 +36,7 @@ class _MandatorySetupSheetState extends State<MandatorySetupSheet> {
   bool _isLoading = false;
   String? _selectedCinsiyet;
   bool _cinsiyetError = false;
+  bool _cinsiyetLocked = false;
 
   final _usernameCtrl = TextEditingController();
   String? _usernameStatus;
@@ -47,6 +48,8 @@ class _MandatorySetupSheetState extends State<MandatorySetupSheet> {
     super.initState();
     // Mevcut verileri doldur
     _selectedCinsiyet = widget.userData['cinsiyet'] as String?;
+    // Cinsiyet zaten seçilmişse kilitli olsun (değiştirilemez)
+    _cinsiyetLocked = _selectedCinsiyet != null && _selectedCinsiyet!.isNotEmpty;
     final existingUsername = widget.userData['username'] as String?;
     if (existingUsername != null && existingUsername.isNotEmpty) {
       _usernameCtrl.text = existingUsername;
@@ -202,7 +205,9 @@ class _MandatorySetupSheetState extends State<MandatorySetupSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Uygulamayı kullanmaya devam edebilmek için kullanıcı adı ve cinsiyet seçimi yapmanız gerekmektedir.',
+            _cinsiyetLocked
+                ? 'Uygulamayı kullanmaya devam edebilmek için kullanıcı adı seçimi yapmanız gerekmektedir.'
+                : 'Uygulamayı kullanmaya devam edebilmek için kullanıcı adı ve cinsiyet seçimi yapmanız gerekmektedir.',
             style: GoogleFonts.nunito(
               fontSize: 14,
               color: context.colors.textSecondary,
@@ -212,55 +217,57 @@ class _MandatorySetupSheetState extends State<MandatorySetupSheet> {
           const SizedBox(height: 28),
           
           // Cinsiyet Seçimi
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Cinsiyet',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: context.colors.textSecondary,
+          if (!_cinsiyetLocked) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Cinsiyet',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text('*', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 11, color: Color(0xFFBBAB00)),
-                  const SizedBox(width: 4),
-                  const Expanded(
-                    child: Text(
-                      'Bu seçim yalnızca bir kez yapılabilir ve daha sonra değiştirilemez.',
-                      style: TextStyle(fontSize: 10, color: Color(0xFFAA9000), height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _CinsiyetToggle(
-                secili: _selectedCinsiyet,
-                onChanged: (val) => setState(() {
-                  _selectedCinsiyet = val;
-                  _cinsiyetError = false;
-                }),
-              ),
-              if (_cinsiyetError)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, left: 4),
-                  child: Text(
-                    'Lütfen bir seçenek belirtin.',
-                    style: TextStyle(fontSize: 11, color: Colors.red.shade400),
-                  ),
+                    const SizedBox(width: 4),
+                    const Text('*', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline, size: 11, color: Color(0xFFBBAB00)),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'Bu seçim yalnızca bir kez yapılabilir ve daha sonra değiştirilemez.',
+                        style: TextStyle(fontSize: 10, color: Color(0xFFAA9000), height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _CinsiyetToggle(
+                  secili: _selectedCinsiyet,
+                  onChanged: (val) => setState(() {
+                    _selectedCinsiyet = val;
+                    _cinsiyetError = false;
+                  }),
+                ),
+                if (_cinsiyetError)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, left: 4),
+                    child: Text(
+                      'Lütfen bir seçenek belirtin.',
+                      style: TextStyle(fontSize: 11, color: Colors.red.shade400),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Kullanıcı Adı Seçimi
           Row(
