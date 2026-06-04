@@ -51,118 +51,139 @@ class HabitHeatMapSheet extends StatelessWidget {
         color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 10),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.borderGrey,
-                borderRadius: BorderRadius.circular(999),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 10),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
             ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 12, 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 32,
-                  decoration: BoxDecoration(
+            
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 12, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: habit.color,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          habit.title,
+                          style: GoogleFonts.nunito(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        Text(
+                          'Devamlılık Haritası',
+                          style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textMid, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Divider(height: 1, color: AppColors.borderGrey),
+            
+            // İstatistikler
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Row(
+                children: [
+                  _StatCard(
+                    title: 'Ateş Serisi',
+                    value: '$currentStreak',
+                    icon: '🔥',
+                    color: AppColors.orange,
+                  ),
+                  const SizedBox(width: 16),
+                  _StatCard(
+                    title: 'Toplam Gün',
+                    value: '${completedDateStrs.length}',
+                    icon: '⭐',
                     color: habit.color,
-                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ],
+              ),
+            ),
+  
+            if (hadithText != null && hadithText!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Text(
+                  'Fazilet',
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: habit.color.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: habit.color.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        habit.title,
-                        style: GoogleFonts.nunito(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
+                      Icon(Icons.star_rounded, color: habit.color, size: 12),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          hadithText!,
+                          style: GoogleFonts.nunito(
+                            fontSize: 10.5,
+                            color: AppColors.textDark,
+                            height: 1.35,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Devamlılık Haritası',
-                        style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textMid, size: 24),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-          
-          const Divider(height: 1, color: AppColors.borderGrey),
-          
-          // İstatistikler
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Row(
-              children: [
-                _StatCard(
-                  title: 'Ateş Serisi',
-                  value: '$currentStreak',
-                  icon: '🔥',
-                  color: AppColors.orange,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Toplam Gün',
-                  value: '${completedDateStrs.length}',
-                  icon: '⭐',
-                  color: habit.color,
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
-            child: Text(
-              'Alışkanlık Haritası',
-              style: GoogleFonts.nunito(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
               ),
-            ),
-          ),
-          
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: SizedBox(
-              height: 160,
-              child: _HabitHeatGrid(
-                habitColor: habit.color,
-                completedDateStrs: completedDateStrs,
-                createdAt: createdAt,
-              ),
-            ),
-          ),
+              const SizedBox(height: 10),
+            ],
 
-          if (hadithText != null && hadithText!.isNotEmpty) ...[
-            const SizedBox(height: 20),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
               child: Text(
-                'Fazilet',
+                'Alışkanlık Haritası',
                 style: GoogleFonts.nunito(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -170,40 +191,20 @@ class HabitHeatMapSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: habit.color.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: habit.color.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.star_rounded, color: habit.color, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        hadithText!,
-                        style: GoogleFonts.nunito(
-                          fontSize: 13,
-                          color: AppColors.textDark,
-                          height: 1.55,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
+              child: SizedBox(
+                height: 160,
+                child: _HabitHeatGrid(
+                  habitColor: habit.color,
+                  completedDateStrs: completedDateStrs,
+                  createdAt: createdAt,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -226,7 +227,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
@@ -249,7 +250,7 @@ class _StatCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               value,
               style: GoogleFonts.nunito(
@@ -280,27 +281,46 @@ class _HabitHeatGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final todayClean = DateTime(today.year, today.month, today.day);
-    final createdDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
+
+    // Başlangıç tarihi hesabı açtığı gün (createdAt) veya en eski tamamlama tarihidir
+    DateTime effectiveStartDate = createdAt;
+    for (final dateStr in completedDateStrs) {
+      try {
+        final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
+        final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        if (d.isBefore(effectiveStartDate)) effectiveStartDate = d;
+      } catch (_) {}
+    }
 
     final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
-    final startMonday = createdDay.subtract(Duration(days: createdDay.weekday - 1));
-    final totalWeeks = (currentMonday.difference(startMonday).inDays ~/ 7) + 1;
+    final startMonday = effectiveStartDate.subtract(Duration(days: effectiveStartDate.weekday - 1));
+    
+    // Her zaman 1 yıllık harita (53 hafta) gösterilir
+    const int totalWeeks = 53;
+
+    // Mevcut haftanın indeksini bul (left-to-right kronolojik sırada kaçıncı kolona denk geldiği)
+    final currentWeekIndex = currentMonday.difference(startMonday).inDays ~/ 7;
+    // Mevcut haftayı görünür kılmak için kaydırma offseti (kolon genişliği 16 + gap 3 = 19)
+    final scrollOffset = currentWeekIndex >= 3 
+        ? (currentWeekIndex - 2) * 19.0 
+        : 0.0;
 
     const double squareSize = 16;
     const double gap = 3;
     const List<String> monthNames = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
-    // Ay etiketlerini önceden hesapla — çakışmayı önlemek için min 2 kolon boşluk
+    // Ay etiketlerini önceden hesapla — soldan sağa kronolojik sırada
     final Map<int, String> labelMap = {};
     int lastLabelCol = -10;
     String? pendingLabel;
     for (int i = 0; i < totalWeeks; i++) {
-      final wm = currentMonday.subtract(Duration(days: i * 7));
+      final wm = startMonday.add(Duration(days: i * 7));
       if (i == 0) {
         labelMap[0] = monthNames[wm.month - 1];
         lastLabelCol = 0;
       } else {
-        final prevWm = currentMonday.subtract(Duration(days: (i - 1) * 7));
+        final prevWm = startMonday.add(Duration(days: (i - 1) * 7));
         if (prevWm.month != wm.month) {
           pendingLabel = monthNames[wm.month - 1];
         }
@@ -322,11 +342,11 @@ class _HabitHeatGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               _dayLabel('Pzt', squareSize, gap),
-              _dayLabel('', squareSize, gap),
+              _dayLabel('Sal', squareSize, gap),
               _dayLabel('Çar', squareSize, gap),
-              _dayLabel('', squareSize, gap),
+              _dayLabel('Per', squareSize, gap),
               _dayLabel('Cum', squareSize, gap),
-              _dayLabel('', squareSize, gap),
+              _dayLabel('Cmt', squareSize, gap),
               _dayLabel('Paz', squareSize, gap),
             ],
           ),
@@ -334,10 +354,11 @@ class _HabitHeatGrid extends StatelessWidget {
 
         Expanded(
           child: ListView.builder(
+            controller: ScrollController(initialScrollOffset: scrollOffset),
             scrollDirection: Axis.horizontal,
             itemCount: totalWeeks,
             itemBuilder: (context, index) {
-              final weekMonday = currentMonday.subtract(Duration(days: index * 7));
+              final weekMonday = startMonday.add(Duration(days: index * 7));
               final monthLabel = labelMap[index];
 
               return Column(
@@ -364,23 +385,38 @@ class _HabitHeatGrid extends StatelessWidget {
                     final dStr = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
                     final isDone = completedDateStrs.contains(dStr);
                     final isFuture = d.isAfter(todayClean);
-                    final isBeforeCreation = d.isBefore(createdDay);
-                    final isActive = !isBeforeCreation && !isFuture;
+                    final isBeforeCreation = d.isBefore(effectiveStartDate);
+
+                    Color boxColor;
+                    Border boxBorder;
+
+                    if (isBeforeCreation) {
+                      boxColor = Colors.transparent;
+                      boxBorder = const Border.fromBorderSide(BorderSide.none);
+                    } else if (isFuture) {
+                      boxColor = Colors.transparent;
+                      boxBorder = Border.all(
+                        color: AppColors.borderGrey.withValues(alpha: 0.25),
+                        width: 1.0,
+                      );
+                    } else {
+                      boxColor = isDone ? habitColor : AppColors.borderGrey.withValues(alpha: 0.3);
+                      boxBorder = Border.all(
+                        color: isDone ? habitColor.withValues(alpha: 0.5) : Colors.transparent,
+                        width: 1.0,
+                      );
+                    }
 
                     return Container(
                       width: squareSize,
                       height: squareSize,
                       margin: const EdgeInsets.only(bottom: gap, right: gap),
                       decoration: BoxDecoration(
-                        color: isActive
-                            ? (isDone ? habitColor : AppColors.borderGrey.withValues(alpha: 0.3))
-                            : Colors.transparent,
+                        color: boxColor,
                         borderRadius: BorderRadius.circular(3),
-                        border: isActive
-                            ? Border.all(color: isDone ? habitColor.withValues(alpha: 0.5) : Colors.transparent)
-                            : Border.all(color: AppColors.borderGrey.withValues(alpha: 0.08)),
+                        border: boxBorder,
                       ),
-                      child: isActive
+                      child: (!isBeforeCreation && !isFuture)
                           ? Center(
                               child: Text(
                                 '${d.day}',
@@ -413,7 +449,7 @@ class _HabitHeatGrid extends StatelessWidget {
       child: Text(
         text,
         style: GoogleFonts.nunito(
-          fontSize: 10,
+          fontSize: 8,
           fontWeight: FontWeight.w600,
           color: AppColors.textMid,
         ),

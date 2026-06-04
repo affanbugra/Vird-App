@@ -53,7 +53,8 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         .doc(_uid)
         .snapshots()
         .map((snap) {
-      final List<VirdItem> list = VirdItem.defaultVirds.map((e) => e.copyWith()).toList();
+      // Yeni kullanıcılar için varsayılan olarak hepsi kapalı; kullanıcı prefsMap'te aktif etmediyse gösterilmez
+      final List<VirdItem> list = VirdItem.defaultVirds.map((e) => e.copyWith(active: false)).toList();
       final userData = snap.data() ?? {};
       final prefsMap = userData['virdPreferences'] as Map<String, dynamic>? ?? {};
 

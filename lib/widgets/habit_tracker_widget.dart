@@ -110,6 +110,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
   bool get wantKeepAlive => true;
   bool _isLoading = true;
   List<HabitDef> _habits = [];
+  DateTime? _userCreatedAt;
 
   // dateStr -> { habitId: bool }
   final Map<String, Map<String, bool>> _logs = {};
@@ -134,6 +135,17 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
     setState(() => _isLoading = true);
 
     try {
+      // 0. Fetch User Doc for createdAt
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() ?? {};
+        final createdAtTs = userData['createdAt'] as Timestamp?;
+        _userCreatedAt = createdAtTs?.toDate();
+      }
+
       // 1. Fetch Habit Defs
       final defsDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -217,33 +229,24 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
         ? resolveHabitIcon(editingHabit.iconCode)
         : Icons.star_rounded;
     final colors = [
-      // 1. Kırmızı & Mercan Tonları
-      const Color(0xFFE63946), // Premium Kırmızı
       const Color(0xFFD63031), // Klasik Koyu Kırmızı
+      const Color(0xFFE63946), // Premium Kırmızı
       const Color(0xFFF07167), // Pastel Mercan
-      const Color(0xFFE07A5F), // Sıcak Kiremit
-
-      // 2. Turuncu & Altın Tonları
+      const Color(0xFFE07A5F), // Sıcak Kiremit / Terracotta
       AppColors.orange,        // Canlı Turuncu
       const Color(0xFFF4A261), // Pastel Şeftali
       AppColors.gold,          // Canlı Altın
       const Color(0xFFE9C46A), // Hardal Kum Sarısı
-
-      // 3. Yeşil Tonları
+      const Color(0xFF81B29A), // Adaçayı/Sage Yeşili
+      const Color(0xFF4CAF50), // Doğa Yeşili
       AppColors.emeraldGreen,  // Zümrüt Yeşili
       const Color(0xFF2A9D8F), // Çam Yeşili
-      const Color(0xFF4CAF50), // Doğa Yeşili
-      const Color(0xFF81B29A), // Adaçayı Yeşili
-
-      // 4. Mavi & Turkuaz Tonları
       AppColors.teal,          // Uygulama Teali
       const Color(0xFF00B4D8), // Okyanus Mavisi
       AppColors.infoBlue,      // Gökyüzü Mavisi
       const Color(0xFF4361EE), // Kraliyet Mavisi
-
-      // 5. Mor & Pembe Tonları
-      const Color(0xFF7209B7), // Premium Mor
       const Color(0xFF9B5DE5), // Lavanta
+      const Color(0xFF7209B7), // Premium Mor
       const Color(0xFFB5179E), // Canlı Magenta
       const Color(0xFFFF85A1), // Gül Pembesi
     ];
@@ -311,15 +314,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         color: AppColors.textMid,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: kHabitIcons.length,
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
+                        crossAxisCount: 8,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
                         childAspectRatio: 1,
                       ),
                       itemBuilder: (_, idx) {
@@ -332,21 +335,21 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                               color: isSelected
                                   ? selectedColor.withValues(alpha: 0.15)
                                   : AppColors.lightGrey,
-                              shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(10),
                               border: isSelected
-                                  ? Border.all(color: selectedColor, width: 2)
+                                  ? Border.all(color: selectedColor, width: 1.5)
                                   : null,
                             ),
                             child: Icon(
                               icon,
-                              size: 22,
+                              size: 16,
                               color: isSelected ? selectedColor : AppColors.textMid,
                             ),
                           ),
                         );
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Text(
                       'Renk Seçin',
                       style: GoogleFonts.nunito(
@@ -355,15 +358,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         color: AppColors.textMid,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: colors.length,
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
+                        crossAxisCount: 10,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
                         childAspectRatio: 1,
                       ),
                       itemBuilder: (_, idx) {
@@ -375,13 +378,13 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                             decoration: BoxDecoration(
                               color: c,
                               shape: BoxShape.circle,
-                              border: isSelected ? Border.all(color: AppColors.textDark, width: 3) : null,
+                              border: isSelected ? Border.all(color: AppColors.textDark, width: 2) : null,
                             ),
                           ),
                         );
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -687,7 +690,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
               habit: habit,
               completedDateStrs: completedStrs,
               currentStreak: streak,
-              createdAt: habit.createdAt,
+              createdAt: _userCreatedAt ?? habit.createdAt,
             );
           },
           child: Padding(
@@ -796,15 +799,13 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       if (isInactiveOnDay) {
                         dotColor = Colors.transparent;
                         dotBorder = Border.all(color: AppColors.borderGrey, width: 1.0);
-                      } else if (dCleanOnDot.isAfter(todayClean)) {
-                        dotColor = const Color(0xFFE5ECEE);
                       } else if (isDone) {
                         dotColor = habit.color;
                       } else if (dCleanOnDot == todayClean) {
                         dotColor = Colors.white;
-                        dotBorder = Border.all(color: habit.color, width: 2.4);
+                        dotBorder = Border.all(color: habit.color, width: 1.0);
                       } else {
-                        dotColor = const Color(0xFFFF8C7A).withValues(alpha: 0.5);
+                        dotColor = const Color(0xFFE5ECEE);
                       }
 
                       // Seçili gün göstergesi — bugün+tamamlanmamış stilini bozmuyor
@@ -1081,18 +1082,18 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
           ),
 
         if (_habits.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(24),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderGrey),
-            ),
-            child: Text(
-              "Henüz bir alışkanlık eklemedin.\nSağ üstteki + butonundan başlayabilirsin.",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(color: AppColors.textMid),
+          Padding(
+            padding: const EdgeInsets.only(top: 36, bottom: 24),
+            child: Center(
+              child: Text(
+                "Henüz bir alışkanlık eklemedin.\nSağ üstteki + butonundan başlayabilirsin.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  color: AppColors.textLight,
+                  fontSize: 12.5,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
 

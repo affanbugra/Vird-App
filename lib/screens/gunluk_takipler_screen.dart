@@ -57,6 +57,11 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     });
     _fetchWeekData(0);
     _fetchWeekData(-1);
+
+    // Cari ay verilerini arka planda önceden yükle (hızlandırma için)
+    final now = DateTime.now();
+    _fetchMonthData(now.year, now.month);
+
     _loadSavedTab();
   }
 
@@ -1428,12 +1433,19 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
         return StatefulBuilder(
           builder: (sheetCtx, setSheetState) {
             Future<void> ensureMonthLoaded() async {
-              isMonthLoading = true;
-              if (sheetCtx.mounted) setSheetState(() {});
-              await _fetchMonthData(displayYear, displayMonth);
-              if (!sheetCtx.mounted) return;
-              isMonthLoading = false;
-              setSheetState(() {});
+              final monthKey = 'month_$displayYear-$displayMonth';
+              final alreadyFetched = _fetchedPeriods.contains(monthKey);
+
+              if (!alreadyFetched) {
+                isMonthLoading = true;
+                if (sheetCtx.mounted) setSheetState(() {});
+                await _fetchMonthData(displayYear, displayMonth);
+                if (!sheetCtx.mounted) return;
+                isMonthLoading = false;
+                setSheetState(() {});
+              } else {
+                if (sheetCtx.mounted) setSheetState(() {});
+              }
             }
 
             if (!initialFetched) {
@@ -1467,91 +1479,84 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
-                    child: Row(
+                  SizedBox(
+                    height: 40,
+                    width: double.infinity,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () {
-                            setSheetState(() {
-                              displayMonth--;
-                              if (displayMonth < 1) {
-                                displayMonth = 12;
-                                displayYear--;
-                              }
-                            });
-                            ensureMonthLoaded();
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.all(6),
-                            child: Icon(Icons.chevron_left_rounded,
-                                color: AppColors.textDark, size: 22),
+                        SizedBox(
+                          width: 220,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () {
+                                  setSheetState(() {
+                                    displayMonth--;
+                                    if (displayMonth < 1) {
+                                      displayMonth = 12;
+                                      displayYear--;
+                                    }
+                                  });
+                                  ensureMonthLoaded();
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.all(6),
+                                  child: Icon(Icons.chevron_left_rounded,
+                                      color: AppColors.textDark, size: 22),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  '${_getMonthName(displayMonth)} $displayYear',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              isCurrentMonth
+                                  ? const SizedBox(width: 34)
+                                  : InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        setSheetState(() {
+                                          displayMonth++;
+                                          if (displayMonth > 12) {
+                                            displayMonth = 1;
+                                            displayYear++;
+                                          }
+                                        });
+                                        ensureMonthLoaded();
+                                      },
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(6),
+                                        child: Icon(Icons.chevron_right_rounded,
+                                            color: AppColors.textDark, size: 22),
+                                      ),
+                                    ),
+                            ],
                           ),
                         ),
-                        Expanded(
-                          child: Text(
-                            '${_getMonthName(displayMonth)} $displayYear',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.nunito(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textDark,
-                            ),
+                        Positioned(
+                          right: 16,
+                          child: IconButton(
+                            icon: const Icon(Icons.close,
+                                color: AppColors.textMid, size: 20),
+                            onPressed: () => Navigator.pop(sheetCtx),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
                         ),
-                        if (!isCurrentMonth)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () {
-                              setSheetState(() {
-                                displayMonth++;
-                                if (displayMonth > 12) {
-                                  displayMonth = 1;
-                                  displayYear++;
-                                }
-                              });
-                              ensureMonthLoaded();
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: Icon(Icons.chevron_right_rounded,
-                                  color: AppColors.textDark, size: 22),
-                            ),
-                          )
-                        else
-                          const SizedBox(width: 34),
-                        IconButton(
-                          icon: const Icon(Icons.close,
-                              color: AppColors.textMid, size: 20),
-                          onPressed: () => Navigator.pop(sheetCtx),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 8),
                       ],
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
-                          .map((d) => Expanded(
-                                child: Text(
-                                  d,
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textLight,
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                  ),
                   Flexible(
                     child: SingleChildScrollView(
                       child: GestureDetector(
@@ -1583,16 +1588,34 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
                           child: Column(
                             children: [
+                              _buildMonthlyStats(
+                                  displayYear, displayMonth, cinsiyet,
+                                  isLoading: isMonthLoading),
+                              const SizedBox(height: 10),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                child: Row(
+                                  children: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+                                      .map((d) => Expanded(
+                                            child: Text(
+                                              d,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.nunito(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.textLight,
+                                              ),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
                               _buildMonthlyGrid(
                                   displayYear,
                                   displayMonth,
                                   cinsiyet,
                                   sheetCtx,
                                   () => setSheetState(() {})),
-                              const SizedBox(height: 16),
-                              _buildMonthlyStats(
-                                  displayYear, displayMonth, cinsiyet,
-                                  isLoading: isMonthLoading),
                             ],
                           ),
                         ),
@@ -1706,38 +1729,34 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                   label: 'Vaktinde',
                   done: onTimeCount,
                   total: eligiblePrayers,
-                  detail: '$onTimeCount / $eligiblePrayers vakit',
+                  detail: '$onTimeCount/$eligiblePrayers',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _gaugeCell(
                   label: 'Cemaat',
                   done: cemaatCount,
                   total: eligiblePrayers,
-                  detail: '$cemaatCount vakit',
+                  detail: '$cemaatCount/$eligiblePrayers',
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
+              const SizedBox(width: 6),
               Expanded(
                 child: _gaugeCell(
                   label: 'Sünnet',
                   done: doneSunnahs,
                   total: eligibleSunnahs,
-                  detail: '$doneSunnahs / $eligibleSunnahs',
+                  detail: '$doneSunnahs/$eligibleSunnahs',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _gaugeCell(
                   label: 'Tesbihat',
                   done: doneTesbihats,
                   total: eligibleTesbihats,
-                  detail: '$doneTesbihats / $eligibleTesbihats',
+                  detail: '$doneTesbihats/$eligibleTesbihats',
                 ),
               ),
             ],
@@ -1769,17 +1788,18 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     return Semantics(
       label: '$label %$pctInt — $detail',
       child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.borderGrey),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               child: TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.0, end: hasData ? ratio : 0.0),
                 duration: const Duration(milliseconds: 700),
@@ -1795,14 +1815,14 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           color: ringColor,
                           backgroundColor:
                               AppColors.borderGrey.withValues(alpha: 0.45),
-                          strokeWidth: 5.0,
+                          strokeWidth: 4.0,
                         ),
                       ),
                       Center(
                         child: Text(
                           hasData ? '%${(animValue * 100).round()}' : '—',
                           style: GoogleFonts.nunito(
-                            fontSize: 10.5,
+                            fontSize: 9,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textDark,
                           ),
@@ -1813,35 +1833,32 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 },
               ),
             ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  detail,
-                  style: GoogleFonts.nunito(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textLight,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 2),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textLight,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1859,14 +1876,14 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     return Column(
       children: List.generate(rows, (rowIdx) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
             children: List.generate(7, (colIdx) {
               final cellIdx = rowIdx * 7 + colIdx;
               final dayNum = cellIdx - leadingEmpty + 1;
 
               if (dayNum < 1 || dayNum > daysInMonth) {
-                return const Expanded(child: SizedBox(height: 56));
+                return const Expanded(child: SizedBox(height: 44));
               }
 
               final cellDate = DateTime(year, month, dayNum);
@@ -1887,7 +1904,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           onRecordChanged();
                         },
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 3),
                     child: Opacity(
                       opacity: isFuture ? 0.35 : 1.0,
                       child: Column(
@@ -1896,15 +1913,15 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           Text(
                             '$dayNum',
                             style: GoogleFonts.nunito(
-                              fontSize: 10,
+                              fontSize: 9.5,
                               fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                               color: isToday ? AppColors.teal : AppColors.textLight,
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           SizedBox(
-                            width: 34,
-                            height: 34,
+                            width: 30,
+                            height: 30,
                             child: CustomPaint(
                               painter: PrayerPieChartPainter(
                                 record.prayers,

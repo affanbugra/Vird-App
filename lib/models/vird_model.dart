@@ -99,7 +99,7 @@ class VirdItem {
           recommendedTime: 'Sabah Namazı Sonrası',
           description: 'Sabah namazını müteakip okunması tavsiye edilir.',
           hadith: 'Yâsîn, Kur\'an\'ın kalbidir. Onu bir kimse ancak Allah\'ı ve ahiret yurdunu dileyerek okursa, Allah onu bağışlar. Ölülerinize Yâsîn okuyunuz. (Ebû Dâvûd, Cenâiz, 24)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'fetih',
@@ -110,7 +110,7 @@ class VirdItem {
           recommendedTime: 'Öğle Namazı Sonrası',
           description: 'Öğle namazından sonra okunması tavsiye edilir.',
           hadith: 'Kim Fetih suresini okursa, Mekke\'nin fethinde Resûlullah ile beraber bulunmuş gibi sevap kazanır. Geceleyin bu sureyi okumak bütün dünyadan daha sevgilidir.',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'nebe',
@@ -121,7 +121,7 @@ class VirdItem {
           recommendedTime: 'İkindi Namazı Sonrası',
           description: 'İkindi namazından sonra okunması faziletlidir.',
           hadith: 'İkindi namazından sonra Nebe suresini okuyana Allah büyük bir mükafat verir ve onu kıyamet gününün dehşetinden korur.',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'vakia',
@@ -132,7 +132,7 @@ class VirdItem {
           recommendedTime: 'Akşam Namazı Sonrası',
           description: 'Akşam namazından sonra okumak zenginlik ve bereket vesilesidir.',
           hadith: 'Her kim her gece Vâkıa suresini okursa, ona asla fakirlik dokunmaz. (Beyhakî, Şuabu\'l-İman, 2/491)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'mulk',
@@ -143,7 +143,7 @@ class VirdItem {
           recommendedTime: 'Yatsı Namazı Sonrası',
           description: 'Yatsı namazından sonra okumak kabir azabından koruyucudur.',
           hadith: 'Kur\'an\'da otuz ayetlik bir sure vardır ki, okuyana şefaat eder ve günahları bağışlanır. O, Mülk suresidir. (Ebû Dâvûd, Salât, 327)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'kehf',
@@ -154,7 +154,7 @@ class VirdItem {
           recommendedTime: 'Cuma Gününe Özel',
           description: 'Cuma günleri okunması çok faziletlidir.',
           hadith: 'Kim Cuma günü Kehf suresini okursa, altından semaya kadar kendisi için bir nur parıldar. Bu nur kıyamet gününde onu aydınlatır ve iki Cuma arasındaki günahları bağışlanır. (Tirmizî)',
-          active: true,
+          active: false,
         ),
 
         // --- ZİKİRLER ---
@@ -167,7 +167,7 @@ class VirdItem {
           recommendedTime: 'Günlük',
           description: 'Günde 100 defa okunması günahların dökülmesine vesiledir.',
           hadith: 'Kim günde yüz defa \'Sübhanallahi ve bi-hamdihî\' derse, günahları deniz köpüğü kadar bile olsa bağışlanır. (Buhârî, Deavât, 65)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'salavat',
@@ -178,7 +178,7 @@ class VirdItem {
           recommendedTime: 'Günlük',
           description: 'Resûlullah Efendimiz\'e (sav) salat ve selam getirmek.',
           hadith: 'Kim bana bir defa salâtü selâm getirirse, Allah Teâlâ ona on defa rahmet eder, on günahını siler ve derecesini on kat yükseltir. (Nesâî, Sehv, 55)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'istigfar',
@@ -189,7 +189,7 @@ class VirdItem {
           recommendedTime: 'Günlük',
           description: 'Bağışlanma dilemek ve manevi ferahlık.',
           hadith: 'Kim istiğfara devam ederse, Allah ona her darlıktan bir çıkış, her kederden bir kurtuluş yolu açar ve onu ummadığı yerden rızıklandırır. (Ebû Dâvûd, Vitir, 26)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'kelime_i_tevhid',
@@ -224,7 +224,7 @@ class VirdItem {
           recommendedTime: 'Sabah ve Akşam',
           description: 'Tövbe ve istiğfar dualarının en büyüğü.',
           hadith: 'Kim bu Seyyidül İstiğfar duasını inanarak sabahleyin okur da o gün akşama ermeden ölürse cennetliklerdendir. Akşamleyin okur da sabaha ermeden ölürse yine cennetliklerdendir. (Buhârî, Deavât, 2)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'ayetel_kursi',
@@ -235,7 +235,7 @@ class VirdItem {
           recommendedTime: 'Farz Namazların Ardından',
           description: 'Farz namazlardan sonra okunması faziletlidir.',
           hadith: 'Her kim her farz namazın arkasından Ayete\'l-Kürsî\'yi okursa, cennete girmesine ölümden başka hiçbir şey engel olamaz. (Nesâî, Amelü\'l-Yevm, 100)',
-          active: true,
+          active: false,
         ),
         VirdItem(
           id: 'amenerrasulu',

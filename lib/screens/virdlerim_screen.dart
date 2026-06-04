@@ -35,6 +35,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
   bool _loadingPreferences = true;
   StreamSubscription? _prefsSub;
   StreamSubscription? _logSub;
+  DateTime? _userCreatedAt;
 
   @override
   void initState() {
@@ -71,6 +72,8 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       final List<VirdItem> allVirds = VirdItem.defaultVirds.map((e) => e.copyWith(active: false)).toList();
       final userData = userSnap.data() ?? {};
       final prefsMap = userData['virdPreferences'] as Map<String, dynamic>? ?? {};
+      final createdAtTs = userData['createdAt'] as Timestamp?;
+      final userCreatedAt = createdAtTs?.toDate();
 
       prefsMap.forEach((id, val) {
         final map = Map<String, dynamic>.from(val as Map);
@@ -102,6 +105,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       setState(() {
         _activeVirds = activeVirds;
         _virdOrder = parsedOrder;
+        _userCreatedAt = userCreatedAt;
         _loadingPreferences = false;
       });
     }, onError: (e) {
@@ -280,9 +284,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           children: [
-            _buildProgressCard(0, 0, 0.0, VirdLog(date: _todayDateStr(), completions: {})),
-            const SizedBox(height: 16),
             _buildLibraryShowcaseCard(const []),
+            const SizedBox(height: 12),
+            _buildProgressCard(0, 0, 0.0, VirdLog(date: _todayDateStr(), completions: {})),
             const SizedBox(height: 24),
             _buildEmptyStateExploreNotice(),
             const SizedBox(height: 48),
@@ -724,9 +728,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         dotColor = categoryColor.withValues(alpha: 0.6); // Kısmi ilerleme
       } else if (dClean == todayClean) {
         dotColor = Colors.white;
-        dotBorder = Border.all(color: categoryColor, width: 2.4);
+        dotBorder = Border.all(color: categoryColor, width: 1.0);
       } else {
-        dotColor = const Color(0xFFFF8C7A).withValues(alpha: 0.5);
+        dotColor = const Color(0xFFE5ECEE);
       }
 
       if (isSelectedDay && !(dClean == todayClean && count == 0)) {
@@ -976,10 +980,8 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       
       final streak = _calculateVirdStreak(item.id, item.targetCount, allVirdLogs);
 
-      // En eski tamamlama tarihini bul; hiç tamamlanmamışsa son 30 günü göster
-      DateTime startDate = completedDateStrs.isEmpty
-          ? DateTime.now().subtract(const Duration(days: 29))
-          : DateTime.now();
+      // Başlangıç tarihi hesabı açtığı gün (_userCreatedAt) veya en eski tamamlama tarihidir
+      DateTime startDate = _userCreatedAt ?? DateTime.now();
       for (final dateStr in completedDateStrs) {
         try {
           final parts = dateStr.split('-');
@@ -1040,11 +1042,11 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           const SizedBox(height: 12),
           Text(
             'Aktif Virdiniz Bulunmuyor',
-            style: GoogleFonts.nunito(fontSize: 15.5, fontWeight: FontWeight.bold, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textDark),
           ),
           const SizedBox(height: 6),
           Text(
-            'Yukarıdaki kütüphaneden veya "Kütüphaneyi Keşfet" kartından dilediğiniz sure, dua ve zikirleri listenize ekleyebilirsiniz.',
+            'Vird Kütüphanesi\'nden dilediğiniz sure, dua ve zikirleri listenize ekleyebilirsiniz.',
             textAlign: TextAlign.center,
             style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textLight, height: 1.5),
           ),
@@ -1115,14 +1117,12 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(currentlyAdded 
-                ? '${item.title} listenizden kaldırıldı.' 
-                : '${item.title} listenize eklendi!'),
-            backgroundColor: currentlyAdded ? AppColors.errorRed : AppColors.teal,
-            duration: const Duration(milliseconds: 1500),
-          ),
+        _showTopNotification(
+          context,
+          currentlyAdded 
+              ? '${item.title} listenizden kaldırıldı.' 
+              : '${item.title} listenize eklendi!',
+          isError: currentlyAdded,
         );
       }
     } catch (e) {
@@ -1412,5 +1412,141 @@ class StreamZip {
     );
 
     return controller.stream;
+  }
+}
+
+void _showTopNotification(BuildContext context, String message, {required bool isError}) {
+  final overlay = Overlay.of(context);
+  late OverlayEntry entry;
+
+  entry = OverlayEntry(
+    builder: (context) => _TopNotificationOverlay(
+      message: message,
+      isError: isError,
+      onDismiss: () => entry.remove(),
+    ),
+  );
+
+  overlay.insert(entry);
+}
+
+class _TopNotificationOverlay extends StatefulWidget {
+  final String message;
+  final bool isError;
+  final VoidCallback onDismiss;
+
+  const _TopNotificationOverlay({
+    required this.message,
+    required this.isError,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_TopNotificationOverlay> createState() => _TopNotificationOverlayState();
+}
+
+class _TopNotificationOverlayState extends State<_TopNotificationOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _yAnim;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _yAnim = Tween<double>(begin: -80.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _controller.forward();
+
+    // Auto dismiss after 1.8 seconds
+    Future.delayed(const Duration(milliseconds: 1800), () async {
+      if (mounted) {
+        await _controller.reverse();
+        widget.onDismiss();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor = widget.isError ? const Color(0xFFFDE8E8) : const Color(0xFFE0F2F1);
+    final Color textColor = widget.isError ? const Color(0xFFC81E1E) : const Color(0xFF00695C);
+    final IconData icon = widget.isError ? Icons.info_outline_rounded : Icons.check_circle_outline_rounded;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _yAnim.value),
+                child: Opacity(
+                  opacity: _fadeAnim.value,
+                  child: child,
+                ),
+              );
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: textColor.withValues(alpha: 0.15), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: textColor, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        widget.message,
+                        style: GoogleFonts.nunito(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
