@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -68,6 +70,7 @@ class _ZikirmatikModalState extends State<ZikirmatikModal> {
   bool _vibrateEnabled = true;
   bool _soundEnabled = true;
   double _btnScale = 1.0;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -75,41 +78,49 @@ class _ZikirmatikModalState extends State<ZikirmatikModal> {
     _count = widget.initialCount;
   }
 
-  void _increment() {
-    if (mounted) {
-      setState(() {
-        _count++;
-        _btnScale = 0.90;
-      });
+  @override
+  void dispose() {
+    // Modal kapanırken bekleyen yazma varsa flush et
+    if (_debounceTimer?.isActive ?? false) {
+      _debounceTimer!.cancel();
       widget.onCountChanged(_count);
-
-      // Haptic Feedback
-      if (_vibrateEnabled) {
-        if (_count == widget.targetCount) {
-          // Target reached: strong double vibration
-          HapticFeedback.heavyImpact();
-          Future.delayed(const Duration(milliseconds: 150), () {
-            HapticFeedback.heavyImpact();
-          });
-        } else {
-          HapticFeedback.lightImpact();
-        }
-      }
-
-      // Sound Feedback (System Click)
-      if (_soundEnabled) {
-        SystemSound.play(SystemSoundType.click);
-      }
-
-      // Restore button scale animation
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          setState(() {
-            _btnScale = 1.0;
-          });
-        }
-      });
     }
+    super.dispose();
+  }
+
+  void _increment() {
+    if (!mounted || _count >= widget.targetCount) return;
+    setState(() {
+      _count++;
+      _btnScale = 0.90;
+    });
+    // Son tıktan 600 ms sonra tek bir yazma yap — hızlı tıklarda kuyruğu önler
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 600), () {
+      widget.onCountChanged(_count);
+    });
+
+    // Haptic Feedback
+    if (_vibrateEnabled) {
+      if (_count == widget.targetCount) {
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 150), () {
+          HapticFeedback.heavyImpact();
+        });
+      } else {
+        HapticFeedback.lightImpact();
+      }
+    }
+
+    // Sound Feedback (System Click)
+    if (_soundEnabled) {
+      SystemSound.play(SystemSoundType.click);
+    }
+
+    // Restore button scale animation
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _btnScale = 1.0);
+    });
   }
 
   void _showManualCountDialog() {

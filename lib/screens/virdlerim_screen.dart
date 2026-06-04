@@ -67,7 +67,8 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         .listen((userSnap) {
       if (!mounted) return;
       
-      final List<VirdItem> allVirds = VirdItem.defaultVirds.map((e) => e.copyWith()).toList();
+      // Yeni kullanıcılar için varsayılan olarak hepsi kapalı; kullanıcı prefsMap'te aktif etmediyse gösterilmez
+      final List<VirdItem> allVirds = VirdItem.defaultVirds.map((e) => e.copyWith(active: false)).toList();
       final userData = userSnap.data() ?? {};
       final prefsMap = userData['virdPreferences'] as Map<String, dynamic>? ?? {};
 
@@ -254,49 +255,6 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     }
   }
 
-  void _showHadithDialog(VirdItem item) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.star_rounded, color: AppColors.gold, size: 24),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Fazileti & Önemi',
-                style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textDark, fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.title,
-              style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.teal),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.hadith ?? item.description,
-              style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark, height: 1.5, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Kapat', style: GoogleFonts.nunito(color: AppColors.teal, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -370,7 +328,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         children: [
           // Kategori Başlığı + Sayaç
           Padding(
-            padding: const EdgeInsets.only(top: 20, bottom: 6, left: 4),
+            padding: const EdgeInsets.only(top: 10, bottom: 6, left: 4),
             child: Row(
               children: [
                 Text(
@@ -504,11 +462,11 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         children: [
           _buildLibraryShowcaseCard(activeVirds),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildProgressCard(completed.length, activeVirds.length, totalProgress, log),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           _buildDateSelector(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
 
           if (_isFriday()) _buildFridayBanner(),
 
@@ -580,7 +538,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   ),
                 ),
                 Text(
-                  '"Az da olsa devamlı olanıdır." (Müslim, Müsâfirîn 215)',
+                  '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 215)',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     color: AppColors.textMid,
@@ -714,7 +672,6 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
 
   Widget _buildVirdCard(VirdItem item, int currentCount, {Key? key, bool isDone = false, bool isLast = false}) {
     final isZikir = item.category == 'zikir';
-    final progress = item.targetCount > 0 ? (currentCount / item.targetCount).clamp(0.0, 1.0) : 0.0;
 
     // Kategoriye göre ikon ve soft renk seçimi
     IconData categoryIcon;
@@ -809,7 +766,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         child: InkWell(
         onTap: () => _showVirdHistoryHeatMap(item, categoryColor),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Row(
             children: [
               // Sol Kategori İkonu
@@ -915,127 +872,49 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
               ),
               const SizedBox(width: 10),
               
-              // Sağ Aksiyon Butonu
+              // Zikirmatik butonu — sadece zikir kartları için
               if (isZikir) ...[
-                if (isDone)
-                  _buildDoneIndicator()
-                else
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _updateVirdProgress(item.id, currentCount + 1);
-                    },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0.0, end: progress),
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, animVal, _) => CircularProgressIndicator(
-                              value: animVal,
-                              strokeWidth: 2.5,
-                              backgroundColor: AppColors.borderGrey,
-                              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.add_rounded, color: AppColors.orange, size: 18),
-                      ],
-                    ),
-                  ),
-              ] else ...[
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _toggleSureDua(item, currentCount);
-                  },
+                  onTap: () => _openZikirmatik(item, currentCount),
                   child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone ? categoryColor : Colors.white,
-                      border: isDone
-                          ? Border.all(color: categoryColor, width: 2.0)
-                          : Border.all(color: const Color(0xFFD0D9DD), width: 2.0),
-                    ),
-                    child: isDone
-                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
-                        : null,
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.touch_app_rounded, color: AppColors.orange, size: 19),
                   ),
                 ),
+                const SizedBox(width: 4),
               ],
-              const SizedBox(width: 4),
 
-              // Seçenekler Menüsü (Üç Nokta)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onSelected: (value) {
-                  if (value == 'hadith') _showHadithDialog(item);
-                  if (value == 'calendar') _showVirdHistoryHeatMap(item, categoryColor);
-                  if (value == 'zikirmatik') _openZikirmatik(item, currentCount);
+              // Sağ Aksiyon Butonu (sure/dua/zikir hepsi aynı onay dairesi)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _toggleSureDua(item, currentCount);
                 },
-                itemBuilder: (_) => [
-                  if (item.hadith != null || item.description.isNotEmpty)
-                    PopupMenuItem(
-                      value: 'hadith',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textMid),
-                          const SizedBox(width: 10),
-                          Text('Fazileti & Önemi', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                  PopupMenuItem(
-                    value: 'calendar',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textMid),
-                        const SizedBox(width: 10),
-                        Text('Detaylı Takvim', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
-                      ],
-                    ),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDone ? categoryColor : Colors.white,
+                    border: isDone
+                        ? Border.all(color: categoryColor, width: 2.0)
+                        : Border.all(color: const Color(0xFFD0D9DD), width: 2.0),
                   ),
-                  if (isZikir)
-                    PopupMenuItem(
-                      value: 'zikirmatik',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.touch_app_rounded, size: 18, color: AppColors.orange),
-                          const SizedBox(width: 10),
-                          Text('Zikirmatik Aç', style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.orange)),
-                        ],
-                      ),
-                    ),
-                ],
+                  child: isDone
+                      ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                      : null,
+                ),
               ),
+              const SizedBox(width: 4),
             ],
           ),
         ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDoneIndicator() {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: const BoxDecoration(
-        color: AppColors.successGreen,
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
     );
   }
 
@@ -1097,11 +976,14 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       
       final streak = _calculateVirdStreak(item.id, item.targetCount, allVirdLogs);
 
-      // En eski log tarihini bul — heat map bu tarihten bugüne kadar uzanır
-      DateTime startDate = DateTime.now();
+      // En eski tamamlama tarihini bul; hiç tamamlanmamışsa son 30 günü göster
+      DateTime startDate = completedDateStrs.isEmpty
+          ? DateTime.now().subtract(const Duration(days: 29))
+          : DateTime.now();
       for (final dateStr in completedDateStrs) {
         try {
           final parts = dateStr.split('-');
+          if (parts.length != 3) continue;
           final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
           if (d.isBefore(startDate)) startDate = d;
         } catch (_) {}
@@ -1122,6 +1004,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         completedDateStrs: completedDateStrs,
         currentStreak: streak,
         createdAt: startDate,
+        hadithText: item.hadith ?? (item.description.isNotEmpty ? item.description : null),
       );
     } catch (e) {
       if (mounted) Navigator.pop(context); // Dismiss loading dialog in case of error

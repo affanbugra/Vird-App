@@ -8,6 +8,7 @@ class HabitHeatMapSheet extends StatelessWidget {
   final Set<String> completedDateStrs;
   final int currentStreak;
   final DateTime createdAt;
+  final String? hadithText;
 
   const HabitHeatMapSheet({
     super.key,
@@ -15,6 +16,7 @@ class HabitHeatMapSheet extends StatelessWidget {
     required this.completedDateStrs,
     required this.currentStreak,
     required this.createdAt,
+    this.hadithText,
   });
 
   static Future<void> show(
@@ -23,6 +25,7 @@ class HabitHeatMapSheet extends StatelessWidget {
     required Set<String> completedDateStrs,
     required int currentStreak,
     required DateTime createdAt,
+    String? hadithText,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -33,6 +36,7 @@ class HabitHeatMapSheet extends StatelessWidget {
         completedDateStrs: completedDateStrs,
         currentStreak: currentStreak,
         createdAt: createdAt,
+        hadithText: hadithText,
       ),
     );
   }
@@ -152,6 +156,53 @@ class HabitHeatMapSheet extends StatelessWidget {
               ),
             ),
           ),
+
+          if (hadithText != null && hadithText!.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Text(
+                'Fazilet',
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: habit.color.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: habit.color.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.star_rounded, color: habit.color, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hadithText!,
+                        style: GoogleFonts.nunito(
+                          fontSize: 13,
+                          color: AppColors.textDark,
+                          height: 1.55,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
         ],
       ),
     );

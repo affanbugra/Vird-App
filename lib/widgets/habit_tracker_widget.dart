@@ -691,7 +691,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Row(
               children: [
                 // Yuvarlak Habit İkonu (virdlerim stili)
@@ -1067,7 +1067,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         ),
                       ),
                       Text(
-                        'Allah katında amellerin en sevimlisi (en makbülü) az da olsa devamlı olanıdır',
+                        '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 215)',
                         style: GoogleFonts.nunito(
                           fontSize: 12,
                           color: AppColors.textMid,

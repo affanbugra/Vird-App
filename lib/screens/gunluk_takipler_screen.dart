@@ -159,8 +159,11 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
       for (var doc in snapshots) {
         if (!doc.exists) continue;
         final data = doc.data()!;
-        final dateStr = (data['date'] as String).replaceAll('prayer_', '');
+        final rawDate = data['date'];
+        if (rawDate == null) continue;
+        final dateStr = (rawDate as String).replaceAll('prayer_', '');
         final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
         final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
         
         final Map<String, dynamic> pMap = data['prayers'] ?? {};
@@ -373,13 +376,21 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                             if (val == 'all') {
                               for (var time in PrayerTime.values) {
                                 record.prayers[time] = PrayerStatus.regl;
+                                record.sunnahs[time] = _defaultSunnahs(time);
+                                record.tesbihats[time] = false;
                               }
                               setModalState(() {});
                               setState(() {});
                               _updatePrayer(record, PrayerTime.sabah, PrayerStatus.regl);
                             } else if (val == 'current') {
                               final newStatus = isRegl ? PrayerStatus.none : PrayerStatus.regl;
-                              setModalState(() { record.prayers[selectedTime] = newStatus; });
+                              setModalState(() {
+                                record.prayers[selectedTime] = newStatus;
+                                if (newStatus == PrayerStatus.regl) {
+                                  record.sunnahs[selectedTime] = _defaultSunnahs(selectedTime);
+                                  record.tesbihats[selectedTime] = false;
+                                }
+                              });
                               setState(() {});
                               _updatePrayer(record, selectedTime, newStatus);
                             } else if (val == 'calendar') {
@@ -557,6 +568,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                             activeColor: AppColors.gold,
                             activeTextColor: Colors.white,
                             fontSize: 11,
+                            isEnabled: !(isKaza || isRegl),
                             onTap: () {
                               setModalState(() { record.tesbihats[selectedTime] = !isTesbihat; });
                               setState(() {});
@@ -570,8 +582,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           final sName = sNameRaw == 'Vitir' ? 'Vitir Namazı' : sNameRaw;
                           final isDone = record.sunnahs[selectedTime]![idx];
                           
-                          // Kaza seçiliyse pasif görünüm
-                          final isPassive = isKaza;
+                          // Kaza veya Regl seçiliyse pasif görünüm
+                          final isPassive = isKaza || isRegl;
 
                           return Expanded(
                             child: Padding(
