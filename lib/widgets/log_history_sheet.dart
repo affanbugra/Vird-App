@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
@@ -46,64 +47,76 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Tüm kayıtları sil',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (currentSeri > 0) ...[
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
-                  children: [
-                    const TextSpan(text: '🔥 Seriniz '),
-                    TextSpan(
-                      text: '$currentSeri gün',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
-                    ),
-                    const TextSpan(text: '\'den '),
-                    const TextSpan(
-                      text: '0 güne',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.errorRed),
-                    ),
-                    const TextSpan(text: ' sıfırlanacak.'),
-                  ],
+      builder: (ctx) => Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+            Navigator.pop(ctx, true);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Tüm kayıtları sil',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (currentSeri > 0) ...[
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                        color: AppColors.textMid, fontSize: 14),
+                    children: [
+                      const TextSpan(text: '🔥 Seriniz '),
+                      TextSpan(
+                        text: '$currentSeri gün',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark),
+                      ),
+                      const TextSpan(text: '\'den '),
+                      const TextSpan(
+                        text: '0 güne',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.errorRed),
+                      ),
+                      const TextSpan(text: ' sıfırlanacak.'),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 10),
+              ],
+              const Text(
+                'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
+                style: TextStyle(color: AppColors.textMid),
               ),
-              const SizedBox(height: 10),
             ],
-            const Text(
-              'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
-              style: TextStyle(color: AppColors.textMid),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal',
+                  style: TextStyle(color: AppColors.textMid)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.errorRed,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Tümünü Sil',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Tümünü Sil',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     ) ?? false;
     if (!confirmed || !mounted) return;
@@ -366,81 +379,93 @@ class _LogTile extends StatelessWidget {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (seriDrops) ...[
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
-                  children: [
-                    const TextSpan(text: 'Seriniz '),
-                    TextSpan(
-                      text: '$currentSeri gün',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
-                    ),
-                    const TextSpan(text: '\'den '),
-                    TextSpan(
-                      text: '$newSeri gün',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: newSeri == 0
-                            ? AppColors.errorRed
-                            : AppColors.orange,
+      builder: (ctx) => Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+            Navigator.pop(ctx, true);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (seriDrops) ...[
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                        color: AppColors.textMid, fontSize: 14),
+                    children: [
+                      const TextSpan(text: 'Seriniz '),
+                      TextSpan(
+                        text: '$currentSeri gün',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark),
                       ),
-                    ),
-                    const TextSpan(text: '\'e düşecek.'),
-                  ],
+                      const TextSpan(text: '\'den '),
+                      TextSpan(
+                        text: '$newSeri gün',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: newSeri == 0
+                              ? AppColors.errorRed
+                              : AppColors.orange,
+                        ),
+                      ),
+                      const TextSpan(text: '\'e düşecek.'),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
+                style: const TextStyle(color: AppColors.textMid),
               ),
-              const SizedBox(height: 10),
+              if (seriDrops) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Bu işlem geri alınamaz.',
+                  style: TextStyle(
+                      color: AppColors.errorRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
             ],
-            Text(
-              '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
-              style: const TextStyle(color: AppColors.textMid),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal',
+                  style: TextStyle(color: AppColors.textMid)),
             ),
-            if (seriDrops) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Bu işlem geri alınamaz.',
-                style: TextStyle(
-                    color: AppColors.errorRed,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.errorRed,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
-            ],
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                seriDrops ? 'Yine de Sil' : 'Sil',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              seriDrops ? 'Yine de Sil' : 'Sil',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -461,10 +486,17 @@ class _LogTile extends StatelessWidget {
       );
       await batch.commit();
 
-      if (log.hatimId != null) {
-        await HatimCalculator.recalculate(uid, log.hatimId!);
-      }
-      await SeriCalculator.recalculate(uid);
+      // Arka planda asenkron çalıştır (UI bloklanmasın)
+      Future.microtask(() async {
+        try {
+          if (log.hatimId != null) {
+            await HatimCalculator.recalculate(uid, log.hatimId!);
+          }
+          await SeriCalculator.recalculate(uid);
+        } catch (e) {
+          debugPrint('Arka plan recalculate hatası: $e');
+        }
+      });
     } catch (e) {
       debugPrint('Log sil hatası: $e');
     }

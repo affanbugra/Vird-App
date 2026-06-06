@@ -95,6 +95,24 @@ Tipler: `feat` `fix` `style` `refactor` `docs`
 
 ---
 
+## Dini İçerik Protokolü
+
+Uygulamaya herhangi bir **hadis, ayet, fetva veya dini hüküm** eklenecekse — kullanıcı söylemese de — aşağıdaki adımlar otomatik uygulanır:
+
+**1. Çapraz Doğrulama (zorunlu, en az 2-3 kaynak):**
+- Hadis için: kaynak koleksiyonunu (Buhârî, Müslim vb.) ve kitap/bab numarasını en az 2 farklı güvenilir siteden doğrula (örn. hadislerleislam.diyanet.gov.tr, islamiokul.com, sorularlaislamiyet.com).
+- Ayet için: sure ve ayet numarasını, meal metnini Diyanet Meali ile karşılaştır.
+- Fetva/hüküm için: Diyanet Din İşleri Yüksek Kurulu veya TDV İslam Ansiklopedisi'nden teyit et.
+- Numaralar baskıya göre ±1-2 farklılık gösterebilir; bu durumda en yaygın/güvenilir referansı kullan ve notu ekle.
+
+**2. Kaynakça Güncellemesi (koşullu):**
+- Yeni bir **hadis koleksiyonu** ilk kez kullanılıyorsa → `profil_screen.dart` kaynakça bölümüne ekle.
+- Yeni bir **fetva kaynağı** (site/kurum) ilk kez kullanılıyorsa → Fetva ve Fıkıh Kaynakları bölümüne ekle.
+- Zaten mevcut bir koleksiyondan yeni hadis eklendiyse → kaynakçayı **güncelleme**, inline kaynak yeterli.
+- Ayet için: meal Diyanet Meali'nden ise → kaynakçayı güncelleme, zaten kapsanıyor.
+
+---
+
 ## Skill Kullanım (Claude Code)
 
 | Durum | Skill |

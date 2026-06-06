@@ -38,6 +38,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
   // _allRecords.containsKey yerine bunu kullanmak, build sırasında
   // _getRecordForDate'in oluşturduğu boş kayıtların fetch'i atlatmasını önler.
   final Set<String> _fetchedPeriods = {};
+  DateTime? _userCreatedAt;
 
   late final PageController _pageController;
   final int _initialPage = 10000;
@@ -57,6 +58,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     });
     _fetchWeekData(0);
     _fetchWeekData(-1);
+    _fetchUserCreatedAt();
 
     // Cari ay verilerini arka planda önceden yükle (hızlandırma için)
     final now = DateTime.now();
@@ -122,6 +124,19 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
       case PrayerTime.aksam: return ['Sünnet'];
       case PrayerTime.yatsi: return ['İlk Sünnet', 'Son Sünnet', 'Vitir'];
     }
+  }
+
+  Future<void> _fetchUserCreatedAt() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final ts = (doc.data() as Map<String, dynamic>?)?['createdAt'] as Timestamp?;
+      if (ts != null && mounted) {
+        final d = ts.toDate();
+        setState(() => _userCreatedAt = DateTime(d.year, d.month, d.day));
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchWeekData(int targetOffset) async {
@@ -511,10 +526,9 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                               final next = isKaza ? PrayerStatus.none : PrayerStatus.kaza;
                               setModalState(() {
                                 record.prayers[selectedTime] = next;
-                                // Kaza seçilince o vaktin sünnetlerini sıfırla —
-                                // aksi halde stats'a yanlış sünnet tamamlandı sayılır.
                                 if (next == PrayerStatus.kaza) {
                                   record.sunnahs[selectedTime] = _defaultSunnahs(selectedTime);
+                                  record.tesbihats[selectedTime] = false;
                                 }
                               });
                               setState(() {});
@@ -712,14 +726,15 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               if (distance < innerR || distance > outerR + 4) return null;
               double deg = math.atan2(dy, dx) * 180 / math.pi;
               deg = (deg % 360 + 360) % 360;
-              if (deg >= 350 || deg < 10) return 'red';
+              if (deg >= 350 || deg < 10) return 'green'; // Akşam → Yatsı
               if (deg < 135) return 'green';
               if (deg < 180) return 'yellow';
               if (deg < 200) return 'red';
               if (deg < 255) return 'green';
               if (deg < 270) return 'red';
               if (deg < 315) return 'green';
-              if (deg < 350) return 'blue';
+              if (deg < 335) return 'blue';  // İkindi başı
+              if (deg < 350) return 'red';   // Akşam öncesi kerahat
               return null;
             }
 
@@ -924,6 +939,24 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                             emojiColor: AppColors.teal,
                             title: 'Neden Her Vakitten Sonra Tesbihat?',
                             content: _buildTesbihatContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '📖',
+                            emojiColor: AppColors.teal,
+                            title: 'Amellerin En Faziletlisi?',
+                            content: _buildNamazFaziletContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '⚖️',
+                            emojiColor: AppColors.errorRed,
+                            title: 'Kıyamette İlk Hesap',
+                            content: _buildKiyametHesapContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '🕐',
+                            emojiColor: AppColors.gold,
+                            title: 'İkindi: Orta Namaz',
+                            content: _buildIkindiContent(sheetCtx),
                           ),
                           const SizedBox(height: 4),
                           _buildKaynakcaFooter(sheetCtx),
@@ -1258,6 +1291,79 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
           'Fakir Muhacirler Resûlullah\'a (sav.) gelerek zengin kardeşlerinin hac, umre, cihad ve sadaka ile yüksek dereceleri aldıklarını söyleyince Efendimiz şöyle buyurdu: "—Size bir şey öğreteyim mi? Onun sayesinde sizi geçenlere yetişir, sizden sonrakileri de geçersiniz. Her namazın peşinden otuz üç defa Sübhânallah, otuz üç defa Elhamdülillâh, otuz üç defa Allâhü ekber dersiniz."',
           '— Buhârî, Ezân, 155; Müslim, Mesâcid, 142',
           accent: AppColors.teal,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNamazFaziletContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _hadithCard(
+          '"Hz. Abdullah b. Mes\'ûd anlatıyor: Resûlullah\'a (sav.) \'Allah katında amellerin en faziletlisi hangisidir?\' diye sordum. \'Vaktinde kılınan namazdır\' buyurdu. \'Sonra hangisidir?\' dedim; \'Anne babaya iyilik\' buyurdu."',
+          '— Buhârî, Mevâkît, 5; Müslim, Îmân, 137',
+          accent: AppColors.teal,
+        ),
+        _hadithCard(
+          '"Ebû Hüreyre\'den: Resûlullah (sav.) sordu: \'Birinizin kapısının önünden bir nehir geçse ve onda her gün beş defa yıkansa, bu o kimsenin kirinden bir şey bırakır mı?\' Sahâbe: \'Hiçbir şey bırakmaz\' dedi. \'İşte beş vakit namaz da böyledir; Allah onlarla günahları yok eder.\' buyurdu."',
+          '— Buhârî, Mevâkît, 6; Müslim, Mesâcid, 282',
+          accent: AppColors.teal,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKiyametHesapContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Kıyamet gününde kulun ilk hesap vereceği amel namazdır. Farzlarda eksik çıkarsa nâfile namazlar o eksiği kapatır — sünnetleri neden takip ettiğimizin en güçlü gerekçesidir.',
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textDark,
+              height: 1.55,
+            ),
+          ),
+        ),
+        _hadithCard(
+          '"Kıyamet gününde kulun hesaba çekileceği ilk ameli namazdır. Eğer namazı düzgün olursa kurtulur ve kazançlı çıkar. Farzlarından bir eksik çıkarsa Rabbi: \'Kulumun nâfile namazları var mı?\' der; eksik, nâfilelerle tamamlanır."',
+          '— Tirmizî, Mevâkît, 188; Ebû Dâvûd, Salât, 149',
+          accent: AppColors.errorRed,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIkindiContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Kur\'an\'da namazlar içinde ikindi özel olarak anılır. Gündüzün en yoğun vaktine denk geldiği için kaçırılma riski en yüksek namazdır.',
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textDark,
+              height: 1.55,
+            ),
+          ),
+        ),
+        _hadithCard(
+          '"Namazlara ve orta namaza devam edin; gönülden boyun eğerek Allah için namaza durun."',
+          '— Bakara Sûresi, 2/238',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          '"Kim ikindi namazını kaçırırsa, sanki ailesini ve malını kaybetmiş gibidir."',
+          '— Buhârî, Mevâkît, 14; Müslim, Mesâcid, 200',
+          accent: AppColors.gold,
         ),
       ],
     );
@@ -1650,6 +1756,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
       final d = DateTime(year, month, day);
       if (d.isAfter(todayClean)) continue;
       final cleanD = DateTime(d.year, d.month, d.day);
+      // Kullanıcı kaydolmadan önceki günler istatistiğe dahil edilmez
+      if (_userCreatedAt != null && cleanD.isBefore(_userCreatedAt!)) continue;
       final record = _allRecords[cleanD];
       if (record == null) {
         // Default eligible (kayıt yoksa hiçbiri tamamlanmamış)
@@ -2453,14 +2561,15 @@ class KerahatChartPainter extends CustomPainter {
     }
 
     // Sektörler (vakit sınırları)
-    drawSector(-10, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red');
+    drawSector(-10, 20, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green'); // Akşam → Yatsı
     drawSector(10, 125, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
     drawSector(135, 45, AppColors.goldSoft.withValues(alpha: 0.25), AppColors.gold, sectorKey: 'yellow');
     drawSector(180, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red');
     drawSector(200, 55, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
     drawSector(255, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red');
     drawSector(270, 45, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
-    drawSector(315, 35, AppColors.tealSoft.withValues(alpha: 0.25), AppColors.teal, sectorKey: 'blue');
+    drawSector(315, 20, AppColors.tealSoft.withValues(alpha: 0.25), AppColors.teal, sectorKey: 'blue');   // İkindi başı
+    drawSector(335, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red'); // Akşam öncesi kerahat
 
     // Vakit etiketleri — sektör sınırları (vakit başlangıçları)
     final labelRadius = outerRadius + 18;

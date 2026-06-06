@@ -159,7 +159,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
         _habits = items.map((e) => HabitDef.fromMap(e as Map<String, dynamic>)).toList();
       }
 
-      // 2. Fetch Logs for last 30 days
+      // 2. Fetch all habit logs (seri ve heat map için tüm geçmiş lazım)
       final logsSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(_uid)
@@ -218,6 +218,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
           }, SetOptions(merge: true));
     } catch (e) {
       debugPrint("Error updating habit: $e");
+      if (!mounted) return;
+      setState(() => _logs[dateStr]![habit.id] = currentStatus);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kayıt sırasında hata oluştu. İnternet bağlantını kontrol et.', style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          backgroundColor: AppColors.errorRed,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -449,7 +458,16 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
             'items': _habits.map((e) => e.toMap()).toList()
           });
     } catch (e) {
-      debugPrint("Error saving habit def: \$e");
+      debugPrint("Error saving habit def: $e");
+      if (!mounted) return;
+      setState(() => _habits.removeWhere((h) => h.id == newHabit.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Alışkanlık eklenemedi. İnternet bağlantını kontrol et.', style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          backgroundColor: AppColors.errorRed,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -496,6 +514,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
           });
     } catch (e) {
       debugPrint('Error deleting habit: $e');
+      if (!mounted) return;
+      setState(() => _habits.add(habit));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Silme sırasında hata oluştu. İnternet bağlantını kontrol et.', style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          backgroundColor: AppColors.errorRed,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -1060,7 +1087,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                             ? 'Bu tarih için aktif alışkanlık yok'
                             : (progress == 1.0
                                 ? 'Harika! Hepsini tamamladın 🎉'
-                                : selDay == todayClean ? 'Bugün nasılız?' : 'Geçmiş Gün'),
+                                : selDay == todayClean ? 'Günlük Rutinim' : 'Geçmiş Gün'),
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -1068,7 +1095,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         ),
                       ),
                       Text(
-                        '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 215)',
+                        '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 216)',
                         style: GoogleFonts.nunito(
                           fontSize: 12,
                           color: AppColors.textMid,

@@ -67,9 +67,15 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         } else {
           final idx = list.indexWhere((e) => e.id == id);
           if (idx != -1) {
+            final defaultMap = list[idx].toMap();
             list[idx] = VirdItem.fromMap({
-              ...list[idx].toMap(),
+              ...defaultMap,
               ...map,
+              // İçerik alanları her zaman koddan gelir — Firestore'daki eskiler geçersiz
+              'hadith': defaultMap['hadith'],
+              'description': defaultMap['description'],
+              'arabicTitle': defaultMap['arabicTitle'],
+              'recommendedTime': defaultMap['recommendedTime'],
             });
           }
         }
@@ -91,11 +97,6 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           'active': active,
           'category': item.category,
           'targetCount': item.targetCount,
-          'title': item.title,
-          'arabicTitle': item.arabicTitle,
-          'description': item.description,
-          'recommendedTime': item.recommendedTime,
-          'hadith': item.hadith,
           'isCustom': item.isCustom,
           'updatedAt': FieldValue.serverTimestamp(),
         }
@@ -658,7 +659,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildVirdList(defaultItems: suresDefault, customItems: suresCustom),
+              _buildVirdList(
+                defaultItems: suresDefault,
+                customItems: suresCustom,
+                footer: _buildSureAutoLogNote(),
+              ),
               _buildVirdList(defaultItems: zikirsDefault, customItems: zikirsCustom),
               _buildVirdList(defaultItems: duasDefault, customItems: duasCustom),
             ],
@@ -684,9 +689,42 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
     );
   }
 
+  Widget _buildSureAutoLogNote() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.tealLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.auto_stories_rounded, size: 16, color: AppColors.teal),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Günlük olarak tamamladığınız sureler otomatik okuma kaydı olarak eklenir; seri ve Kuran haritanızı günceller.',
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.tealDark,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildVirdList({
     required List<VirdItem> defaultItems,
     required List<VirdItem> customItems,
+    Widget? footer,
   }) {
     if (defaultItems.isEmpty && customItems.isEmpty) {
       return Center(
@@ -751,6 +789,8 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         children.add(_buildVirdTile(item, isLast: isLast));
       }
     }
+
+    if (footer != null) children.add(footer);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

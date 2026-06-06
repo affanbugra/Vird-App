@@ -318,14 +318,17 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
       } else {
         // lastLogDate null — dünkü loglara bak (migration / veri bozulması)
+        // Dizin hatasını / takılmayı önlemek için composite index gerektirmeyen tek alanlı sorgu yapıp
+        // bellek içinde filtreliyoruz.
         final hadLogYesterday = lastLogDate == null
             ? await userRef.collection('logs')
-                .where('type', whereIn: ['arapca', 'meal'])
                 .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
                 .where('createdAt', isLessThan: Timestamp.fromDate(today))
-                .limit(1)
                 .get()
-                .then((s) => s.docs.isNotEmpty)
+                .then((s) => s.docs.any((doc) {
+                      final t = doc.data()['type'] as String?;
+                      return t == 'arapca' || t == 'meal';
+                    }))
             : false;
         if (hadLogYesterday) {
           // Gerçek zincir uzunluğunu bilmiyoruz; commit sonrası recalculate hesaplar
@@ -415,86 +418,107 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       await batch.commit();
 
-      // lastLogDate null iken dünkü log bulunduysa — gerçek seri uzunluğunu hesapla
-      if (needsSeriRecalculate) {
-        await SeriCalculator.recalculate(user.uid);
-      }
-
-      bool justCompleted = false;
-      if (hatimId != null) {
-        justCompleted = await HatimCalculator.recalculate(user.uid, hatimId);
-      }
-
-      // ── Tilavet Secdesi kontrolü ─────────────────────────────────────
-      if (mounted) {
-        final secdePages = TilavetSecdeData.secdesInRange(startPage, endPage);
-        for (final sPage in secdePages) {
-          if (!mounted) break;
-          await _showSecdePrompt(user.uid, hatimId, sPage);
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────
-
-      // ── Seri animasyonu ──────────────────────────────────────────────
-      // Bug 8: needsSeriRecalculate durumunda da animasyon göster
-      int newSeri;
-      if (seriUpdate.containsKey('seri')) {
-        newSeri = (seriUpdate['seri'] as int);
-      } else if (needsSeriRecalculate) {
-        // recalculate yaptı — Firestore'dan güncel seriyi oku
-        final refreshed = await userRef.get();
-        newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
-      } else {
-        newSeri = displayedSeri; // Bugün zaten okunmuş, değişmedi
-      }
-
-      // Bug 1: prevCount olarak Firestore ham değeri değil, görüntülenen değer kullanılıyor
-      final shouldShowAnimation = newSeri > displayedSeri;
-
-      ({List<bool> filled, List<String> labels})? weekData;
-      if (shouldShowAnimation && mounted) {
-        try {
-          weekData = await _getWeekFilled(user.uid);
-        } catch (e) {
-          debugPrint('Seri animasyonu yüklenemedi: $e');
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────
-
+      // ── 1. Sheet'i hemen ve kesinlikle kapat (Instant UI Feedback) ────
       if (!mounted) return;
-
-      // Milestone kontrolü — animasyondan bağımsız her log sonrası çalışır.
-      // Transaction ile idempotent; aynı milestone iki kez claim edilemez.
-      final milestoneResult = await StreakFreezeService.claimMilestones(
-          uid: user.uid, newSeri: newSeri);
-
       final overlayCtx = Navigator.of(context, rootNavigator: true).context;
-      Navigator.pop(context, justCompleted);
+      Navigator.pop(context, false); // Kapatıldı. Artık spinner yok.
 
-      if (shouldShowAnimation && weekData != null) {
-        final wd = weekData;
-        final milestone = milestoneResult;
-        final ctx = overlayCtx;
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!ctx.mounted) return;
-          await StreakAnimationScreen.show(
-            ctx,
-            count: newSeri,
-            prevCount: displayedSeri,
-            filled: wd.filled,
-            dayLabels: wd.labels,
-            todayIndex: 6,
-          );
-          if (milestone.claimed.isNotEmpty && ctx.mounted) {
-            await StreakFreezeRewardScreen.show(
-              ctx,
-              milestoneDays: milestone.claimed.last,
-              freezesGranted: milestone.totalGranted,
+      // ── 2. Post-commit işlemleri — Firestore ve sheet animasyonu paralel ──
+      Future.microtask(() async {
+        // Sheet pop animasyonu (~250ms) ile Firestore işlemleri eş zamanlı başlar
+        final animDelay = Future.delayed(const Duration(milliseconds: 320));
+
+        try {
+          // ── A. Bağımsız recalculate'ler paralel ──────────────────────────
+          bool justCompleted = false;
+          final recalcFutures = <Future<void>>[];
+          if (needsSeriRecalculate) {
+            recalcFutures.add(SeriCalculator.recalculate(user.uid));
+          }
+          if (hatimId != null) {
+            final hId = hatimId;
+            recalcFutures.add(
+              HatimCalculator.recalculate(user.uid, hId)
+                  .then((v) => justCompleted = v),
             );
           }
-        });
-      }
+          if (recalcFutures.isNotEmpty) await Future.wait(recalcFutures);
+
+          // ── B. Tilavet Secdesi (UI — sıralı) ─────────────────────────────
+          if (overlayCtx.mounted) {
+            final secdePages = TilavetSecdeData.secdesInRange(startPage ?? 1, endPage ?? 1);
+            for (final sPage in secdePages) {
+              if (!overlayCtx.mounted) break;
+              await _showSecdePrompt(overlayCtx, user.uid, hatimId, sPage);
+            }
+          }
+
+          // ── C. newSeri hesapla ────────────────────────────────────────────
+          int newSeri = displayedSeri;
+          if (seriUpdate.containsKey('seri')) {
+            newSeri = seriUpdate['seri'] as int;
+          } else if (needsSeriRecalculate) {
+            final refreshed = await userRef.get();
+            newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
+          }
+          final shouldShowAnimation = newSeri > displayedSeri;
+
+          // ── D. Week data + milestones PARALEL ────────────────────────────
+          ({List<bool> filled, List<String> labels})? weekData;
+          ({List<int> claimed, int totalGranted})? milestoneResult;
+
+          final dataFutures = <Future<void>>[
+            StreakFreezeService.claimMilestones(uid: user.uid, newSeri: newSeri)
+                .then((v) => milestoneResult = v),
+          ];
+          if (shouldShowAnimation) {
+            dataFutures.add(() async {
+              try {
+                weekData = await _getWeekFilled(user.uid);
+              } catch (e) {
+                debugPrint('Seri animasyonu yüklenemedi: $e');
+              }
+            }());
+          }
+          await Future.wait(dataFutures);
+
+          // ── E. Sheet kapanma animasyonunu bekle (büyük ihtimalle bitti) ───
+          await animDelay;
+
+          // ── F. UI sırayla göster ──────────────────────────────────────────
+          if (overlayCtx.mounted) {
+            // 1. Seri animasyonu
+            if (shouldShowAnimation && weekData != null) {
+              await StreakAnimationScreen.show(
+                overlayCtx,
+                count: newSeri,
+                prevCount: displayedSeri,
+                filled: weekData!.filled,
+                dayLabels: weekData!.labels,
+                todayIndex: 6,
+              );
+            }
+            // 2. Milestone ödülü
+            if (milestoneResult != null &&
+                milestoneResult!.claimed.isNotEmpty &&
+                overlayCtx.mounted) {
+              await StreakFreezeRewardScreen.show(
+                overlayCtx,
+                milestoneDays: milestoneResult!.claimed.last,
+                freezesGranted: milestoneResult!.totalGranted,
+              );
+            }
+            // 3. Hatim tamamlanma tebriği
+            if (justCompleted && overlayCtx.mounted) {
+              await _showHatimCompletedDialog(overlayCtx);
+            }
+          }
+        } catch (e, st) {
+          debugPrint('Arka plan post-commit işlem hatası: $e\n$st');
+        }
+      });
     } catch (e, st) {
+      // Pre-commit hatası — veri kaydedilemedi
       debugPrint('LOG KAYDETME HATASI: $e\n$st');
       if (mounted) {
         setState(() => _isLoading = false);
@@ -506,6 +530,50 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         );
       }
     }
+  }
+
+  Future<void> _showHatimCompletedDialog(BuildContext dialogContext) async {
+    await showDialog<void>(
+      context: dialogContext,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🎉', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 12),
+            const Text(
+              'Hatim Tamamlandı',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
+              style: TextStyle(fontSize: 15, color: AppColors.textMid),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Âmin',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── Son 7 günlük doluluk verisi (seri animasyonu için) ──────────────
@@ -567,12 +635,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   // ── Tilavet Secdesi Prompt ──────────────────────────────────────────
 
   Future<void> _showSecdePrompt(
-      String uid, String? hatimId, int page) async {
-    if (!mounted) return;
+      BuildContext dialogContext, String uid, String? hatimId, int page) async {
     final label = TilavetSecdeData.secdeLabel(page) ?? 'Tilavet Secdesi';
 
     final result = await showDialog<String>(
-      context: context,
+      context: dialogContext,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

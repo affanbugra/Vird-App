@@ -2853,6 +2853,7 @@ class _KaynakcaSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // ── GİRİŞ ──────────────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -2881,7 +2882,7 @@ class _KaynakcaSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Uygulama içindeki tüm ayet ve hadis alıntıları; Diyanet İşleri Başkanlığı yayınları, Kütüb-i Sitte ve TDV İslam Ansiklopedisi referans alınarak hazırlanmıştır. Şahsi hükümler için ehlinden istifade edilmesi tavsiye olunur.',
+                          'Uygulamadaki tüm hadis ve ayet alıntıları aşağıda tanıtılan birincil İslâmî kaynaklardan derlenmiştir. Her alıntının kaynağı ilgili içeriğin altında belirtilmiştir. Şahsi hükümler ve daha geniş bilgi için bu kaynaklara veya bir ilim ehline başvurulması tavsiye olunur.',
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -2893,46 +2894,52 @@ class _KaynakcaSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
+
+                  // ── HADİS KOLEKSİYONLARI ───────────────────────────────
                   _kaynakSection(
-                    'Hadis Kaynakları',
+                    'Hadis Koleksiyonları',
                     [
                       _Kaynak('Sahîh-i Buhârî',
-                          'Ezân, Mevâkıt, Megâzî bölümleri (Cemaat hadisleri, Tesbihat hadisi, vd.)'),
+                          'İmam Muhammed b. İsmâil el-Buhârî (ö. 256/870). Hadis ilminin en güvenilir ve muteber kaynağı; "Sahîhayn"ın birincisi.'),
                       _Kaynak('Sahîh-i Müslim',
-                          'Mesâcid, Salât, Müsâfirîn, Tahâret bölümleri (Cemaat, Sabah sünneti, Tesbihat hadisleri)'),
-                      _Kaynak('Sünen-i Ebû Dâvûd',
-                          'Vitir bölümü (Tesbihat hadisi)'),
-                      _Kaynak('Sünen-i İbn Mâce',
-                          'Mesâcid bölümü (Cemaat hadisi takviyesi)'),
+                          'İmam Müslim b. Haccâc el-Kuşeyrî (ö. 261/875). Buhârî ile birlikte "Sahîhayn" adıyla anılır; İslam dünyasının en temel iki hadis külliyatından biri.'),
                       _Kaynak('Sünen-i Tirmizî',
-                          'Salât bölümü (genel referans)'),
+                          'İmam Muhammed b. Îsâ et-Tirmizî (ö. 279/892). Kütüb-i Sitte\'nin önemli sünen koleksiyonu; her hadisin sıhhat derecesini de değerlendirir.'),
+                      _Kaynak('Sünen-i Ebû Dâvûd',
+                          'İmam Ebû Dâvûd Süleymân b. el-Eş\'as es-Sicistânî (ö. 275/889). Fıkhî hadislere zengin yer veren güvenilir sünen koleksiyonu.'),
+                      _Kaynak('Sünen-i İbn Mâce',
+                          'İmam Muhammed b. Yezîd İbn Mâce el-Kazvînî (ö. 273/887). Kütüb-i Sitte\'yi tamamlayan koleksiyon.'),
                       _Kaynak('Sünen-i Nesâî',
-                          'Sehv bölümü (genel referans)'),
+                          'İmam Ahmed b. Şuayb en-Nesâî (ö. 303/915). Kütüb-i Sitte\'nin en sahih sünen koleksiyonlarından biri; özellikle Amelü\'l-Yevm ve\'l-Leyle bölümü günlük zikir ve duaların kaynağıdır.'),
+                      _Kaynak('Ahmed b. Hanbel — Müsned & Fedâilü\'s-Sahâbe',
+                          'İmam Ahmed b. Hanbel (ö. 241/855). Müsned, en kapsamlı hadis derlemelerinden biridir. Fedâilü\'s-Sahâbe sahâbenin faziletlerini aktarır.'),
+                      _Kaynak('Hâkim — el-Müstedrek',
+                          'Hâkim en-Nîsâbûrî (ö. 405/1014). Buhârî ve Müslim\'in almadığı sahih hadisleri derlemiştir; sıhhat değerlendirmesi için Zehebî\'nin telhisi ile birlikte değerlendirilir.'),
+                      _Kaynak('Beyhakî — es-Sünenü\'l-Kübrâ',
+                          'İmam Beyhakî (ö. 458/1066). Fıkıh ve hadis konularında kapsamlı bir sünen koleksiyonu.'),
                     ],
                   ),
+
+                  // ── KUR'AN MEALİ ────────────────────────────────────────
                   _kaynakSection(
-                    'Fıkıh & Fetva',
+                    'Kur\'an-ı Kerîm Meali',
                     [
-                      _Kaynak('Diyanet İşleri Başkanlığı',
-                          'Din İşleri Yüksek Kurulu — Mekruh ve Kerahat Vakitleri Fetvaları'),
-                      _Kaynak('TDV İslam Ansiklopedisi',
-                          '"Vakit" ve "Kerahat" maddeleri — fıkhî dayanaklar'),
+                      _Kaynak('Diyanet İşleri Başkanlığı Meali',
+                          'Uygulamada yer alan tüm ayet mealleri Diyanet İşleri Başkanlığı\'nın resmî Türkçe meali esas alınarak verilmiştir.'),
                     ],
                   ),
+
+                  // ── FETVA KAYNAKLARI ────────────────────────────────────
                   _kaynakSection(
-                    'Kur\'an-ı Kerim',
+                    'Fetva ve Fıkıh Kaynakları',
                     [
-                      _Kaynak('Diyanet Meali',
-                          'Kur\'an-ı Kerim Türkçe meali, Nisâ Sûresi 103. âyet (Tesbihat bölümünde)'),
+                      _Kaynak('Kerahat Vakitleri',
+                          'Alışkanlıklar → Namaz Bilgileri → Kerahat Vakitleri bölümündeki fıkhî kurallar şu kaynaklara dayanmaktadır:\n• diyanet.gov.tr — Din İşleri Yüksek Kurulu fetvaları\n• islamansiklopedisi.org.tr — "Vakit" ve "Kerahat" maddeleri'),
+                      _Kaynak('Vird Faziletleri',
+                          'Alışkanlıklar → Virdlerim bölümündeki sure, zikir ve dua faziletleri için ek kaynak:\n• islamansiklopedisi.org.tr — "Nebe\'", "Vâkıa", "Kehf", "Yâsîn" ve ilgili sure maddeleri (sure faziletleri ve hadis sıhhati değerlendirmeleri)'),
                     ],
                   ),
-                  _kaynakSection(
-                    'Web Referansları',
-                    [
-                      _Kaynak('islamveihsan.com',
-                          'Cemaatle namaz faziletleri içeriği için referans alındı'),
-                    ],
-                  ),
+
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(12),

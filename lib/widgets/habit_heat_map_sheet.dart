@@ -293,11 +293,19 @@ class _HabitHeatGrid extends StatelessWidget {
       } catch (_) {}
     }
 
-    final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
-    final startMonday = effectiveStartDate.subtract(Duration(days: effectiveStartDate.weekday - 1));
-    
     // Her zaman 1 yıllık harita (53 hafta) gösterilir
     const int totalWeeks = 53;
+
+    // Bugün her zaman ızgarada görünür olsun — başlangıç tarihi en fazla 52 hafta öncesi olabilir
+    final minStartDate = todayClean.subtract(Duration(days: (totalWeeks - 1) * 7));
+    if (effectiveStartDate.isBefore(minStartDate)) effectiveStartDate = minStartDate;
+
+    // Saat bileşenini sıfırla — saat bilgisi weekMonday ve d hesaplarını bozuyor:
+    // d = weekMonday + N gün → saat dahil olursa bugün "gelecek" sayılıyor
+    effectiveStartDate = DateTime(effectiveStartDate.year, effectiveStartDate.month, effectiveStartDate.day);
+
+    final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
+    final startMonday = effectiveStartDate.subtract(Duration(days: effectiveStartDate.weekday - 1));
 
     // Mevcut haftanın indeksini bul (left-to-right kronolojik sırada kaçıncı kolona denk geldiği)
     final currentWeekIndex = currentMonday.difference(startMonday).inDays ~/ 7;

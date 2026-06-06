@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../app_colors.dart';
 import '../providers/user_provider.dart';
@@ -451,6 +452,8 @@ class _HomeView extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  const _ConsistencyCheckCard(),
                 ],
               ),
             ),
@@ -470,6 +473,181 @@ class _HomeView extends StatelessWidget {
             ]),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Tutarlılık Kontrol Kartı ─────────────────────────────────────────────────
+
+class _ConsistencyCheckCard extends StatefulWidget {
+  const _ConsistencyCheckCard();
+
+  @override
+  State<_ConsistencyCheckCard> createState() => _ConsistencyCheckCardState();
+}
+
+class _ConsistencyCheckCardState extends State<_ConsistencyCheckCard> {
+  bool _loading = false;
+
+  Future<void> _run() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _loading = true);
+
+    try {
+      final db = FirebaseFirestore.instance;
+
+      final results = await Future.wait([
+        db.collection('users').doc(user.uid).get(),
+        db.collection('users').doc(user.uid).collection('logs')
+            .where('type', whereIn: ['arapca', 'meal']).get(),
+      ]);
+
+      final userDoc = results[0] as DocumentSnapshot;
+      final logsSnap = results[1] as QuerySnapshot;
+
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      final totalPagesStored = userData?['totalPages'] as int? ?? 0;
+      final hasanatStored    = userData?['hasanat']    as int? ?? 0;
+
+      int sumFromLogs = 0;
+      final int logCount = logsSnap.docs.length;
+      for (final doc in logsSnap.docs) {
+        sumFromLogs += (doc.data() as Map<String, dynamic>)['pagesRead'] as int? ?? 0;
+      }
+
+      final int hasanatFromLogs = sumFromLogs * 10;
+      final int pageDiff    = sumFromLogs - totalPagesStored;
+      final int hasanatDiff = hasanatFromLogs - hasanatStored;
+      final bool allOk = pageDiff == 0 && hasanatDiff == 0;
+
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Veri Tutarlılığı', style: TextStyle(fontWeight: FontWeight.w700)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _row('Log sayısı', '$logCount kayıt'),
+              const SizedBox(height: 6),
+              _row('Log sayfa toplamı', '$sumFromLogs'),
+              _row('Profil totalPages', '$totalPagesStored'),
+              const SizedBox(height: 6),
+              _row('Beklenen hasanat', '$hasanatFromLogs'),
+              _row('Profil hasanat', '$hasanatStored'),
+              const SizedBox(height: 12),
+              _statusBox(
+                ok: allOk,
+                text: allOk
+                    ? 'Tutarlı — tüm sayaçlar doğru'
+                    : [
+                        if (pageDiff != 0)
+                          pageDiff > 0
+                              ? 'Sayfa: $pageDiff eksik'
+                              : 'Sayfa: ${pageDiff.abs()} fazla',
+                        if (hasanatDiff != 0)
+                          hasanatDiff > 0
+                              ? 'Hasanat: $hasanatDiff eksik'
+                              : 'Hasanat: ${hasanatDiff.abs()} fazla',
+                      ].join(' · '),
+              ),
+            ],
+          ),
+          actions: [
+            if (!allOk)
+              TextButton(
+                onPressed: () async {
+                  await db.collection('users').doc(user.uid).update({
+                    'totalPages': sumFromLogs,
+                    'hasanat': hasanatFromLogs,
+                  });
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text('Düzeltildi → $sumFromLogs sayfa, $hasanatFromLogs hasanat')),
+                    );
+                  }
+                },
+                child: const Text('İkisini Düzelt', style: TextStyle(color: Colors.orange)),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Kapat'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _row(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(children: [
+      Text('$label: ', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+      Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+    ]),
+  );
+
+  Widget _statusBox({required bool ok, required String text}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: (ok ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: (ok ? Colors.green : Colors.orange).withValues(alpha: 0.3)),
+    ),
+    child: Row(children: [
+      Icon(ok ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+          color: ok ? Colors.green : Colors.orange, size: 16),
+      const SizedBox(width: 8),
+      Expanded(child: Text(text, style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: ok ? Colors.green.shade700 : Colors.orange.shade800,
+      ))),
+    ]),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: _loading ? null : _run,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.verified_outlined, size: 20, color: Color(0xFF64748B)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Veri Tutarlılığı Kontrolü',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+              const Text('totalPages ↔ log toplamı karşılaştır',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            ]),
+          ),
+          if (_loading)
+            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+        ]),
       ),
     );
   }

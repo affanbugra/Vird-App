@@ -6,10 +6,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
 import '../models/vird_model.dart';
+import '../utils/seri_calculator.dart';
 import 'vird_library_screen.dart';
 import '../widgets/zikirmatik_modal.dart';
 import '../widgets/habit_tracker_widget.dart';
 import '../widgets/habit_heat_map_sheet.dart';
+import '../screens/streak_animation_screen.dart';
+import '../services/streak_freeze_service.dart';
 
 class VirdlerimContentWidget extends StatefulWidget {
   const VirdlerimContentWidget({super.key});
@@ -33,6 +36,10 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
   Map<String, List<String>> _virdOrder = {};
   VirdLog? _currentLog;
   bool _loadingPreferences = true;
+  // Sure log: "son istek kazanır" kuyruğu — race condition önleme
+  // virdId → true=oluştur, false=sil
+  final _sureLogPendingIntent = <String, bool>{};
+  final _sureLogProcessing = <String>{};
   StreamSubscription? _prefsSub;
   StreamSubscription? _logSub;
   DateTime? _userCreatedAt;
@@ -84,9 +91,15 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         } else {
           final idx = allVirds.indexWhere((e) => e.id == id);
           if (idx != -1) {
+            final defaultMap = allVirds[idx].toMap();
             allVirds[idx] = VirdItem.fromMap({
-              ...allVirds[idx].toMap(),
+              ...defaultMap,
               ...map,
+              // İçerik alanları her zaman koddan gelir — Firestore'daki eskiler geçersiz
+              'hadith': defaultMap['hadith'],
+              'description': defaultMap['description'],
+              'arabicTitle': defaultMap['arabicTitle'],
+              'recommendedTime': defaultMap['recommendedTime'],
             });
           }
         }
@@ -213,16 +226,19 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
 
   Future<void> _updateVirdProgress(String virdId, int newCount) async {
     if (_uid == null) return;
-    
-    // Optimistic Update for 7-dot tracker
+
     final dateKey = _todayDateStr();
+    // Mevcut completions'ı optimistic update öncesinde snapshotla
+    final mergedCompletions = <String, dynamic>{
+      ...?_currentLog?.completions,
+      virdId: newCount,
+    };
+
     setState(() {
       if (_selectedWeekLogs[dateKey] == null) {
         _selectedWeekLogs[dateKey] = {};
       }
       _selectedWeekLogs[dateKey]![virdId] = newCount;
-      
-      // Update local _currentLog as well for immediate UI response
       if (_currentLog != null) {
         _currentLog!.completions[virdId] = newCount;
       }
@@ -235,25 +251,14 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           .collection('logs')
           .doc(dateKey);
 
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) {
-          transaction.set(docRef, {
-            'type': 'vird',
-            'date': dateKey,
-            'completions': {virdId: newCount},
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          final data = snapshot.data() ?? {};
-          final completions = Map<String, dynamic>.from(data['completions'] ?? {});
-          completions[virdId] = newCount;
-          transaction.update(docRef, {
-            'completions': completions,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-      });
+      // runTransaction yerine direkt set — server round-trip okuma yok, flicker önlendi
+      // SetOptions(merge: true): sureLogIds/sureLogPages gibi diğer alanlar korunur
+      await docRef.set({
+        'type': 'vird',
+        'date': dateKey,
+        'completions': mergedCompletions,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Error saving progress: $e');
     }
@@ -467,9 +472,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         children: [
           _buildLibraryShowcaseCard(activeVirds),
           const SizedBox(height: 12),
-          _buildProgressCard(completed.length, activeVirds.length, totalProgress, log),
-          const SizedBox(height: 10),
           _buildDateSelector(),
+          const SizedBox(height: 10),
+          _buildProgressCard(completed.length, activeVirds.length, totalProgress, log),
           const SizedBox(height: 6),
 
           if (_isFriday()) _buildFridayBanner(),
@@ -478,7 +483,28 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           buildCategoryGroup('ZİKİRLER', AppColors.orange, zikirs, 'zikir'),
           buildCategoryGroup('DUALAR', AppColors.infoBlue, duas, 'dua'),
           buildCategoryGroup('DİĞER', AppColors.textMid, others, 'other'),
-          const SizedBox(height: 48),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.bookmark_border_rounded, size: 13, color: AppColors.textLight),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Tüm kaynaklar Profil > Ayarlar > Kaynakça bölümündedir.',
+                    style: GoogleFonts.nunito(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textLight,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 36),
         ],
       ),
     );
@@ -542,7 +568,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   ),
                 ),
                 Text(
-                  '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 215)',
+                  '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 216)',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     color: AppColors.textMid,
@@ -922,10 +948,363 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     );
   }
 
+  // Vird ID → Kuran sure bilgisi (id, başlangıç/bitiş sayfa)
+  // Sayfa aralıkları lib/data/quran_cuz.dart ile hizalıdır.
+  static const Map<String, ({int surahId, int startPage, int endPage})> _sureVirdMap = {
+    'kehf':  (surahId: 18, startPage: 292, endPage: 303),
+    'yasin': (surahId: 36, startPage: 439, endPage: 444),
+    'fetih': (surahId: 48, startPage: 510, endPage: 514),
+    'vakia': (surahId: 56, startPage: 533, endPage: 536),
+    'mulk':  (surahId: 67, startPage: 561, endPage: 563),
+    'nebe':  (surahId: 78, startPage: 581, endPage: 582),
+  };
+
   void _toggleSureDua(VirdItem item, int current) {
     HapticFeedback.mediumImpact();
     final newCount = current >= item.targetCount ? 0 : item.targetCount;
     _updateVirdProgress(item.id, newCount);
+
+    // Sadece varsayılan sure virdleri için okuma logu oluşturulur
+    if (item.category == 'sure' && !item.isCustom && _sureVirdMap.containsKey(item.id)) {
+      if (newCount >= item.targetCount) {
+        // Tamamlandı
+        if (_isToday()) {
+          _requestSureLog(item, true);
+        } else {
+          _showTopNotification(
+            context,
+            'Vird kaydedildi. Bu tarih için okuma logu oluşturulmadı — istatistiklere ve Kuran haritasına yansıtmak istersen "Okuma Kaydet" ekranından manuel giriş yapabilirsin.',
+            isError: false,
+            duration: const Duration(milliseconds: 5000),
+          );
+        }
+      } else {
+        // Geri alındı — yalnızca bugünse logu sil
+        if (_isToday()) _requestSureLog(item, false);
+      }
+    }
+  }
+
+  // Kullanıcı tıklamalarını sıralar; son istek her zaman kazanır
+  void _requestSureLog(VirdItem item, bool shouldCreate) {
+    _sureLogPendingIntent[item.id] = shouldCreate;
+    if (!_sureLogProcessing.contains(item.id)) {
+      _processSureLogQueue(item);
+    }
+  }
+
+  // Kuyruğu tüketir — create devam ederken undo gelirse create biter, sonra undo çalışır
+  Future<void> _processSureLogQueue(VirdItem item) async {
+    _sureLogProcessing.add(item.id);
+    try {
+      while (_sureLogPendingIntent.containsKey(item.id)) {
+        final shouldCreate = _sureLogPendingIntent.remove(item.id)!;
+        if (shouldCreate) {
+          await _doCreateSureReadingLog(item);
+        } else {
+          await _doDeleteSureReadingLog(item.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('Sure log queue error: $e');
+    } finally {
+      _sureLogProcessing.remove(item.id);
+    }
+  }
+
+  Future<void> _doCreateSureReadingLog(VirdItem item) async {
+    if (_uid == null) return;
+    final info = _sureVirdMap[item.id];
+    if (info == null) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final uid = _uid;
+      final pagesRead = info.endPage - info.startPage + 1;
+      final dateStr = _todayDateStr(); // await öncesinde yakala
+
+      try { await StreakFreezeService.autoApplyFreezes(uid); } catch (_) {}
+
+      final userRef = db.collection('users').doc(uid);
+      final virdDocRef = db.collection('users').doc(uid).collection('logs').doc(dateStr);
+
+      // Paralel: user doc + vird tracking doc
+      final fetchResults = await Future.wait([userRef.get(), virdDocRef.get()]);
+      final userSnap = fetchResults[0] as DocumentSnapshot;
+      final virdSnap = fetchResults[1] as DocumentSnapshot;
+
+      // İdempotency: bu sure için zaten log varsa tekrar oluşturma
+      final existingLogId = (virdSnap.data() as Map<String, dynamic>?)?['sureLogIds']?[item.id] as String?;
+      if (existingLogId != null) {
+        debugPrint('Sure log for ${item.id} already exists ($existingLogId), skipping');
+        return;
+      }
+
+      final userData = userSnap.data() as Map<String, dynamic>?;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final lastLogTs = userData?['lastLogDate'] as Timestamp?;
+      final lastLogDate = lastLogTs?.toDate();
+      final currentSeri = (userData?['seri'] as int?) ?? 0;
+      final displayedSeri = seriDisplayState(currentSeri, lastLogTs).value;
+
+      final Map<String, dynamic> seriUpdate;
+      bool needsSeriRecalculate = false;
+
+      if (lastLogDate != null && !lastLogDate.isBefore(today)) {
+        seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+      } else if (lastLogDate != null && !lastLogDate.isBefore(yesterday)) {
+        seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
+      } else {
+        final hadLogYesterday = lastLogDate == null
+            ? await userRef.collection('logs')
+                .where('type', whereIn: ['arapca', 'meal'])
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
+                .where('createdAt', isLessThan: Timestamp.fromDate(today))
+                .limit(1)
+                .get()
+                .then((s) => s.docs.isNotEmpty)
+            : false;
+        if (hadLogYesterday) {
+          needsSeriRecalculate = true;
+          seriUpdate = {'lastLogDate': FieldValue.serverTimestamp()};
+        } else {
+          seriUpdate = {'seri': 1, 'lastLogDate': FieldValue.serverTimestamp()};
+        }
+      }
+
+      // Haftalık hasanat güncelleme (LogEntryBottomSheet ile birebir)
+      final weekMonday = today.subtract(Duration(days: today.weekday - 1));
+      final weekStartStr = '${weekMonday.year}-${weekMonday.month.toString().padLeft(2, '0')}-${weekMonday.day.toString().padLeft(2, '0')}';
+      final existingWeekStr = userData?['weeklyStartDate'] as String?;
+      final Map<String, dynamic> weeklyUpdate;
+      if (existingWeekStr == weekStartStr) {
+        weeklyUpdate = {
+          'weeklyHasanat': FieldValue.increment(pagesRead * 10),
+          'weeklyStartDate': weekStartStr,
+        };
+      } else if (existingWeekStr == null) {
+        final weekStartTs = Timestamp.fromDate(weekMonday);
+        final existingSnap = await userRef.collection('logs')
+            .where('createdAt', isGreaterThanOrEqualTo: weekStartTs)
+            .get();
+        int existingWeekPages = 0;
+        for (final doc in existingSnap.docs) {
+          final logType = doc.data()['type'] as String?;
+          if (logType != 'arapca' && logType != 'meal') continue;
+          existingWeekPages += (doc.data()['pagesRead'] as int?) ?? 0;
+        }
+        weeklyUpdate = {
+          'weeklyHasanat': (existingWeekPages + pagesRead) * 10,
+          'weeklyStartDate': weekStartStr,
+        };
+      } else {
+        weeklyUpdate = {
+          'weeklyHasanat': pagesRead * 10,
+          'weeklyStartDate': weekStartStr,
+          'prevWeeklyStartDate': existingWeekStr,
+          'prevWeeklyHasanat': (userData?['weeklyHasanat'] as int?) ?? 0,
+        };
+      }
+
+      final batch = db.batch();
+      final logRef = userRef.collection('logs').doc();
+
+      batch.set(logRef, {
+        'type': 'arapca',
+        'method': 'surah',
+        'pagesRead': pagesRead,
+        'surahId': info.surahId,
+        'startPage': info.startPage,
+        'endPage': info.endPage,
+        'hatimId': null,
+        'source': 'vird',
+        'createdAt': Timestamp.fromDate(now),
+      });
+
+      batch.set(userRef, {
+        'hasanat': FieldValue.increment(pagesRead * 10),
+        'totalPages': FieldValue.increment(pagesRead),
+        ...seriUpdate,
+        ...weeklyUpdate,
+      }, SetOptions(merge: true));
+
+      // sureLogIds aynı batch'te — log + istatistik + takip ID'si atomik
+      batch.set(virdDocRef, {
+        'sureLogIds': {item.id: logRef.id},
+        'sureLogPages': {item.id: pagesRead},
+      }, SetOptions(merge: true));
+
+      await batch.commit();
+
+      if (mounted) {
+        _showTopNotification(
+          context,
+          'Okuma kaydı oluşturuldu — profil istatistiklerinize ve Kuran haritasına eklendi.',
+          isError: false,
+          duration: const Duration(milliseconds: 3500),
+        );
+      }
+
+      // Seri hesapla + animasyonu göster
+      int newSeri = displayedSeri;
+      if (needsSeriRecalculate) {
+        await SeriCalculator.recalculate(uid);
+        final refreshed = await userRef.get();
+        newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
+      } else if (seriUpdate.containsKey('seri')) {
+        newSeri = seriUpdate['seri'] as int;
+      }
+
+      if (newSeri > displayedSeri && mounted) {
+        // Root navigator kullan — widget nested navigator içinde olsa bile tam ekran görünür
+        final rootCtx = Navigator.of(context, rootNavigator: true).context;
+        try {
+          final weekData = await _getWeekFilled(uid);
+          if (mounted && rootCtx.mounted) {
+            await StreakAnimationScreen.show(
+              rootCtx,
+              count: newSeri,
+              prevCount: displayedSeri,
+              filled: weekData.filled,
+              dayLabels: weekData.labels,
+              todayIndex: 6,
+            );
+          }
+        } catch (e) {
+          debugPrint('Seri animasyonu gösterilemedi: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating sure reading log: $e');
+    }
+  }
+
+  Future<void> _doDeleteSureReadingLog(String virdId) async {
+    if (_uid == null) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final uid = _uid;
+      final virdDocRef = db.collection('users').doc(uid).collection('logs').doc(_todayDateStr());
+
+      final virdDoc = await virdDocRef.get();
+      if (!virdDoc.exists) return;
+
+      final sureLogIds = (virdDoc.data()?['sureLogIds'] as Map<String, dynamic>?) ?? {};
+      final logId = sureLogIds[virdId] as String?;
+      if (logId == null) return;
+
+      final sureLogPages = (virdDoc.data()?['sureLogPages'] as Map<String, dynamic>?) ?? {};
+      int pagesRead = (sureLogPages[virdId] as int?) ?? 0;
+
+      // Log dokümanından gerçek sayfa sayısını doğrula
+      final logDoc = await db.collection('users').doc(uid).collection('logs').doc(logId).get();
+      if (logDoc.exists) {
+        pagesRead = (logDoc.data()?['pagesRead'] as int?) ?? pagesRead;
+      }
+
+      final batch = db.batch();
+      final userRef = db.collection('users').doc(uid);
+
+      if (logDoc.exists) {
+        batch.delete(logDoc.reference);
+
+        // Stat reversal yalnızca log gerçekten varsa — dışarıdan silinmişse double decrement önlenir
+        if (pagesRead > 0) {
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final weekMonday = today.subtract(Duration(days: today.weekday - 1));
+          final weekStartStr = '${weekMonday.year}-${weekMonday.month.toString().padLeft(2, '0')}-${weekMonday.day.toString().padLeft(2, '0')}';
+          final userSnap = await userRef.get();
+          final existingWeekStr = (userSnap.data())?['weeklyStartDate'] as String?;
+          final logCreatedAt = (logDoc.data()?['createdAt'] as Timestamp?)?.toDate();
+          final logInThisWeek = logCreatedAt != null && !logCreatedAt.isBefore(weekMonday) && existingWeekStr == weekStartStr;
+
+          final Map<String, dynamic> reversal = {
+            'hasanat': FieldValue.increment(-pagesRead * 10),
+            'totalPages': FieldValue.increment(-pagesRead),
+          };
+          if (logInThisWeek) {
+            reversal['weeklyHasanat'] = FieldValue.increment(-pagesRead * 10);
+          }
+          batch.update(userRef, reversal);
+        }
+      } else {
+        debugPrint('Sure log $logId already deleted externally — clearing sureLogIds only');
+      }
+
+      // sureLogIds ve sureLogPages her durumda temizle
+      // completions.$virdId: 0 da aynı write'a eklenir — batch stream'i tetiklediğinde
+      // virdDoc'taki completions güncel kalır, flicker önlenir
+      batch.update(virdDocRef, {
+        'sureLogIds.$virdId': FieldValue.delete(),
+        'sureLogPages.$virdId': FieldValue.delete(),
+        'completions.$virdId': 0,
+      });
+
+      await batch.commit();
+
+      await SeriCalculator.recalculate(uid);
+
+      if (mounted) {
+        _showTopNotification(
+          context,
+          'Okuma kaydı silindi.',
+          isError: false,
+          duration: const Duration(milliseconds: 2500),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error deleting sure reading log: $e');
+    }
+  }
+
+  // Seri animasyonu için son 7 günlük doluluk verisi (LogEntryBottomSheet ile aynı)
+  static const _dayAbbr = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
+
+  Future<({List<bool> filled, List<String> labels})> _getWeekFilled(String uid) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startDay = today.subtract(const Duration(days: 6));
+
+    final results = await Future.wait([
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDay))
+          .get(),
+      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+    ]);
+
+    final logsSnap = results[0] as QuerySnapshot;
+    final userSnap = results[1] as DocumentSnapshot;
+    final frozenDates = Set<String>.from(
+      ((userSnap.data() as Map<String, dynamic>?)?['frozenDates'] as List<dynamic>?) ?? [],
+    );
+
+    final loggedDays = <String>{...frozenDates};
+    for (final doc in logsSnap.docs) {
+      final docData = doc.data() as Map<String, dynamic>?;
+      if (docData == null) continue;
+      final type = docData['type'] as String?;
+      if (type != 'arapca' && type != 'meal') continue;
+      final d = (docData['createdAt'] as Timestamp?)?.toDate().toLocal();
+      if (d != null) loggedDays.add(seriDateKey(d));
+    }
+
+    final filled = List.generate(7, (i) {
+      final day = startDay.add(Duration(days: i));
+      return loggedDays.contains(seriDateKey(day));
+    });
+    final labels = List.generate(7, (i) {
+      final day = startDay.add(Duration(days: i));
+      return _dayAbbr[day.weekday - 1];
+    });
+
+    return (filled: filled, labels: labels);
   }
 
   void _openZikirmatik(VirdItem item, int current) {
@@ -958,7 +1337,6 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           .collection('users')
           .doc(_uid)
           .collection('logs')
-          .where('type', isEqualTo: 'vird')
           .get();
           
       if (mounted) Navigator.pop(context); // Dismiss loading dialog
@@ -967,12 +1345,13 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       final Set<String> completedDateStrs = {};
       
       for (var doc in logsSnap.docs) {
+        if (!doc.id.startsWith('vird_')) continue;
         final data = doc.data();
-        final dateKey = data['date'] as String; // e.g. "vird_2026-06-01"
+        final dateKey = doc.id; // "vird_2026-06-01"
         allVirdLogs[dateKey] = data;
-        
+
         final comps = data['completions'] as Map<String, dynamic>? ?? {};
-        final count = comps[item.id] as int? ?? 0;
+        final count = (comps[item.id] as num?)?.toInt() ?? 0;
         if (count >= item.targetCount) {
           completedDateStrs.add(dateKey.replaceAll('vird_', ''));
         }
@@ -1105,11 +1484,6 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
             'active': true,
             'category': item.category,
             'targetCount': item.targetCount,
-            'title': item.title,
-            'arabicTitle': item.arabicTitle,
-            'description': item.description,
-            'recommendedTime': item.recommendedTime,
-            'hadith': item.hadith,
             'isCustom': item.isCustom,
             'updatedAt': FieldValue.serverTimestamp(),
           }
@@ -1415,7 +1789,7 @@ class StreamZip {
   }
 }
 
-void _showTopNotification(BuildContext context, String message, {required bool isError}) {
+void _showTopNotification(BuildContext context, String message, {required bool isError, Duration duration = const Duration(milliseconds: 1800)}) {
   final overlay = Overlay.of(context);
   late OverlayEntry entry;
 
@@ -1423,6 +1797,7 @@ void _showTopNotification(BuildContext context, String message, {required bool i
     builder: (context) => _TopNotificationOverlay(
       message: message,
       isError: isError,
+      duration: duration,
       onDismiss: () => entry.remove(),
     ),
   );
@@ -1433,12 +1808,14 @@ void _showTopNotification(BuildContext context, String message, {required bool i
 class _TopNotificationOverlay extends StatefulWidget {
   final String message;
   final bool isError;
+  final Duration duration;
   final VoidCallback onDismiss;
 
   const _TopNotificationOverlay({
     required this.message,
     required this.isError,
     required this.onDismiss,
+    this.duration = const Duration(milliseconds: 1800),
   });
 
   @override
@@ -1469,8 +1846,7 @@ class _TopNotificationOverlayState extends State<_TopNotificationOverlay>
 
     _controller.forward();
 
-    // Auto dismiss after 1.8 seconds
-    Future.delayed(const Duration(milliseconds: 1800), () async {
+    Future.delayed(widget.duration, () async {
       if (mounted) {
         await _controller.reverse();
         widget.onDismiss();
@@ -1536,8 +1912,6 @@ class _TopNotificationOverlayState extends State<_TopNotificationOverlay>
                           fontWeight: FontWeight.w700,
                           color: textColor,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

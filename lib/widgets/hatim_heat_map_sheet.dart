@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_colors.dart';
@@ -328,11 +329,12 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                         DuolingoButton(
                           color: AppColors.teal,
                           bottomColor: AppColors.tealDark,
-                          onPressed: () {
+                          onPressed: () async {
+                            final callback = widget.onDevamEt!;
                             Navigator.pop(context);
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              widget.onDevamEt!();
-                            });
+                            // İlk sheet'in tamamen kapanmasını bekle (web uyumluluğu)
+                            await Future.delayed(const Duration(milliseconds: 200));
+                            callback();
                           },
                           child: Text(
                             'DEVAM ET',
@@ -971,11 +973,18 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
       );
       await batch.commit();
 
+      // Arka planda asenkron çalıştır (UI bloklanmasın)
       final hatimId = data['hatimId'] as String?;
-      if (hatimId != null) {
-        await HatimCalculator.recalculate(widget.uid, hatimId);
-      }
-      await SeriCalculator.recalculate(widget.uid);
+      Future.microtask(() async {
+        try {
+          if (hatimId != null) {
+            await HatimCalculator.recalculate(widget.uid, hatimId);
+          }
+          await SeriCalculator.recalculate(widget.uid);
+        } catch (e) {
+          debugPrint('Arka plan recalculate hatası: $e');
+        }
+      });
     } catch (e) {
       debugPrint('Log sil hatası: $e');
     }
@@ -1004,81 +1013,93 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (seriDrops) ...[
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textMid, fontSize: 14),
-                  children: [
-                    const TextSpan(text: 'Seriniz '),
-                    TextSpan(
-                      text: '$currentSeri gün',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
-                    ),
-                    const TextSpan(text: '\'den '),
-                    TextSpan(
-                      text: '$newSeri gün',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: newSeri == 0
-                            ? AppColors.errorRed
-                            : AppColors.orange,
+      builder: (ctx) => Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+            Navigator.pop(ctx, true);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (seriDrops) ...[
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                        color: AppColors.textMid, fontSize: 14),
+                    children: [
+                      const TextSpan(text: 'Seriniz '),
+                      TextSpan(
+                        text: '$currentSeri gün',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark),
                       ),
-                    ),
-                    const TextSpan(text: '\'e düşecek.'),
-                  ],
+                      const TextSpan(text: '\'den '),
+                      TextSpan(
+                        text: '$newSeri gün',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: newSeri == 0
+                              ? AppColors.errorRed
+                              : AppColors.orange,
+                        ),
+                      ),
+                      const TextSpan(text: '\'e düşecek.'),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                'Bu okuma kaydı silinsin mi?\nHasanat ${pagesRead * 10} geri alınacak.',
+                style: const TextStyle(color: AppColors.textMid),
               ),
-              const SizedBox(height: 10),
+              if (seriDrops) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Bu işlem geri alınamaz.',
+                  style: TextStyle(
+                      color: AppColors.errorRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
             ],
-            Text(
-              'Bu okuma kaydı silinsin mi?\nHasanat ${pagesRead * 10} geri alınacak.',
-              style: const TextStyle(color: AppColors.textMid),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal',
+                  style: TextStyle(color: AppColors.textMid)),
             ),
-            if (seriDrops) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Bu işlem geri alınamaz.',
-                style: TextStyle(
-                    color: AppColors.errorRed,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.errorRed,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
-            ],
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                seriDrops ? 'Yine de Sil' : 'Sil',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.textMid)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              seriDrops ? 'Yine de Sil' : 'Sil',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
       ),
     ) ?? false;
     if (confirmed) await _deleteLog(doc);
