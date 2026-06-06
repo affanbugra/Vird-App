@@ -222,7 +222,19 @@ class QuranData {
 
   // Göreli ısı rengi — max=1 iken bile "en az okunan" seviyede kalır.
   // Taban 10: 10+ okumaya sahip sayfalar tam karanlık eşiğine ulaşabilir.
-  static Color heatColorRelative(int count, int maxCount) {
+  // isDark=true: renk mantığı tersine döner — çok okunan = parlak teal, az okunan = koyu/saydam
+  static Color heatColorRelative(int count, int maxCount, {bool isDark = false}) {
+    if (isDark) {
+      if (count == 0) return const Color(0xFF0D2830); // dark'ta okunmamış → neredeyse görünmez
+      final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
+      final ratio = count / denom;
+      if (ratio <= 0.1) return const Color(0xFF0D4455);  // çok az → koyu teal
+      if (ratio <= 0.3) return const Color(0xFF1A6678);  // az → orta teal
+      if (ratio <= 0.55) return const Color(0xFF2A8FA0); // orta → parlak teal
+      if (ratio <= 0.8) return const Color(0xFF3AAFBF);  // çok → canlı teal
+      return const Color(0xFF58D4E6);                     // maksimum → neon teal
+    }
+    // Light mode (orijinal)
     if (count == 0) return const Color(0xFFEEEEEF);
     final denom = maxCount < 10 ? 10.0 : maxCount.toDouble();
     final ratio = count / denom;

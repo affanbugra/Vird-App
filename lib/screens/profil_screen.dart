@@ -5,9 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../constants/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../data/quran_cuz.dart';
 import '../utils/name_utils.dart';
 import '../widgets/duolingo_button.dart';
@@ -343,7 +345,7 @@ class _ProfileHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isHafiz ? AppColors.emeraldGreen : Colors.white,
+                    color: isHafiz ? AppColors.emeraldGreen : context.colors.surface,
                     width: 3,
                   ),
                   boxShadow: [
@@ -356,7 +358,7 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 child: CircleAvatar(
                   radius: avatarR,
-                  backgroundColor: AppColors.tealLight,
+                  backgroundColor: context.colors.tealSurface,
                   backgroundImage: avatarSeed != null
                       ? NetworkImage(
                           'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
@@ -394,7 +396,7 @@ class _ProfileHeader extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 19,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textDark,
+                              color: context.colors.textPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -490,7 +492,7 @@ class _ProfileHeader extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textMid,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ],
@@ -500,7 +502,7 @@ class _ProfileHeader extends StatelessWidget {
                         locationParts.join(' · '),
                         style: GoogleFonts.nunito(
                           fontSize: 11,
-                          color: AppColors.textLight,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -589,8 +591,8 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -612,7 +614,7 @@ class _StatCard extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 7.5,
               fontWeight: FontWeight.w700,
-              color: AppColors.textLight,
+              color: context.colors.textTertiary,
               letterSpacing: 0.4,
             ),
           ),
@@ -660,8 +662,8 @@ class _KuranHaritasiCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -688,7 +690,7 @@ class _KuranHaritasiCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     Text(
@@ -696,7 +698,7 @@ class _KuranHaritasiCard extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   ],
@@ -710,12 +712,12 @@ class _KuranHaritasiCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: !isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: !isMeal ? AppColors.teal : context.colors.surfaceVariant,
                         borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
                       ),
                       child: Text('ARAPÇA', style: GoogleFonts.nunito(
                         fontSize: 10, fontWeight: FontWeight.w700,
-                        color: !isMeal ? Colors.white : AppColors.textMid,
+                        color: !isMeal ? Colors.white : context.colors.textSecondary,
                       )),
                     ),
                   ),
@@ -724,12 +726,12 @@ class _KuranHaritasiCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isMeal ? AppColors.teal : AppColors.lightGrey,
+                        color: isMeal ? AppColors.teal : context.colors.surfaceVariant,
                         borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
                       ),
                       child: Text('MEAL', style: GoogleFonts.nunito(
                         fontSize: 10, fontWeight: FontWeight.w700,
-                        color: isMeal ? Colors.white : AppColors.textMid,
+                        color: isMeal ? Colors.white : context.colors.textSecondary,
                       )),
                     ),
                   ),
@@ -796,9 +798,9 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : AppColors.white,
+          color: isSelected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.colors.border,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -808,7 +810,7 @@ class _FilterChip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: isSelected ? AppColors.teal : AppColors.textMid,
+            color: isSelected ? AppColors.teal : context.colors.textSecondary,
           ),
         ),
       ),
@@ -840,9 +842,10 @@ class _HeatGrid extends StatelessWidget {
     return (squaresArea - _maxPages * _squareGap) / _maxPages;
   }
 
-  Widget _buildSquare(int page, double sq, double radius, int maxCount) {
+  Widget _buildSquare(BuildContext context, int page, double sq, double radius, int maxCount) {
     final count = readings[page] ?? 0;
     final isSelected = selectedPage == page;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => onPageTap(page),
       child: Container(
@@ -850,9 +853,9 @@ class _HeatGrid extends StatelessWidget {
         height: sq,
         margin: const EdgeInsets.only(right: _squareGap),
         decoration: BoxDecoration(
-          color: QuranData.heatColorRelative(count, maxCount),
+          color: QuranData.heatColorRelative(count, maxCount, isDark: isDark),
           borderRadius: BorderRadius.circular(radius),
-          border: isSelected ? Border.all(color: AppColors.textDark, width: 1) : null,
+          border: isSelected ? Border.all(color: context.colors.textPrimary, width: 1) : null,
         ),
       ),
     );
@@ -867,11 +870,12 @@ class _HeatGrid extends StatelessWidget {
         final maxCount = readings.isEmpty ? 0 : readings.values.fold(0, (a, b) => a > b ? a : b);
         final fatihaCount = readings[1] ?? 0; // Fatiha rengi Bakara 1. sayfayla aynı
         final fatihaSelected = selectedPage == 0;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         final labelStyle = GoogleFonts.nunito(
           fontSize: 8,
           fontWeight: FontWeight.w700,
-          color: AppColors.textLight,
+          color: context.colors.textTertiary,
         );
 
         final rows = <Widget>[];
@@ -889,10 +893,10 @@ class _HeatGrid extends StatelessWidget {
                   width: sq,
                   height: sq,
                   decoration: BoxDecoration(
-                    color: QuranData.heatColorRelative(fatihaCount, maxCount),
+                    color: QuranData.heatColorRelative(fatihaCount, maxCount, isDark: isDark),
                     borderRadius: BorderRadius.circular(radius),
                     border: fatihaSelected
-                        ? Border.all(color: AppColors.textDark, width: 1)
+                        ? Border.all(color: context.colors.textPrimary, width: 1)
                         : null,
                   ),
                 ),
@@ -916,7 +920,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('${cuz.cuzNo}', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(cuz.pageCount, (i) => _buildSquare(cuz.startPage + i, sq, radius, maxCount)),
+                  ...List.generate(cuz.pageCount, (i) => _buildSquare(context, cuz.startPage + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -932,7 +936,7 @@ class _HeatGrid extends StatelessWidget {
                     child: Text('30', textAlign: TextAlign.right, style: labelStyle),
                   ),
                   const SizedBox(width: _labelGap),
-                  ...List.generate(20, (i) => _buildSquare(581 + i, sq, radius, maxCount)),
+                  ...List.generate(20, (i) => _buildSquare(context, 581 + i, sq, radius, maxCount)),
                 ],
               ),
             ));
@@ -943,7 +947,7 @@ class _HeatGrid extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(width: _labelW + _labelGap),
-                  ...List.generate(4, (i) => _buildSquare(601 + i, sq, radius, maxCount)),
+                  ...List.generate(4, (i) => _buildSquare(context, 601 + i, sq, radius, maxCount)),
                   const SizedBox(width: 3),
                   Text('İhlâs · Felak · Nâs', style: labelStyle),
                 ],
@@ -978,7 +982,7 @@ class _Legend extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('Az', style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid)),
+              Text('Az', style: GoogleFonts.nunito(fontSize: 10, color: context.colors.textSecondary)),
               const SizedBox(width: 4),
               ...levels.map(
                 (c) => Container(
@@ -992,7 +996,7 @@ class _Legend extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 1),
-              Text('Çok', style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid)),
+              Text('Çok', style: GoogleFonts.nunito(fontSize: 10, color: context.colors.textSecondary)),
             ],
           ),
         );
@@ -1016,13 +1020,13 @@ class _DetailPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
       ),
       child: page == null
           ? Text(
               'Detay için bir sayfaya dokun',
-              style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+              style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary),
             )
           : _PageDetail(page: page!, count: readings[page] ?? 0, maxCount: maxCount),
     );
@@ -1054,13 +1058,13 @@ class _PageDetail extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               if (surahText.isNotEmpty)
                 Text(
                   surahText,
-                  style: GoogleFonts.nunito(fontSize: 10, color: AppColors.textMid),
+                  style: GoogleFonts.nunito(fontSize: 10, color: context.colors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -1070,8 +1074,8 @@ class _PageDetail extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.borderGrey),
+            color: context.colors.surface,
+            border: Border.all(color: context.colors.border),
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
@@ -1079,7 +1083,7 @@ class _PageDetail extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: count == 0 ? AppColors.textLight : QuranData.heatColorRelative(count, maxCount),
+              color: count == 0 ? context.colors.textTertiary : QuranData.heatColorRelative(count, maxCount, isDark: Theme.of(context).brightness == Brightness.dark),
             ),
           ),
         ),
@@ -1107,37 +1111,37 @@ class _SettingsSheet extends StatefulWidget {
 
 class _SettingsSheetState extends State<_SettingsSheet> {
   void _showProfileAccountSheet(BuildContext context) {
-    Navigator.pop(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _ProfileAccountSheet(userData: widget.userData, user: widget.user),
+      builder: (_) => _ProfileAccountSheet(
+        userData: widget.userData,
+        user: widget.user,
+        onBack: () => Navigator.pop(context),
+      ),
     );
   }
 
   void _showHafizSheet(BuildContext context) {
-    final navContext = context;
-    Navigator.pop(context);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      showModalBottomSheet(
-        context: navContext,
-        isScrollControlled: true,
-        useSafeArea: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (_) => _HafizSheet(
-          uid: widget.user.uid,
-          isHafiz: (widget.userData['isHafiz'] as bool?) ?? false,
-          name: (widget.userData['name'] as String?) ?? '',
-          username: (widget.userData['username'] as String?) ?? '',
-          avatarSeed: widget.userData['avatarSeed'] as String?,
-        ),
-      );
-    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _HafizSheet(
+        uid: widget.user.uid,
+        isHafiz: (widget.userData['isHafiz'] as bool?) ?? false,
+        name: (widget.userData['name'] as String?) ?? '',
+        username: (widget.userData['username'] as String?) ?? '',
+        avatarSeed: widget.userData['avatarSeed'] as String?,
+        onBack: () => Navigator.pop(context),
+      ),
+    );
   }
 
   void _showKaynakcaSheet(BuildContext context) {
@@ -1168,7 +1172,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1178,7 +1182,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 20),
@@ -1193,7 +1197,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -1201,7 +1205,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             icon: Icons.history,
             title: 'Okuma Geçmişi',
             onTap: () {
-              Navigator.pop(context);
               LogHistorySheet.show(context);
             },
           ),
@@ -1223,13 +1226,51 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               });
             },
           ),
+          const SizedBox(height: 12),
+          // Dark mode toggle
+          Consumer<ThemeProvider>(
+            builder: (context, theme, _) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: context.colors.border),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      theme.isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                      color: context.colors.textPrimary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Karanlık Mod',
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: theme.isDark,
+                      onChanged: (_) => theme.toggle(),
+                      activeColor: AppColors.teal,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 20),
           Text(
             'Gizlilik',
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -1237,14 +1278,14 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               'Harita ve istatistiklerin kimler tarafından görülebileceğini belirle.\nYakında eklenecek.',
               style: GoogleFonts.nunito(
                 fontSize: 13,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
                 height: 1.5,
               ),
             ),
@@ -1290,12 +1331,12 @@ class _SettingsItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderGrey),
+          border: Border.all(color: context.colors.border),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.textDark, size: 22),
+            Icon(icon, color: context.colors.textPrimary, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1303,11 +1344,11 @@ class _SettingsItem extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMid),
+            Icon(Icons.chevron_right, color: context.colors.textSecondary),
           ],
         ),
       ),
@@ -1413,7 +1454,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: AppColors.borderGrey,
+                    color: context.colors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1423,7 +1464,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 style: GoogleFonts.nunito(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 20),
@@ -1448,7 +1489,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 decoratorProps: DropDownDecoratorProps(
                   decoration: InputDecoration(
                     labelText: 'Şehir (Opsiyonel)',
-                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                     prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
@@ -1476,7 +1517,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 decoratorProps: DropDownDecoratorProps(
                   decoration: InputDecoration(
                     labelText: 'Üniversite (Opsiyonel)',
-                    labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                    labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                     prefixIcon: const Icon(Icons.school, color: AppColors.teal),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
@@ -1493,8 +1534,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: DuolingoButton(
                   color: AppColors.teal,
                   bottomColor: AppColors.tealDark,
-                  disabledColor: AppColors.borderGrey,
-                  isLoading: _isLoading,
+                    isLoading: _isLoading,
                   onPressed: _isLoading ? null : _save,
                   child: Text(
                     'KAYDET',
@@ -1521,7 +1561,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
         counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
@@ -1541,7 +1581,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 class _ProfileAccountSheet extends StatefulWidget {
   final Map<String, dynamic> userData;
   final User user;
-  const _ProfileAccountSheet({required this.userData, required this.user});
+  final VoidCallback? onBack;
+  const _ProfileAccountSheet({required this.userData, required this.user, this.onBack});
 
   @override
   State<_ProfileAccountSheet> createState() => _ProfileAccountSheetState();
@@ -1560,6 +1601,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
   final _newPassCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   bool _passwordLoading = false;
+  bool _deleteLoading = false;
   late bool _hasPassword;
 
   late final List<String> _sortedCities;
@@ -1654,6 +1696,98 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Hesabı Sil',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
+        content: Text(
+          'Hesabının tüm bilgileri ve ilerlemelerin kalıcı olarak silinecektir. Bu işlem geri alınamaz.\n\nOnaylıyor musun?',
+          style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Vazgeç',
+                style: GoogleFonts.nunito(color: context.colors.textSecondary, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Evet, Sil',
+                style: GoogleFonts.nunito(color: AppColors.errorRed, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleteLoading = true);
+
+    // Firestore silme sırasında MandatorySetup tetiklenmesin
+    try { context.read<UserProvider>().suppressSetup(); } catch (_) {}
+
+    final uid = widget.user.uid;
+    final authProvider = context.read<AuthProvider>();
+    // Navigator ve ScaffoldMessenger'ı async öncesinde yakala:
+    // user.delete() auth state'i değiştirince context stale olabilir,
+    // NavigatorState referansı ise her zaman geçerli kalır.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      // 1. Token'ı tazele — hesap dışarıdan silinmişse veya oturum tamamen geçersizse
+      //    burada hata fırlatır. requires-recent-login yalnızca user.delete()'te yakalanır.
+      await widget.user.reload();
+
+      // 2. Firestore verisini sil — hâlâ authenticated olduğumuz için kurallar geçerli.
+      final logsSnap = await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('logs').get();
+      for (final doc in logsSnap.docs) await doc.reference.delete();
+
+      final hatimsSnap = await FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('hatims').get();
+      for (final doc in hatimsSnap.docs) await doc.reference.delete();
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+
+      // 3. Auth hesabını sil — Firestore temizlendi, artık güvenli.
+      await widget.user.delete();
+
+      // 4. Sheet'leri kapat — navigator önceden alındığı için context stale olsa da güvenli.
+      // signOut() çağrılmıyor: user.delete() zaten auth state'i null yapıyor,
+      // AuthWrapper LoginScreen'e otomatik geçer ve çift auth event oluşmaz.
+      navigator.popUntil((route) => route.isFirst);
+
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteLoading = false);
+      if (e.code == 'requires-recent-login') {
+        navigator.popUntil((route) => route.isFirst);
+        authProvider.signOut(); // fire-and-forget — AuthWrapper geçişini tetikler
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Güvenlik nedeniyle hesabınızı silmeden önce tekrar giriş yapmalısınız.'),
+            backgroundColor: AppColors.errorRed,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Hata: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteLoading = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1669,17 +1803,34 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
                 width: 40, height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2),
+                  color: context.colors.border, borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            Text('Profil & Hesap',
-              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            Row(
+              children: [
+                if (widget.onBack != null)
+                  GestureDetector(
+                    onTap: widget.onBack,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: context.colors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: context.colors.textSecondary),
+                    ),
+                  ),
+                Text('Profil & Hesap',
+                  style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
+              ],
+            ),
 
             const SizedBox(height: 24),
             // ── Profil ──────────────────────────────────────────────
             Text('Profil Bilgileri',
-              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
             const SizedBox(height: 12),
             Form(
               key: _profileFormKey,
@@ -1703,7 +1854,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
                     decoratorProps: DropDownDecoratorProps(
                       decoration: InputDecoration(
                         labelText: 'Şehir (Opsiyonel)',
-                        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                         prefixIcon: const Icon(Icons.location_city, color: AppColors.teal),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         focusedBorder: OutlineInputBorder(
@@ -1728,7 +1879,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
                     decoratorProps: DropDownDecoratorProps(
                       decoration: InputDecoration(
                         labelText: 'Üniversite (Opsiyonel)',
-                        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                         prefixIcon: const Icon(Icons.school, color: AppColors.teal),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         focusedBorder: OutlineInputBorder(
@@ -1751,14 +1902,14 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
                       return InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'Cinsiyet (Değiştirilemez)',
-                          labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+                          labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
                           prefixIcon: const Icon(Icons.wc, color: AppColors.teal),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           enabled: false,
                         ),
                         child: Text(
                           label,
-                          style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.nunito(fontSize: 15, color: context.colors.textPrimary, fontWeight: FontWeight.w600),
                         ),
                       );
                     },
@@ -1771,7 +1922,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               width: double.infinity, height: 50,
               child: DuolingoButton(
                 color: AppColors.teal, bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey, isLoading: _profileLoading,
+                isLoading: _profileLoading,
                 onPressed: _profileLoading ? null : _saveProfile,
                 child: Text('PROFİLİ KAYDET',
                   style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
@@ -1784,25 +1935,25 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
 
             // ── Hesap ────────────────────────────────────────────────
             Text('Hesap Ayarları',
-              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
             const SizedBox(height: 12),
 
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12),
+                color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.email_outlined, color: AppColors.textLight, size: 20),
+                  Icon(Icons.email_outlined, color: context.colors.textTertiary, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(widget.user.email ?? '—',
-                      style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid)),
+                      style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary)),
                   ),
                   Text('e-posta',
-                    style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight)),
+                    style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary)),
                 ],
               ),
             ),
@@ -1810,13 +1961,13 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
             const SizedBox(height: 20),
             Text(
               _hasPassword ? 'Şifre Değiştir' : 'Şifre Belirle',
-              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid),
+              style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textSecondary),
             ),
             if (!_hasPassword) ...[
               const SizedBox(height: 6),
               Text(
                 'Google ile giriş yaptığın için henüz bir şifren yok. Belirleyerek e-posta & şifreyle de giriş yapabilirsin.',
-                style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight, height: 1.4),
+                style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary, height: 1.4),
               ),
             ],
             const SizedBox(height: 12),
@@ -1839,7 +1990,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               width: double.infinity, height: 50,
               child: DuolingoButton(
                 color: AppColors.teal, bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey, isLoading: _passwordLoading,
+                isLoading: _passwordLoading,
                 onPressed: _passwordLoading ? null : _savePassword,
                 child: Text(
                   _hasPassword ? 'ŞİFREYİ DEĞİŞTİR' : 'ŞİFRE BELİRLE',
@@ -1852,7 +2003,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               const Expanded(child: Divider()),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('veya', style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textLight)),
+                child: Text('veya', style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textTertiary)),
               ),
               const Expanded(child: Divider()),
             ]),
@@ -1872,6 +2023,29 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
               label: Text('Başka cihazdan giriş linki gönder',
                 style: GoogleFonts.nunito(fontSize: 14, color: AppColors.teal, fontWeight: FontWeight.w600)),
             ),
+
+            // ── Hesabı Sil ─────────────────────────────────────────
+            const SizedBox(height: 8),
+            Center(
+              child: _deleteLoading
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : TextButton(
+                      onPressed: _deleteAccount,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      child: Text(
+                        'Hesabımı Kalıcı Olarak Sil',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          color: context.colors.textTertiary,
+                          decoration: TextDecoration.underline,
+                          decorationColor: context.colors.textTertiary,
+                        ),
+                      ),
+                    ),
+            ),
           ],
         ),
       ),
@@ -1886,7 +2060,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
       maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
         counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
@@ -1907,7 +2081,7 @@ class _ProfileAccountSheetState extends State<_ProfileAccountSheet> {
       maxLength: 64,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
         counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(
@@ -1933,6 +2107,7 @@ class _HafizSheet extends StatefulWidget {
   final String name;
   final String username;
   final String? avatarSeed;
+  final VoidCallback? onBack;
 
   const _HafizSheet({
     required this.uid,
@@ -1940,6 +2115,7 @@ class _HafizSheet extends StatefulWidget {
     required this.name,
     required this.username,
     this.avatarSeed,
+    this.onBack,
   });
 
   @override
@@ -2026,11 +2202,11 @@ class _HafizSheetState extends State<_HafizSheet> {
             children: [
               Text(
                 'Yönetici inceledikten sonra rozetiniz kaldırılacaktır.',
-                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+                style: GoogleFonts.nunito(fontSize: 13, color: ctx.colors.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 14),
               Text('Açıklama (opsiyonel)',
-                  style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: ctx.colors.textPrimary)),
               const SizedBox(height: 6),
               TextField(
                 controller: noteCtrl,
@@ -2038,7 +2214,7 @@ class _HafizSheetState extends State<_HafizSheet> {
                 autofocus: false,
                 decoration: InputDecoration(
                   hintText: 'Neden iptal etmek istediğinizi yazabilirsiniz…',
-                  hintStyle: GoogleFonts.nunito(color: AppColors.textLight, fontSize: 12),
+                  hintStyle: GoogleFonts.nunito(color: ctx.colors.textTertiary, fontSize: 12),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -2099,23 +2275,23 @@ class _HafizSheetState extends State<_HafizSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
+        color: AppColors.gold.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.hourglass_top_rounded, color: Color(0xFFFFB300), size: 32),
+          const Icon(Icons.hourglass_top_rounded, color: AppColors.gold, size: 32),
           const SizedBox(height: 10),
           Text(
             'İptal Başvurunuz İnceleniyor',
-            style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+            style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.gold),
           ),
           const SizedBox(height: 6),
           Text(
             'Hafız statünüzü kaldırma başvurunuz yönetici tarafından inceleniyor. Rozetiniz bu süreçte aktif kalmaya devam edecektir.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+            style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary, height: 1.5),
           ),
         ],
       ),
@@ -2149,7 +2325,7 @@ class _HafizSheetState extends State<_HafizSheet> {
               ),
               if (note != null && note.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(note, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark, height: 1.5)),
+                Text(note, style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textPrimary, height: 1.5)),
               ],
               const SizedBox(height: 8),
               Text(
@@ -2165,13 +2341,13 @@ class _HafizSheetState extends State<_HafizSheet> {
           child: OutlinedButton(
             onPressed: _loading ? null : _submitRevokeRequest,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.textLight),
+              side: BorderSide(color: context.colors.textTertiary),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
               'Tekrar Başvur',
-              style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMid),
+              style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.textSecondary),
             ),
           ),
         ),
@@ -2197,7 +2373,7 @@ class _HafizSheetState extends State<_HafizSheet> {
               child: Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -2205,6 +2381,19 @@ class _HafizSheetState extends State<_HafizSheet> {
             const SizedBox(height: 16),
             Row(
               children: [
+                if (widget.onBack != null)
+                  GestureDetector(
+                    onTap: widget.onBack,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: context.colors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: context.colors.textSecondary),
+                    ),
+                  ),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -2219,7 +2408,7 @@ class _HafizSheetState extends State<_HafizSheet> {
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ],
@@ -2280,7 +2469,7 @@ class _HafizSheetState extends State<_HafizSheet> {
           Text(
             'Lütfen internet bağlantınızı kontrol edip sayfayı kapatıp tekrar açın.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMid),
+            style: GoogleFonts.nunito(fontSize: 12, color: context.colors.textSecondary),
           ),
         ],
       ),
@@ -2315,7 +2504,7 @@ class _HafizSheetState extends State<_HafizSheet> {
               Text(
                 'Profilinizde HAFIZ rozeti görünmektedir.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+                style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
               ),
               const SizedBox(height: 12),
               Text(
@@ -2337,9 +2526,9 @@ class _HafizSheetState extends State<_HafizSheet> {
             'Hafız statümü kaldırmak istiyorum',
             style: GoogleFonts.nunito(
               fontSize: 12,
-              color: AppColors.textLight,
+              color: context.colors.textTertiary,
               decoration: TextDecoration.underline,
-              decorationColor: AppColors.textLight,
+              decorationColor: context.colors.textTertiary,
             ),
           ),
         ),
@@ -2372,7 +2561,7 @@ class _HafizSheetState extends State<_HafizSheet> {
           Text(
             'Hafızlık belgeniz incelendikten sonra hesabınıza HAFIZ rozeti eklenecektir.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+            style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary, height: 1.5),
           ),
         ],
       ),
@@ -2412,7 +2601,7 @@ class _HafizSheetState extends State<_HafizSheet> {
                 const SizedBox(height: 8),
                 Text(
                   note,
-                  style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark, height: 1.5),
+                  style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textPrimary, height: 1.5),
                 ),
               ],
             ],
@@ -2457,7 +2646,7 @@ class _HafizSheetState extends State<_HafizSheet> {
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textDark, height: 1.4),
+              style: GoogleFonts.nunito(fontSize: 12.5, color: context.colors.textPrimary, height: 1.4),
             ),
           ),
         ],
@@ -2505,14 +2694,14 @@ class _HafizSheetState extends State<_HafizSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               'Başvurunuzu inceleyebilmemiz için hafızlık belgenizi Google Drive üzerinden paylaşabilir ya da ek bir not bırakabilirsiniz. Bu alan zorunlu değildir.\n\nPaylaştığınız bilgiler yalnızca hafızlık durumunuzu doğrulamak amacıyla kullanılacak; inceleme tamamlandıktan sonra sistemimizden kalıcı olarak silinecektir. Verileriniz herhangi bir üçüncü tarafla paylaşılmayacaktır.',
               style: GoogleFonts.nunito(
                 fontSize: 12.5,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
                 height: 1.55,
               ),
             ),
@@ -2520,15 +2709,15 @@ class _HafizSheetState extends State<_HafizSheet> {
           const SizedBox(height: 20),
           Text(
             'Ad Soyad',
-            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
           ),
           const SizedBox(height: 6),
           TextFormField(
             controller: _nameCtrl,
-            style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Belgedeki adınız',
-              hintStyle: GoogleFonts.nunito(color: AppColors.textLight),
+              hintStyle: GoogleFonts.nunito(color: context.colors.textTertiary),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2541,23 +2730,23 @@ class _HafizSheetState extends State<_HafizSheet> {
           const SizedBox(height: 16),
           Text(
             'Belge veya Not (Opsiyonel)',
-            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
           ),
           const SizedBox(height: 4),
           Text(
             'Drive linki paylaşıyorsanız "Bağlantıya sahip olan herkes görüntüleyebilir" ayarını seçin.',
-            style: GoogleFonts.nunito(fontSize: 11.5, color: AppColors.textLight),
+            style: GoogleFonts.nunito(fontSize: 11.5, color: context.colors.textTertiary),
           ),
           const SizedBox(height: 6),
           TextFormField(
             controller: _linkCtrl,
-            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textPrimary),
             keyboardType: TextInputType.multiline,
             maxLines: 3,
             minLines: 1,
             decoration: InputDecoration(
               hintText: 'Drive linki veya iletmek istediğiniz bir not…',
-              hintStyle: GoogleFonts.nunito(color: AppColors.textLight, fontSize: 13),
+              hintStyle: GoogleFonts.nunito(color: context.colors.textTertiary, fontSize: 13),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2587,7 +2776,7 @@ class _HafizSheetState extends State<_HafizSheet> {
                 Expanded(
                   child: Text(
                     'Paylaştığım bilgilerin yalnızca hafızlık doğrulaması amacıyla kullanılacağını ve inceleme sonrasında kalıcı olarak silineceğini anlıyorum.',
-                    style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textMid, height: 1.5),
+                    style: GoogleFonts.nunito(fontSize: 12.5, color: context.colors.textSecondary, height: 1.5),
                   ),
                 ),
               ],
@@ -2681,7 +2870,7 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
               width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -2698,12 +2887,34 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
             const SizedBox(height: 16),
             Text('Link Gönderildi!',
                 style: GoogleFonts.nunito(fontSize: 20,
-                    fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                    fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
             const SizedBox(height: 8),
             Text(
               '${widget.email} adresine giriş linki gönderildi.\nLinke tıkladığında o cihazda otomatik giriş yapılır.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+              style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: Color(0xFFB45309)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mailı göremiyorsan spam / gereksiz klasörünü de kontrol etmeyi unutma.',
+                      style: GoogleFonts.nunito(
+                          fontSize: 12, color: const Color(0xFF92400E), height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -2712,7 +2923,6 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
               child: DuolingoButton(
                 color: AppColors.teal,
                 bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey,
                 isLoading: false,
                 onPressed: () => Navigator.pop(context),
                 child: Text('TAMAM',
@@ -2725,8 +2935,8 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
               children: [
                 Container(
                   width: 44, height: 44,
-                  decoration: const BoxDecoration(
-                      color: AppColors.tealLight, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                      color: context.colors.tealSurface, shape: BoxShape.circle),
                   child: const Icon(Icons.link_rounded,
                       color: AppColors.teal, size: 22),
                 ),
@@ -2738,10 +2948,10 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
                       Text('Başka Cihazdan Giriş',
                           style: GoogleFonts.nunito(fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textDark)),
+                              color: context.colors.textPrimary)),
                       Text('Tek tıkla giriş linki al',
                           style: GoogleFonts.nunito(
-                              fontSize: 13, color: AppColors.textMid)),
+                              fontSize: 13, color: context.colors.textSecondary)),
                     ],
                   ),
                 ),
@@ -2751,19 +2961,19 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.lightGrey,
+                color: context.colors.surfaceVariant,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.mail_outline_rounded,
-                      color: AppColors.textLight, size: 18),
+                  Icon(Icons.mail_outline_rounded,
+                      color: context.colors.textTertiary, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(widget.email,
                         style: GoogleFonts.nunito(fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textDark)),
+                            color: context.colors.textPrimary)),
                   ),
                 ],
               ),
@@ -2772,7 +2982,7 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
             Text(
               'Bu adrese bir giriş linki gönderilecek. Linki almak istediğin cihazda e-postanı aç ve linke tıkla — şifre gerekmeden otomatik giriş yapılır.',
               style: GoogleFonts.nunito(fontSize: 13,
-                  color: AppColors.textMid, height: 1.5),
+                  color: context.colors.textSecondary, height: 1.5),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -2781,7 +2991,6 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
               child: DuolingoButton(
                 color: AppColors.teal,
                 bottomColor: AppColors.tealDark,
-                disabledColor: AppColors.borderGrey,
                 isLoading: _isLoading,
                 onPressed: _isLoading ? null : _send,
                 child: Text('GİRİŞ LİNKİ GÖNDER',

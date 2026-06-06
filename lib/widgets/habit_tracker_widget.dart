@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import 'habit_heat_map_sheet.dart';
 
 // Kullanıcının seçebileceği alışkanlık ikonları. const liste — codePoint ile lookup yapılır,
@@ -272,8 +273,8 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                 bottom: MediaQuery.of(context).viewInsets.bottom + 24,
                 top: 24, left: 24, right: 24
               ),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
+              decoration: BoxDecoration(
+                color: context.colors.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SingleChildScrollView(
@@ -286,7 +287,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       style: GoogleFonts.nunito(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -304,7 +305,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         decoration: InputDecoration(
                           hintText: 'Örn: Sabah Yürüyüşü',
                           filled: true,
-                          fillColor: AppColors.lightGrey,
+                          fillColor: context.colors.surfaceVariant,
                           counterText: '',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -320,7 +321,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       style: GoogleFonts.nunito(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -343,7 +344,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? selectedColor.withValues(alpha: 0.15)
-                                  : AppColors.lightGrey,
+                                  : context.colors.surfaceVariant,
                               borderRadius: BorderRadius.circular(10),
                               border: isSelected
                                   ? Border.all(color: selectedColor, width: 1.5)
@@ -352,7 +353,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                             child: Icon(
                               icon,
                               size: 16,
-                              color: isSelected ? selectedColor : AppColors.textMid,
+                              color: isSelected ? selectedColor : context.colors.textSecondary,
                             ),
                           ),
                         );
@@ -364,7 +365,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       style: GoogleFonts.nunito(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -387,7 +388,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                             decoration: BoxDecoration(
                               color: c,
                               shape: BoxShape.circle,
-                              border: isSelected ? Border.all(color: AppColors.textDark, width: 2) : null,
+                              border: isSelected ? Border.all(color: context.colors.textPrimary, width: 2) : null,
                             ),
                           ),
                         );
@@ -481,12 +482,12 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
         title: Text('Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
         content: Text(
           '"${habit.title}" alışkanlığını silmek istediğinize emin misiniz?\nTüm geçmiş veriler de silinecek.',
-          style: GoogleFonts.nunito(color: AppColors.textMid),
+          style: GoogleFonts.nunito(color: context.colors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('İptal', style: GoogleFonts.nunito(color: AppColors.textMid)),
+            child: Text('İptal', style: GoogleFonts.nunito(color: context.colors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -543,7 +544,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
           },
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppColors.lightGrey,
+            fillColor: context.colors.surfaceVariant,
             counterText: '',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -554,7 +555,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('İptal', style: GoogleFonts.nunito(color: AppColors.textMid)),
+            child: Text('İptal', style: GoogleFonts.nunito(color: context.colors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -693,11 +694,11 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
       margin: const EdgeInsets.symmetric(vertical: 3),
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: isDoneToday ? habit.color.withValues(alpha: 0.18) : AppColors.white,
+        color: isDoneToday ? habit.color.withValues(alpha: 0.18) : context.colors.surface,
         border: Border.all(
           color: isDoneToday
               ? habit.color.withValues(alpha: 0.33)
-              : AppColors.borderGrey,
+              : context.colors.border,
           width: 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -753,7 +754,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         style: GoogleFonts.nunito(
                           fontSize: 14.0,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
+                          color: context.colors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -763,7 +764,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                           'Bu gün henüz eklenmemişti',
                           style: GoogleFonts.nunito(
                             fontSize: 10.0,
-                            color: AppColors.textLight,
+                            color: context.colors.textTertiary,
                             fontStyle: FontStyle.italic,
                           ),
                         )
@@ -775,7 +776,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                               style: GoogleFonts.nunito(
                                 fontSize: 10.0,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textLight,
+                                color: context.colors.textTertiary,
                               ),
                             ),
                             if (streak > 0) ...[
@@ -784,7 +785,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                                 '•',
                                 style: TextStyle(
                                   fontSize: 8,
-                                  color: AppColors.textLight.withValues(alpha: 0.5),
+                                  color: context.colors.textTertiary.withValues(alpha: 0.5),
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -825,7 +826,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
 
                       if (isInactiveOnDay) {
                         dotColor = Colors.transparent;
-                        dotBorder = Border.all(color: AppColors.borderGrey, width: 1.0);
+                        dotBorder = Border.all(color: context.colors.border, width: 1.0);
                       } else if (isDone) {
                         dotColor = habit.color;
                       } else if (dCleanOnDot == todayClean) {
@@ -837,7 +838,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
 
                       // Seçili gün göstergesi — bugün+tamamlanmamış stilini bozmuyor
                       if (isSelectedDay && !(dCleanOnDot == todayClean && !isDone)) {
-                        dotBorder = Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2);
+                        dotBorder = Border.all(color: context.colors.textPrimary.withValues(alpha: 0.45), width: 1.2);
                       }
 
                       return Container(
@@ -880,7 +881,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                 const SizedBox(width: 4),
                 // Üç nokta menüsü
                 PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
+                  icon: Icon(Icons.more_vert, color: context.colors.textTertiary, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -894,7 +895,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       value: 'rename',
                       child: Row(
                         children: [
-                          const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMid),
+                          Icon(Icons.edit_outlined, size: 18, color: context.colors.textSecondary),
                           const SizedBox(width: 10),
                           Text('Adı Düzenle', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                         ],
@@ -904,7 +905,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       value: 'design',
                       child: Row(
                         children: [
-                          const Icon(Icons.palette_outlined, size: 18, color: AppColors.textMid),
+                          Icon(Icons.palette_outlined, size: 18, color: context.colors.textSecondary),
                           const SizedBox(width: 10),
                           Text('İkon & Renk', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                         ],
@@ -986,15 +987,15 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
+                    color: context.colors.surfaceVariant,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.borderGrey),
+                    border: Border.all(color: context.colors.border),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textDark, size: 22),
+                        icon: Icon(Icons.chevron_left_rounded, color: context.colors.textPrimary, size: 22),
                         onPressed: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -1009,7 +1010,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       ),
                       if (_selectedDate.isBefore(todayClean))
                         IconButton(
-                          icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textDark, size: 22),
+                          icon: Icon(Icons.chevron_right_rounded, color: context.colors.textPrimary, size: 22),
                           onPressed: () {
                             final next = _selectedDate.add(const Duration(days: 1));
                             if (!next.isAfter(todayClean)) {
@@ -1042,9 +1043,9 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
             margin: const EdgeInsets.only(bottom: 16, top: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(
               children: [
@@ -1060,7 +1061,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         builder: (context, animVal, _) => CircularProgressIndicator(
                           value: animVal,
                           strokeWidth: 6,
-                          backgroundColor: AppColors.lightGrey,
+                          backgroundColor: context.colors.surfaceVariant,
                           color: progress == 1.0 ? AppColors.teal : AppColors.orange,
                         ),
                       ),
@@ -1070,7 +1071,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       )
@@ -1091,14 +1092,14 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                       Text(
                         '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 216)',
                         style: GoogleFonts.nunito(
                           fontSize: 12,
-                          color: AppColors.textMid,
+                          color: context.colors.textSecondary,
                         ),
                       )
                     ],
@@ -1116,7 +1117,7 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                 "Henüz bir alışkanlık eklemedin.\nSağ üstteki + butonundan başlayabilirsin.",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
-                  color: AppColors.textLight,
+                  color: context.colors.textTertiary,
                   fontSize: 12.5,
                   height: 1.5,
                 ),
@@ -1192,3 +1193,5 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
     );
   }
 }
+
+

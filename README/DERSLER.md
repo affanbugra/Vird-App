@@ -162,6 +162,25 @@ Sheet kapandıktan sonra dialog için: `showModalBottomSheet<bool>` await et, `c
 
 ### Firestore
 
+**`context.colors.*` + `const` widget çakışması**
+`context.colors.*` runtime değerdir (`Theme.of(context)` çağrısı), `const` constructor içinde kullanılamaz. Derleyici "Not a constant expression" verir.
+```dart
+// ❌ Hata: const BoxDecoration(color: context.colors.surface)
+const Container(
+  decoration: BoxDecoration(color: context.colors.surface),
+)
+// ✅ Çözüm: widget'tan const'u kaldır, içteki sabit alt widget'lar const kalabilir
+Container(
+  decoration: BoxDecoration(color: context.colors.surface),
+  child: const SizedBox(width: 40),  // bu const kalabilir
+)
+```
+Kural: `context.colors.*` kullanan her widget `const` olamaz. Sadece `AppColors.teal` gibi sabit semantic renkler `const` içinde kullanılabilir.
+
+---
+
+### Firestore
+
 **Rules deploy edilmeden test → optimistik yazma yanıltır**
 Firestore rules yeni bir koleksiyona izin vermeden önce `.set()` çağrısı lokalde başarılı görünür (SDK optimistik cache yazması). UI anında güncellenir, kullanıcı "işlem tamam" sanır. Sunucu birkaç saniye içinde `permission-denied` döndürünce SDK cache'i geri alır (rollback) → UI eski haline döner. Hata mesajı da gecikmeli gelir.
 ```

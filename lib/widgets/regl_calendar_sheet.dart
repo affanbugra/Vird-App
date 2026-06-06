@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../app_colors.dart';
+import '../app_theme.dart';
 
 class ReglCalendarSheet extends StatefulWidget {
   const ReglCalendarSheet({super.key});
@@ -78,9 +78,9 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      decoration: const BoxDecoration(
-        color: AppColors.lightGrey,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceVariant,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -92,11 +92,11 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
                 style: GoogleFonts.nunito(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: AppColors.textMid),
+                icon: Icon(Icons.close, color: context.colors.textSecondary),
                 onPressed: () => Navigator.pop(context),
               )
             ],
@@ -134,9 +134,9 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +146,7 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
             style: GoogleFonts.nunito(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
@@ -158,7 +158,7 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
                 child: Center(
                   child: Text(
                     day,
-                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: AppColors.textMid),
+                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: context.colors.textSecondary),
                   ),
                 ),
               );
@@ -200,7 +200,7 @@ class _ReglCalendarSheetState extends State<ReglCalendarSheet> {
                       style: GoogleFonts.nunito(
                         fontSize: 8,
                         fontWeight: isRegl ? FontWeight.w800 : FontWeight.w600,
-                        color: isRegl ? Colors.pink.shade400 : AppColors.textDark,
+                        color: isRegl ? Colors.pink.shade400 : context.colors.textPrimary,
                       ),
                     ),
                   ),

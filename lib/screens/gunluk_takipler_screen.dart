@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../providers/user_provider.dart';
 import '../widgets/habit_tracker_widget.dart';
 import '../widgets/regl_calendar_sheet.dart';
@@ -372,8 +373,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 right: 16,
                 bottom: 20 + bottomInset + 16,
               ),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
+              decoration: BoxDecoration(
+                color: context.colors.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
@@ -385,7 +386,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                     children: [
                       Text(
                         '${record.date.day} ${_getMonthName(record.date.month)} Namaz Takibi',
-                        style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                        style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
                       ),
                       if (cinsiyet == 'hanim')
                         PopupMenuButton<String>(
@@ -457,7 +458,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: isRegl ? Colors.pink.shade50 : AppColors.lightGrey,
+                              color: isRegl ? Colors.pink.shade50 : context.colors.surfaceVariant,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: isRegl ? Colors.pink.shade200 : Colors.transparent),
                             ),
@@ -479,7 +480,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                   // 1. SATIR: Vakit Seçici Bar
                   Container(
                     height: 36,
-                    decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(18)),
+                    decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(18)),
                     child: Row(
                       children: PrayerTime.values.map((time) {
                         final isSelected = time == selectedTime;
@@ -495,7 +496,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                               alignment: Alignment.center,
                               child: Text(
                                 _getPrayerName(time),
-                                style: GoogleFonts.nunito(fontSize: 11, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, color: isSelected ? Colors.white : AppColors.textMid),
+                                style: GoogleFonts.nunito(fontSize: 11, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, color: isSelected ? Colors.white : context.colors.textSecondary),
                               ),
                             ),
                           ),
@@ -610,7 +611,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                               child: _buildActionButton(
                                 label: sName,
                                 isSelected: isDone,
-                                activeColor: isPassive ? AppColors.borderGrey : AppColors.goldSoft,
+                                activeColor: isPassive ? context.colors.border : AppColors.goldSoft,
                                 activeTextColor: Colors.white,
                                 fontSize: 10,
                                 isEnabled: !isPassive,
@@ -662,9 +663,9 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? activeColor : AppColors.lightGrey,
+            color: isSelected ? activeColor : context.colors.surfaceVariant,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isSelected ? activeColor.withValues(alpha: 0.5) : AppColors.borderGrey),
+            border: Border.all(color: isSelected ? activeColor.withValues(alpha: 0.5) : context.colors.border),
           ),
           alignment: Alignment.center,
           child: Row(
@@ -681,7 +682,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                     style: GoogleFonts.nunito(
                       fontSize: fontSize,
                       fontWeight: isBold || isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? activeTextColor : AppColors.textMid,
+                      color: isSelected ? activeTextColor : context.colors.textSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -743,8 +744,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 maxHeight: MediaQuery.of(sheetCtx).size.height * 0.92,
               ),
               padding: const EdgeInsets.only(top: 12, bottom: 24),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
+              decoration: BoxDecoration(
+                color: context.colors.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
@@ -755,7 +756,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.borderGrey,
+                      color: context.colors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -769,11 +770,11 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: AppColors.textMid, size: 20),
+                          icon: Icon(Icons.close, color: context.colors.textSecondary, size: 20),
                           onPressed: () => Navigator.pop(sheetCtx),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -812,7 +813,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                       },
                                       child: CustomPaint(
                                         painter: KerahatChartPainter(
-                                            highlightSector: selectedSector),
+                                            highlightSector: selectedSector,
+                                            textColor: context.colors.textPrimary),
                                       ),
                                     ),
                                   ),
@@ -821,7 +823,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                       width: 100,
                                       height: 100,
                                       decoration: BoxDecoration(
-                                        color: AppColors.white,
+                                        color: context.colors.surface,
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
@@ -838,7 +840,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                         style: GoogleFonts.nunito(
                                           fontSize: 9.5,
                                           fontWeight: FontWeight.w800,
-                                          color: AppColors.textDark,
+                                          color: context.colors.textPrimary,
                                           height: 1.3,
                                         ),
                                       ),
@@ -868,7 +870,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                   style: GoogleFonts.nunito(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textDark,
+                                    color: context.colors.textPrimary,
                                     height: 1.55,
                                   ),
                                 ),
@@ -877,7 +879,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.tealLight,
+                                    color: context.colors.tealSurface,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                         color:
@@ -992,7 +994,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               style: GoogleFonts.nunito(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
                 height: 1.5,
               ),
             ),
@@ -1018,7 +1020,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                       style: GoogleFonts.nunito(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                         height: 1.5,
                       ),
                     ),
@@ -1038,7 +1040,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.6,
             ),
             children: [
@@ -1050,7 +1052,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               const TextSpan(text: ' kılınır. Başka nafile namaz yoktur. '),
               TextSpan(
                 text: 'Sabahın farzı bu vakit içinde her zaman kılınabilir.',
-                style: GoogleFonts.nunito(fontStyle: FontStyle.italic, color: AppColors.textMid),
+                style: GoogleFonts.nunito(fontStyle: FontStyle.italic, color: context.colors.textSecondary),
               ),
             ],
           ),
@@ -1065,7 +1067,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.6,
             ),
             children: [
@@ -1098,7 +1100,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
             height: 1.55,
           ),
         );
@@ -1107,7 +1109,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     return Container(
       key: key,
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
       ),
@@ -1160,8 +1162,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             child: Container(
               width: 4,
               height: 4,
-              decoration: const BoxDecoration(
-                color: AppColors.textMid,
+              decoration: BoxDecoration(
+                color: context.colors.textSecondary,
                 shape: BoxShape.circle,
               ),
             ),
@@ -1173,7 +1175,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
                 height: 1.5,
               ),
             ),
@@ -1190,7 +1192,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(10),
         border: Border(left: BorderSide(color: color, width: 3)),
       ),
@@ -1202,7 +1204,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.6,
             ),
           ),
@@ -1212,7 +1214,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
         ],
@@ -1264,7 +1266,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.55,
             ),
           ),
@@ -1325,7 +1327,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.55,
             ),
           ),
@@ -1350,7 +1352,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
               height: 1.55,
             ),
           ),
@@ -1375,7 +1377,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
       child: Row(
         children: [
           Icon(Icons.bookmark_border_rounded,
-              size: 13, color: AppColors.textLight),
+              size: 13, color: context.colors.textTertiary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -1383,7 +1385,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               style: GoogleFonts.nunito(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -1405,9 +1407,9 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
@@ -1421,8 +1423,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
           initiallyExpanded: initiallyExpanded,
           tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          iconColor: AppColors.textMid,
-          collapsedIconColor: AppColors.textMid,
+          iconColor: context.colors.textSecondary,
+          collapsedIconColor: context.colors.textSecondary,
           leading: Container(
             width: 32,
             height: 32,
@@ -1438,7 +1440,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           onExpansionChanged: (expanded) {
@@ -1569,8 +1571,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 maxHeight: MediaQuery.of(sheetCtx).size.height * 0.85,
               ),
               padding: const EdgeInsets.only(top: 12, bottom: 20),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
+              decoration: BoxDecoration(
+                color: context.colors.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
@@ -1581,7 +1583,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.borderGrey,
+                      color: context.colors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1608,10 +1610,10 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                   });
                                   ensureMonthLoaded();
                                 },
-                                child: const Padding(
+                                child: Padding(
                                   padding: EdgeInsets.all(6),
                                   child: Icon(Icons.chevron_left_rounded,
-                                      color: AppColors.textDark, size: 22),
+                                      color: context.colors.textPrimary, size: 22),
                                 ),
                               ),
                               Expanded(
@@ -1621,7 +1623,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                   style: GoogleFonts.nunito(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
-                                    color: AppColors.textDark,
+                                    color: context.colors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -1639,10 +1641,10 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                         });
                                         ensureMonthLoaded();
                                       },
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(6),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(6),
                                         child: Icon(Icons.chevron_right_rounded,
-                                            color: AppColors.textDark, size: 22),
+                                            color: context.colors.textPrimary, size: 22),
                                       ),
                                     ),
                             ],
@@ -1651,8 +1653,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                         Positioned(
                           right: 16,
                           child: IconButton(
-                            icon: const Icon(Icons.close,
-                                color: AppColors.textMid, size: 20),
+                            icon: Icon(Icons.close,
+                                color: context.colors.textSecondary, size: 20),
                             onPressed: () => Navigator.pop(sheetCtx),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -1709,7 +1711,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                               style: GoogleFonts.nunito(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w700,
-                                                color: AppColors.textLight,
+                                                color: context.colors.textTertiary,
                                               ),
                                             ),
                                           ))
@@ -1795,7 +1797,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1822,7 +1824,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           style: GoogleFonts.nunito(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textMid,
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],
@@ -1891,16 +1893,16 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     final ratio = hasData ? (done / total).clamp(0.0, 1.0) : 0.0;
     final pctInt = (ratio * 100).round();
     final ringColor =
-        hasData ? _gaugeColorFor(pctInt) : AppColors.borderGrey;
+        hasData ? _gaugeColorFor(pctInt) : context.colors.border;
 
     return Semantics(
       label: '$label %$pctInt — $detail',
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderGrey),
+          border: Border.all(color: context.colors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1922,7 +1924,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           progress: animValue,
                           color: ringColor,
                           backgroundColor:
-                              AppColors.borderGrey.withValues(alpha: 0.45),
+                              context.colors.border.withValues(alpha: 0.45),
                           strokeWidth: 4.0,
                         ),
                       ),
@@ -1932,7 +1934,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                           style: GoogleFonts.nunito(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ),
@@ -1948,7 +1950,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               style: GoogleFonts.nunito(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1960,7 +1962,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
               style: GoogleFonts.nunito(
                 fontSize: 8.5,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -2023,7 +2025,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                             style: GoogleFonts.nunito(
                               fontSize: 9.5,
                               fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                              color: isToday ? AppColors.teal : AppColors.textLight,
+                              color: isToday ? AppColors.teal : context.colors.textTertiary,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -2036,6 +2038,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                 cinsiyet,
                                 record.tesbihats,
                                 record.sunnahs,
+                                surfaceColor: context.colors.surface,
+                                borderColor: context.colors.border,
                               ),
                             ),
                           ),
@@ -2060,18 +2064,18 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
     final currentMonthText = '${_getMonthName(weekMidDate.month)} ${weekMidDate.year}';
 
     return Scaffold(
-      backgroundColor: AppColors.lightGrey,
+      backgroundColor: context.colors.surfaceVariant,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppColors.textDark),
+        iconTheme: IconThemeData(color: context.colors.textPrimary),
         title: Text(
           'Günlük Takiplerim',
           style: GoogleFonts.nunito(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
       ),
@@ -2100,9 +2104,9 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 child: Container(
                 padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.borderGrey),
+                  border: Border.all(color: context.colors.border),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.04),
@@ -2130,10 +2134,10 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                       curve: Curves.easeInOut,
                                     );
                                   },
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
                                     child: Icon(Icons.chevron_left_rounded,
-                                        size: 20, color: AppColors.textMid),
+                                        size: 20, color: context.colors.textSecondary),
                                   ),
                                 ),
                                 InkWell(
@@ -2150,7 +2154,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                         style: GoogleFonts.nunito(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w700,
-                                          color: AppColors.textLight,
+                                          color: context.colors.textTertiary,
                                         ),
                                       ),
                                     ),
@@ -2168,7 +2172,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                 style: GoogleFonts.nunito(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textDark,
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -2176,8 +2180,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                 onTap: () => _showKerahatInfoSheet(context),
                                 child: Container(
                                   padding: const EdgeInsets.all(3),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.tealLight,
+                                  decoration: BoxDecoration(
+                                    color: context.colors.tealSurface,
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -2216,10 +2220,10 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                         curve: Curves.easeInOut,
                                       );
                                     },
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(6),
                                       child: Icon(Icons.chevron_right_rounded,
-                                          size: 20, color: AppColors.textMid),
+                                          size: 20, color: context.colors.textSecondary),
                                     ),
                                   ),
                               ],
@@ -2282,7 +2286,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                             style: GoogleFonts.nunito(
                                               fontSize: 12,
                                               fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                              color: isToday ? AppColors.teal : AppColors.textMid,
+                                              color: isToday ? AppColors.teal : context.colors.textSecondary,
                                             ),
                                           ),
                                           const SizedBox(height: 8),
@@ -2290,7 +2294,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                                             width: 46,
                                             height: 46,
                                             child: CustomPaint(
-                                              painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs),
+                                              painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs, surfaceColor: context.colors.surface, borderColor: context.colors.border),
                                             ),
                                           ),
                                         ],
@@ -2315,7 +2319,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
                 controller: _tabController,
                 indicatorColor: AppColors.teal,
                 labelColor: AppColors.teal,
-                unselectedLabelColor: AppColors.textMid,
+                unselectedLabelColor: context.colors.textSecondary,
                 indicatorSize: TabBarIndicatorSize.tab,
                 labelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800),
                 unselectedLabelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600),
@@ -2353,7 +2357,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Material(color: AppColors.white, child: tabBar);
+    return Material(color: context.colors.surface, child: tabBar);
   }
 
   @override
@@ -2365,8 +2369,13 @@ class PrayerPieChartPainter extends CustomPainter {
   final String cinsiyet;
   final Map<PrayerTime, bool> tesbihats;
   final Map<PrayerTime, List<bool>> sunnahs;
+  final Color surfaceColor;
+  final Color borderColor;
 
-  PrayerPieChartPainter(this.prayers, this.cinsiyet, this.tesbihats, this.sunnahs);
+  PrayerPieChartPainter(this.prayers, this.cinsiyet, this.tesbihats, this.sunnahs, {
+    this.surfaceColor = Colors.white,
+    this.borderColor = const Color(0xFFE2E8F0),
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2380,7 +2389,7 @@ class PrayerPieChartPainter extends CustomPainter {
     final paint = Paint()..style = PaintingStyle.fill;
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..color = AppColors.white
+      ..color = surfaceColor
       ..strokeWidth = 1.5;
 
     int i = 0;
@@ -2396,7 +2405,7 @@ class PrayerPieChartPainter extends CustomPainter {
       } else if (status == PrayerStatus.regl && cinsiyet == 'hanim') {
         paint.color = Colors.pink.shade200; 
       } else {
-        paint.color = AppColors.borderGrey.withValues(alpha: 0.5); 
+        paint.color = borderColor.withValues(alpha: 0.5);
       }
       
       final startAngle = -math.pi / 2 + (i * sweepAngle);
@@ -2427,7 +2436,7 @@ class PrayerPieChartPainter extends CustomPainter {
            if (status == PrayerStatus.regl && cinsiyet == 'hanim') {
              ringColor = Colors.pink.shade200;
            } else {
-             ringColor = isDone ? AppColors.gold : AppColors.borderGrey.withValues(alpha: 0.4);
+             ringColor = isDone ? AppColors.gold : borderColor.withValues(alpha: 0.4);
            }
 
            final ringPaint = Paint()
@@ -2518,8 +2527,9 @@ class _RingGaugePainter extends CustomPainter {
 
 class KerahatChartPainter extends CustomPainter {
   final String? highlightSector; // 'red' | 'yellow' | 'green' | 'blue' | null
+  final Color textColor;
 
-  KerahatChartPainter({this.highlightSector});
+  KerahatChartPainter({this.highlightSector, this.textColor = const Color(0xFF1E293B)});
 
   static const double innerR = 50; // iç delik (orta beyaz dairenin yarıçapı)
 
@@ -2581,7 +2591,7 @@ class KerahatChartPainter extends CustomPainter {
           style: GoogleFonts.nunito(
             fontSize: 11.5,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: textColor,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -2603,3 +2613,6 @@ class KerahatChartPainter extends CustomPainter {
   bool shouldRepaint(covariant KerahatChartPainter old) =>
       old.highlightSector != highlightSector;
 }
+
+
+

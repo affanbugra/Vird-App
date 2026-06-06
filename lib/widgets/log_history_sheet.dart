@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/reading_log_model.dart';
 import '../models/hatim_model.dart';
 import '../data/quran_cuz.dart';
@@ -47,76 +47,64 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Focus(
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-              (event.logicalKey == LogicalKeyboardKey.enter ||
-               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
-            Navigator.pop(ctx, true);
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Tüm kayıtları sil',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (currentSeri > 0) ...[
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                        color: AppColors.textMid, fontSize: 14),
-                    children: [
-                      const TextSpan(text: '🔥 Seriniz '),
-                      TextSpan(
-                        text: '$currentSeri gün',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark),
-                      ),
-                      const TextSpan(text: '\'den '),
-                      const TextSpan(
-                        text: '0 güne',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.errorRed),
-                      ),
-                      const TextSpan(text: ' sıfırlanacak.'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              const Text(
-                'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
-                style: TextStyle(color: AppColors.textMid),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal',
-                  style: TextStyle(color: AppColors.textMid)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.errorRed,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Tümünü Sil',
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Tüm kayıtları sil',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentSeri > 0) ...[
+              RichText(
+                text: TextSpan(
                   style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                      color: context.colors.textSecondary, fontSize: 14),
+                  children: [
+                    const TextSpan(text: '🔥 Seriniz '),
+                    TextSpan(
+                      text: '$currentSeri gün',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: context.colors.textPrimary),
+                    ),
+                    const TextSpan(text: '\'den '),
+                    const TextSpan(
+                      text: '0 güne',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.errorRed),
+                    ),
+                    const TextSpan(text: ' sıfırlanacak.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Text(
+              'Tüm okuma kayıtları silinecek.\nHasanat puanı, okunan sayfalar ve hatim ilerlemeleri sıfırlanır.\n\nBu işlem geri alınamaz.',
+              style: TextStyle(color: context.colors.textSecondary),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('İptal',
+                style: TextStyle(color: context.colors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tümünü Sil',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     ) ?? false;
     if (!confirmed || !mounted) return;
@@ -185,7 +173,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.68,
         child: Scaffold(
-          backgroundColor: AppColors.white,
+          backgroundColor: context.colors.surface,
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -195,12 +183,12 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Son Kayıtlar',
                       style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textDark),
+                          color: context.colors.textPrimary),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -226,14 +214,14 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                     }
                     final docs = snap.data?.docs ?? [];
                     if (docs.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.history, size: 52, color: AppColors.borderGrey),
-                            SizedBox(height: 12),
+                            Icon(Icons.history, size: 52, color: context.colors.border),
+                            const SizedBox(height: 12),
                             Text('Henüz kayıt yok.',
-                                style: TextStyle(color: AppColors.textMid)),
+                                style: TextStyle(color: context.colors.textSecondary)),
                           ],
                         ),
                       );
@@ -249,7 +237,7 @@ class _LogHistoryContentState extends State<_LogHistoryContent> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       itemCount: logs.length,
                       separatorBuilder: (ctx, i) =>
-                          const Divider(height: 1, color: AppColors.borderGrey),
+                          Divider(height: 1, color: context.colors.border),
                       itemBuilder: (context, i) => _LogTile(
                         log: logs[i],
                         uid: uid,
@@ -379,93 +367,81 @@ class _LogTile extends StatelessWidget {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Focus(
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-              (event.logicalKey == LogicalKeyboardKey.enter ||
-               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
-            Navigator.pop(ctx, true);
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (seriDrops) ...[
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                        color: AppColors.textMid, fontSize: 14),
-                    children: [
-                      const TextSpan(text: 'Seriniz '),
-                      TextSpan(
-                        text: '$currentSeri gün',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark),
-                      ),
-                      const TextSpan(text: '\'den '),
-                      TextSpan(
-                        text: '$newSeri gün',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: newSeri == 0
-                              ? AppColors.errorRed
-                              : AppColors.orange,
-                        ),
-                      ),
-                      const TextSpan(text: '\'e düşecek.'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              Text(
-                '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
-                style: const TextStyle(color: AppColors.textMid),
-              ),
-              if (seriDrops) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Bu işlem geri alınamaz.',
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (seriDrops) ...[
+              RichText(
+                text: TextSpan(
                   style: TextStyle(
-                      color: AppColors.errorRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
+                      color: context.colors.textSecondary, fontSize: 14),
+                  children: [
+                    const TextSpan(text: 'Seriniz '),
+                    TextSpan(
+                      text: '$currentSeri gün',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: context.colors.textPrimary),
+                    ),
+                    const TextSpan(text: '\'den '),
+                    TextSpan(
+                      text: '$newSeri gün',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: newSeri == 0
+                            ? AppColors.errorRed
+                            : AppColors.orange,
+                      ),
+                    ),
+                    const TextSpan(text: '\'e düşecek.'),
+                  ],
                 ),
-              ],
+              ),
+              const SizedBox(height: 10),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal',
-                  style: TextStyle(color: AppColors.textMid)),
+            Text(
+              '"$_title" silinsin mi?\nHasanat ${log.pagesRead * 10} geri alınacak.',
+              style: TextStyle(color: context.colors.textSecondary),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.errorRed,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+            if (seriDrops) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Bu işlem geri alınamaz.',
+                style: TextStyle(
+                    color: AppColors.errorRed,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
               ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(
-                seriDrops ? 'Yine de Sil' : 'Sil',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
+            ],
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('İptal',
+                style: TextStyle(color: context.colors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              seriDrops ? 'Yine de Sil' : 'Sil',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -486,17 +462,10 @@ class _LogTile extends StatelessWidget {
       );
       await batch.commit();
 
-      // Arka planda asenkron çalıştır (UI bloklanmasın)
-      Future.microtask(() async {
-        try {
-          if (log.hatimId != null) {
-            await HatimCalculator.recalculate(uid, log.hatimId!);
-          }
-          await SeriCalculator.recalculate(uid);
-        } catch (e) {
-          debugPrint('Arka plan recalculate hatası: $e');
-        }
-      });
+      if (log.hatimId != null) {
+        await HatimCalculator.recalculate(uid, log.hatimId!);
+      }
+      await SeriCalculator.recalculate(uid);
     } catch (e) {
       debugPrint('Log sil hatası: $e');
     }
@@ -529,10 +498,10 @@ class _LogTile extends StatelessWidget {
                     Flexible(
                       child: Text(
                         _title,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: AppColors.textDark),
+                            color: context.colors.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -543,8 +512,8 @@ class _LogTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${_timeText(log.createdAt)} · +${log.pagesRead * 10} ✨',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textLight),
+                  style: TextStyle(
+                      fontSize: 12, color: context.colors.textTertiary),
                 ),
               ],
             ),
@@ -588,7 +557,7 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.colors.tealSurface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

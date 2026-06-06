@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../app_colors.dart';
+import '../app_theme.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const _kAccent      = Color(0xFFF5A623);
@@ -13,36 +15,178 @@ const _kMessages = [
   (min: 1, max: 1, msgs: [
     'Bismillah! İlk adımın hayırlı olsun. Artık geri dönüş yok 😄',
     '"Ameller niyetlere göredir." Sen bugün güzel bir niyet ettin. Allah bu adımını bereketli kılsın.',
-    '"Allah katında amellerin en makbulü az da olsa devam üzere yapılanıdır." Allah dâim etsin.',
+    '"Amellerin Allah Teâlâ\'ya en sevimli olanı, az da olsa devamlı yapılanıdır." (Müslim) Allah dâim etsin.',
+    'İlk adımlar zordur, sen kolaya geçiyorsun. Hoş geldin!',
+    'Uzun yolculuklar tek bir adımla başlar. O adımı bugün attın 🚀',
+    'Şeytan şu an sol alt köşeden ağlayarak uzaklaşıyor... Harikasın! 😎',
+    '"Sizin en hayırlınız Kur\'an\'ı öğrenen ve öğretendir." (Tirmizî) Ne güzel bir yola girdin 🌿',
+    'Başlamak bitirmenin yarısıdır. Bugün o ilk sayfa açıldı!',
+    'Bugün nefis 0, sen 1! Maça harika bir başlangıç yaptın.',
+    'Bugünü milat kabul et, gerisi Allah\'ın izniyle çorap söküğü gibi gelecek.',
+    'Niyetin saf, yolun açık olsun. Bismillah!',
+    'Kur\'an ile tanışıklığını dostluğa çevirmek için ilk mesajı attın sanki 📩',
+    'Kalbine bugün en güzel misafiri kabul ettin.',
+    'Sadece sayfaları değil, kalbinin pasını da silmeye başladın. Maşallah!',
+    '"Rabbim ilmimi artır." (Taha, 114) duasıyla, ilk güne selam olsun!',
+    'En zor olan başlamaktı, sen başardın.',
+    'Zincirin ilk halkası bugün takıldı. Kırmak yok anlaştık mı? 🔗',
+    'Yeni bir alışkanlığın tohumunu attın. Birlikte büyüteceğiz! 🌱',
   ]),
   // range 2-4
   (min: 2, max: 4, msgs: [
     '{X}. günün hayırlı olsun! Alev sönmedi, devam ediyor 🔥',
     'Bugün de geldin. Maşallah! Allah nazardan korusun.',
-    '{X} gün üst üste — "Allah katında amellerin en sevimlis, az da olsa devamlı olanıdır." Sen o yoldasın.',
+    '{X} gün üst üste — "Amellerin Allah Teâlâ\'ya en sevimli olanı, az da olsa devamlı yapılanıdır." (Müslim) Sen o yoldasın.',
     '{X}. gün! Kendine maşallah demeyi unutma, çok iyi gidiyorsun.',
+    'Zincirin halkaları birleşiyor. {X}. gün pırıl pırıl!',
+    '{X}. gün! Şeytanın bağlantı hatası (timeout) verdiği anlardayız, harikasın!',
+    'Alışkanlıklar küçük adımlarla başlar, {X}. adımı attın bile.',
+    'Bugün nefis yine yenildi. {X}. gün zaferin kutlu olsun!',
+    '"Her zorlukla beraber bir kolaylık vardır." (İnşirah, 5) Kolaylık kendini göstermeye başlamıştır inşallah.',
+    'Dün geldin, bugün de buradasın. İstikrar dediğin tam olarak bu! 💪',
+    '{X}. gün! Sistemin tıkır tıkır çalıştığını görmek ne güzel.',
+    'Sadece okumuyorsun, ruhunu besliyorsun. {X}. gün bereketiyle geldi.',
+    'Telefonu eline alıp sosyal medya yerine buraya girmen en büyük zaferin! 📱',
+    'Meleklerin seni tebessümle izlediği bir {X}. gün daha...',
+    'Bugün de Kur\'an\'a vakit ayırdın. Zamanın bereketlendi, emin ol.',
   ]),
   // range 5-10
   (min: 5, max: 10, msgs: [
     '{X}. gün! Artık bu bir alışkanlık olmaya başladı. Allah dâim etsin 🔥',
-    'Bak {X} gün olmuş! Farkında mısın, Kur\'an artık gününün bir parçası.',
-    '{X} gün — için çekmeden gelip okumaya başladın mı? İşte o his Kur\'an\'ın seni çağırması 🌿',
+    'Bak {X} gün olmuş! Farkında mısın, Kur\'an artık gününün en güzel parçası.',
+    '{X} gün — iç çekmeden gelip okumaya başladın mı? İşte o his Kur\'an\'ın seni çağırması 🌿',
+    'Bugün de okudun ya, yüzünde meleklerin fark ettiği o tebessüm var 😊',
+    '"Sizin en hayırlınız Kur\'an\'ı öğrenen ve öğretendir." (Tirmizî) Ne güzel bir yoldasın.',
+    '{X}. gün! Bu rutinin hayatına kattığı huzuru fark ediyor musun?',
+    'İlk günlerdeki zorluk yerini tatlı bir huzura bıraktı. Maşallah sana!',
+    'Günlük koşturmaca içinde buraya gelmen çok kıymetli. {X}. günün kutlu olsun.',
+    '{X}. günde kalbindeki o ferahlığı hisset. Bu, emeğinin karşılığı.',
+    'Bir haftayı geride bırakıyorsun! Müthiş bir ivme yakaladın.',
+    '"Ameller niyetlere göredir." (Buhari) Niyetini bozma, gerisi hep böyle güzel gelecek.',
+    '{X}. gün geldi çattı. Şeytanın mazeret üretme çabaları sonuçsuz kaldı! 🛑',
+    'Sadece okumakla kalmıyor, bu eylemi bir kimliğe dönüştürüyorsun.',
+    '{X} gün! Her gün bir önceki günden daha güçlü bir irade gösteriyorsun.',
+    'Gününün en aydınlık vakti yine Kur\'an ile geçen vakit oldu.',
+    'Çift haneli sayılara doğru koşar adım ilerliyorsun, bravo! 🏃',
   ]),
   // range 11-20
   (min: 11, max: 20, msgs: [
     '{X}. gün! Pek çok insan bu aşamaya gelemez — sen geldin. Allah kabul etsin.',
     '{X} gün boyunca Kur\'an\'la buluşan bir kalp bambaşka bir kalptir. Maşallah sana!',
     '{X}. gün! Bu artık bir rutin, farkında mısın? Seri bozulmadan devam ediyor 💪',
-    '{X} gün! Bir şey fark ettik — sen bırakmıyorsun. Allah da bırakmaz seni 🤲',
+    '{X} gün! Bir şey fark ettik — sen bırakmıyorsun. Allah da her daim seninle olsun 🤲',
     '{X}. gün! Bu seri artık senin karakterinin bir parçası. Maşallah, Allah nazardan korusun.',
+    'Telefonun şarjı bitebilir ama senin streak bitmiyor! Maşallah ⚡',
+    '"Kalpler ancak Allah\'ı anmakla mutmain olur." (Rad, 28) Bugün de kalbine iyi baktın.',
+    'Az ama öz devam... Peygamberimiz Hz. Muhammed (sav) tam da bunu tavsiye etmişti: "Amellerin Allah Teâlâ\'ya en sevimli olanı, az da olsa devamlı yapılanıdır." (Müslim)',
+    'Bazen yorgundun, bazen meşgul... Ama yine de geldin. Helal olsun!',
+    '{X} gün! Bu istikrarın bir tarifi yok, sadece "Maşallah" diyebiliyoruz.',
+    'Bugün de Kur\'an ile nefes aldın. {X}. günün bereketi üzerine olsun.',
+    'Azim, gayret ve niyet... Üçü bir araya geldiğinde {X} günlük bu muazzam tablo çıkıyor.',
+    'Artık iki haneli sayılarda ustalığını konuşturuyorsun.',
+    '{X}. güne gelmek sağlam bir irade ister. Sende bu irade fazlasıyla var!',
+    '"İki günü eşit olan ziyandadır." Sen her gün üstüne koyarak ilerliyorsun! 📈',
+    'Her okuduğun ayet, yorgun ruhuna bir şifa gibi dokunsun. Maşallah!',
   ]),
-  // range 21-30 (ve üstü)
-  (min: 21, max: 999, msgs: [
-    '{X}. gün! Bilim der ki alışkanlık 21 günde oluşur. Ama bence Kur\'an çok daha hızlı kalbe yerleşir 😄',
+  // range 21-30
+  (min: 21, max: 30, msgs: [
+    '{X}. gün! Bilim der ki alışkanlık 21 günde oluşur. Ama bizce Kur\'an çok daha hızlı kalbe yerleşir 😄',
     '{X} gün! Artık Kur\'an günlük bir ihtiyaç oldu senin için. Allah bu nuru dâim etsin 🤲',
     '{X}. gün! Bu noktaya gelen çok az insan geri döner. Sen artık o insanlardan birisin.',
     '{X} gün üst üste! Bir ayı geçiyorsun — bu artık alışkanlık değil, ibadet aşkı 🔥',
-    '{X}. gün! Neredeyse bir ay. Allah\'ın rızası da bu devamda, inan.',
+    '{X}. gün! Bir aya yaklaşıyorsun, hissediyor musun? Az kaldı, bırakma!',
+    '{X} gün! Bir aya yaklaşıyorsun — bu seri senin eserin.',
+    'Bu noktaya gelen çok az insan geri döner. Sağlam adımlarla ilerliyorsun.',
+    'Uygulamanın şarjı bitse de senin motivasyonun bitmiyor! 🔋',
+    'Bazen yorgun olsan da geldin, bazen uykusuz olsan da... Allah bu gayretini zayi etmeyecektir.',
+    '{X} gün! Bir ayı tamamlama fikri seni de heyecanlandırmıyor mu?',
+    'Her gün okuyarak zihnini ve kalbini adeta \'reset\'liyorsun. 🔄',
+    '{X}. günün aydınlığı tüm hayatına yansısın inşallah.',
+    'Gözler yorulur ama kalp Kur\'an ile dinlenir. İyi dinlenmeler 🌿',
+    'Sıfır mazeret, %100 gayret! {X}. gününde de buradasın.',
+    'Bugünü de boş geçmediğin için kendini tebrik etmelisin.',
+    'Kur\'an ile geçen vakit, zamanın israf edilmediği o nadide vakittir. ⏳',
+  ]),
+  // range 31-39
+  (min: 31, max: 39, msgs: [
+    '{X}. gün! 40\'a merdiven dayadın, sakın zinciri kırma! 🧗',
+    'Bu kadar istikrarlı olacağını sen de tahmin etmiyordun değil mi? Maşallah sana! 😄',
+    'Bir ayı devirdin! Artık bu alışkanlığı bırakmak istesen de vicdanın bırakmaz.',
+    '"Rabbin seni terk etmedi ve sana darılmadı." (Duha, 3) Ne güzel bir sığınak.',
+    '{X}. gün! Kod hata verse de, hayat zorlasa da senin streak pas vermiyor! 😉',
+    '{X} gün! Çelik gibi bir iraden var maşallah.',
+    '{X} gündür bu uygulamada geçirdiğin dakikalar ahiret yatırımının en güzel parçası.',
+    'Bir rüzgar gibi başladın, fırtına gibi devam ediyorsun. 40\'a az kaldı!',
+    '"Gerçekten zorlukla beraber bir kolaylık vardır." (İnşirah, 6)',
+    'Her gün yeni bir sayfa, her gün yeni bir şükür. {X}. gün harikasın.',
+    'İradesini eline almış, hedefine kilitlenmiş bir mümin profili çiziyorsun. 🏹',
+    '{X}. gün! Senin bu istikrarından biz de feyz alıyoruz! Aynen devam ✨',
+    'Maşallah demekten yorulmadık, sen de okumaktan yorulmadın!',
+    'Geriye dönüp baktığında "İyi ki bırakmamışım" diyeceğin günlerdeyiz.',
+    'Kur\'an\'ın bereketi hayatına gün gün nasıl yansıyor, farkında mısın?',
+    '{X} gündür zihninin en temiz köşesini Kur\'an\'a ayırdın.',
+    'Pes etmek senin lügatınden çoktan silinmiş! 📚',
+  ]),
+  // range 40 — özel gün
+  (min: 40, max: 40, msgs: [
+    'Vee 40. GÜN! 🎉 Alışkanlığının resmen kırkı çıktı! Artık bu senin bir parçan.',
+    '40 gün dile kolay! Dervişin fikri neyse zikri odur derler, senin zikrin belli oldu 🌿',
+    'Tebrikler! 40 gündür kalbini Kur\'an ile besliyorsun. Şükürler olsun! 🤲',
+    'Efsanevi 40. güne ulaştın! İradene sağlık, kalbine nur dolsun.',
+    '40 gündür pes etmedin. İnanıyoruz ki hayatındaki diğer zorlukları da böyle aşacaksın.',
+    'Alışkanlık mı? O eskidendi. Bu artık senin yaşam tarzın oldu! 🌟',
+    'Kırkikindi yağmurları gibi bereketli, kırk gün kadar kalıcı olsun inşallah.',
+    'Bugün kendine kocaman bir hediye ver, çünkü 40. günü sonuna kadar hak ettin! 🎁',
+    '40 kere maşallah! Allah dâim etsin.',
+    '40. gün hatırası: Kalplerin şifası Kur\'an\'dır!',
+    'Tam 40 gündür ruhunu en güzel gıda ile besliyorsun.',
+    'Senin adını "İstikrar" olarak güncelleyebilir miyiz? 40 gün dile kolay!',
+    '40 gündür nefsi mağlup, ruhu galip ediyorsun. Harikasın!',
+    '40 gün! Bir alışkanlığın tamamen kemale erdiği o muhteşem gün.',
+    'Kur\'an ile geçen 40 muazzam gün... Gerisi de böyle güzel gelsin.',
+    'İşte bu! 40. güne ulaşmanın haklı gururunu yaşa bugün. 😎',
+    '40. günü kutluyor, 50. gün için şimdiden yerimizi ayırtıyoruz!',
+    '"İnananlar ancak kardeştir." (Hucurat, 10) Biz de bu başarına bir kardeşin olarak seviniyoruz!',
+  ]),
+  // range 41-50
+  (min: 41, max: 50, msgs: [
+    '40\'ı aştık, 50\'ye koşuyoruz! Senin hızına biz bile yetişemiyoruz artık 🏎️',
+    'Bu kadar gün üst üste okuyabilmek herkese nasip olmaz. Allah feyzini artırsın.',
+    'Yarım dalya demeye az kaldı! {X}. günün nuru gününü aydınlatsın.',
+    '"Bizi doğru yola, kendilerine nimet verdiklerinin yoluna ilet." (Fatiha)',
+    'İstikrar kelimesinin sözlükteki karşılığına senin adını yazmak lazım 📖',
+    '{X}. gün! Bugünü de boş geçmediğin için kendine teşekkür etmelisin.',
+    'Kur\'an ile geçen vakit, zamanın israf edilmediği tek vakittir. ⏳',
+    'Efsaneler arasına girdin! {X} günlük bir seriyi korumak büyük bir başarı.',
+    '"Sabredenlere mükafatları hesapsız verilecektir." (Zümer, 10)',
+    'Bir gün değil, her gün! Parolan bu oldu ve çok da yakıştı. 💪',
+    '50\'ye doğru emin adımlarla! Yılmak yok, devam.',
+    '"O, kalplerin içinde olanı hakkıyla bilendir." (Mülk, 13) Niyetin saf, yolun açık olsun.',
+    '{X}. günün enerjisiyle tüm haftan güzel geçsin inşallah.',
+    'Kalbinin "hadi Kur\'an okuyalım" dediğini duyar gibiyiz. 🎧',
+    '{X} günlük bir miras inşa ettin. Bozmaya hiç niyetin yok biliyoruz!',
+    '50\'ye bu kadar yaklaşmışken motivasyonun zirvede olmalı! ⛰️',
+    '{X}. gün geldi. Şeytan şu an "Ben bu kişiyle baş edemem" diyor! 😂',
+  ]),
+  // range 51+
+  (min: 51, max: 9999, msgs: [
+    'Yine geldin, yine gönlümüzü fethettin! Maşallah sana.',
+    'Bugün de sayfaları çevirdin, melekler şahidindir.',
+    '{X} gün oldu... "Kim zerre miktarı hayır yapmışsa onu görür." (Zilzâl, 7)',
+    'Her gün gelerek en güzel mesajı aslında sen kendine veriyorsun.',
+    'Bazen bir ayet insanın tüm gününü kurtarır. Bugün nasibine düşen ayetin sana şifa olsun.',
+    'Sıfır mazeret, %100 gayret! {X}. gününde de buradasın.',
+    '{X}. gün! Maşallah diyelim, nazar değmesin. Sen artık bu işin piri oldun.',
+    '"Şüphesiz ki Allah, sabredenlerle beraberdir." (Bakara, 153)',
+    'Bugünü de nurlandırdın. Kalem yazdı, melekler şahit oldu.',
+    '{X} gün dile kolay! Artık bu eylem nefes almak kadar doğal senin için.',
+    'Sen okudukça güzelleşiyorsun, dünya da senin bu eyleminle güzelleşiyor. 🌍',
+    'Kur\'an\'a olan sadakatin {X} gündür tescillendi. Takdire şayan!',
+    'Her harfinde binlerce sevap gizli. Bugün de o hazineden nasibini aldın. 💎',
+    'İstikrar abidesi! {X}. gün için sadece büyük bir alkış bırakıyoruz. 👏👏👏',
+    '"Gevşemeyin, hüzünlenmeyin. Eğer (gerçekten) iman etmiş kimseler iseniz üstün olan sizsiniz." (Âl-i İmrân, 139)',
+    '{X} gündür kesintisiz devam eden bu ibadeti Allah kabul ve makbul eylesin. 🤲',
+    'Senin bu performansın karşısında söyleyecek söz bulamıyoruz, okumaya devam! 🚀',
   ]),
 ];
 
@@ -51,7 +195,7 @@ String _getMotivation(int count) {
     (b) => count >= b.min && count <= b.max,
     orElse: () => _kMessages.last,
   );
-  final msg = bucket.msgs[count % bucket.msgs.length];
+  final msg = bucket.msgs[math.Random().nextInt(bucket.msgs.length)];
   return msg.replaceAll('{X}', '$count');
 }
 
@@ -60,9 +204,10 @@ String _getMotivation(int count) {
 class StreakAnimationScreen extends StatefulWidget {
   final int count;
   final int? prevCount;
-  final List<bool> filled;      // 7 boolean — son 7 gün, index 6 = bugün
-  final int todayIndex;         // filled içinde bugünün indeksi (daima 6)
-  final List<String> dayLabels; // 7 gün etiketi — dinamik, hafta sınırından bağımsız
+  final List<bool> filled;       // 7 boolean — son 7 gün, index 6 = bugün
+  final List<bool> frozenMask;   // frozenDates içinde ama okunmamış günler
+  final int todayIndex;          // filled içinde bugünün indeksi (daima 6)
+  final List<String> dayLabels;  // 7 gün etiketi — dinamik, hafta sınırından bağımsız
   final String ctaLabel;
 
   const StreakAnimationScreen({
@@ -70,16 +215,18 @@ class StreakAnimationScreen extends StatefulWidget {
     required this.count,
     this.prevCount,
     required this.filled,
+    List<bool>? frozenMask,
     required this.todayIndex,
     required this.dayLabels,
     this.ctaLabel = 'Mâşâallah, devam et',
-  });
+  }) : frozenMask = frozenMask ?? const [false, false, false, false, false, false, false];
 
   static Future<void> show(
     BuildContext context, {
     required int count,
     int? prevCount,
     required List<bool> filled,
+    List<bool>? frozenMask,
     required int todayIndex,
     required List<String> dayLabels,
     String ctaLabel = 'Mâşâallah, devam et',
@@ -90,6 +237,7 @@ class StreakAnimationScreen extends StatefulWidget {
           count: count,
           prevCount: prevCount,
           filled: filled,
+          frozenMask: frozenMask,
           todayIndex: todayIndex,
           dayLabels: dayLabels,
           ctaLabel: ctaLabel,
@@ -248,7 +396,7 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -263,11 +411,11 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1F1B14).withValues(alpha: 0.07),
+                      color: context.colors.textPrimary.withValues(alpha: 0.07),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close_rounded,
-                        size: 18, color: Color(0xFF8A8470)),
+                    child: Icon(Icons.close_rounded,
+                        size: 18, color: context.colors.textSecondary),
                   ),
                 ),
               ),
@@ -312,6 +460,7 @@ class _StreakAnimationScreenState extends State<StreakAnimationScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: _DayRow(
                 filled: widget.filled,
+                frozenMask: widget.frozenMask,
                 todayIndex: widget.todayIndex,
                 accent: _kAccent,
                 dayLabels: widget.dayLabels,
@@ -763,12 +912,14 @@ class _FlamePainter extends CustomPainter {
 
 class _DayRow extends StatefulWidget {
   final List<bool> filled;
+  final List<bool> frozenMask;
   final int todayIndex;
   final Color accent;
   final List<String> dayLabels; // dinamik gün etiketleri
 
   const _DayRow({
     required this.filled,
+    required this.frozenMask,
     required this.todayIndex,
     required this.accent,
     required this.dayLabels,
@@ -804,14 +955,21 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  // Dondurulmuş günleri çıkararak turuncu pill bloklarını hesaplar
   List<({int start, int end})> _buildBlocks(List<bool> filled) {
     final blocks = <({int start, int end})>[];
     int? blockStart;
     for (int i = 0; i < 7; i++) {
-      if (filled[i]) {
+      final isOrangeFilled = filled[i] && !widget.frozenMask[i];
+      if (isOrangeFilled) {
         blockStart ??= i;
-        if (i == 6 || !filled[i + 1]) {
+        if (i == 6 || !filled[i + 1] || widget.frozenMask[i + 1]) {
           blocks.add((start: blockStart, end: i));
+          blockStart = null;
+        }
+      } else {
+        if (blockStart != null) {
+          blocks.add((start: blockStart, end: i - 1));
           blockStart = null;
         }
       }
@@ -837,10 +995,10 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
     return LayoutBuilder(builder: (context, constraints) {
       final cellW = constraints.maxWidth / 7;
 
-      // Previous filled day (before today)
+      // Previous orange-filled day (before today — frozen days excluded)
       int prevFilled = -1;
       for (int i = widget.todayIndex - 1; i >= 0; i--) {
-        if (widget.filled[i]) { prevFilled = i; break; }
+        if (widget.filled[i] && !widget.frozenMask[i]) { prevFilled = i; break; }
       }
 
       // Base blocks — week without today
@@ -971,9 +1129,32 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
                 Row(
                   children: List.generate(7, (i) {
                     final isToday  = i == widget.todayIndex;
+                    final isFrozen = widget.frozenMask[i];
                     final isFilled = _todayVisible
                         ? (i == widget.todayIndex || widget.filled[i])
                         : widget.filled[i];
+                    if (isFrozen) {
+                      // Dondurulmuş gün — mavi daire + ❄️
+                      return SizedBox(
+                        width: cellW,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: circleTop),
+                          child: Center(
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: const BoxDecoration(
+                                color: AppColors.infoBlue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Text('❄️', style: TextStyle(fontSize: 14)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
                     return SizedBox(
                       width: cellW,
                       child: Padding(

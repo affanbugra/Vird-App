@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import 'habit_tracker_widget.dart';
 
 class HabitHeatMapSheet extends StatelessWidget {
@@ -47,8 +48,8 @@ class HabitHeatMapSheet extends StatelessWidget {
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).padding.bottom + 24,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SingleChildScrollView(
@@ -63,7 +64,7 @@ class HabitHeatMapSheet extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.borderGrey,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -92,25 +93,25 @@ class HabitHeatMapSheet extends StatelessWidget {
                           style: GoogleFonts.nunito(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         Text(
                           'Devamlılık Haritası',
-                          style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+                          style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textMid, size: 24),
+                    icon: Icon(Icons.close, color: context.colors.textSecondary, size: 24),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
             
-            const Divider(height: 1, color: AppColors.borderGrey),
+            Divider(height: 1, color: context.colors.border),
             
             // İstatistikler
             Padding(
@@ -142,7 +143,7 @@ class HabitHeatMapSheet extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -167,7 +168,7 @@ class HabitHeatMapSheet extends StatelessWidget {
                           hadithText!,
                           style: GoogleFonts.nunito(
                             fontSize: 10.5,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                             height: 1.35,
                             fontStyle: FontStyle.italic,
                           ),
@@ -187,7 +188,7 @@ class HabitHeatMapSheet extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -245,7 +246,7 @@ class _StatCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ],
@@ -256,7 +257,7 @@ class _StatCard extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
           ],
@@ -349,13 +350,13 @@ class _HabitHeatGrid extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _dayLabel('Pzt', squareSize, gap),
-              _dayLabel('Sal', squareSize, gap),
-              _dayLabel('Çar', squareSize, gap),
-              _dayLabel('Per', squareSize, gap),
-              _dayLabel('Cum', squareSize, gap),
-              _dayLabel('Cmt', squareSize, gap),
-              _dayLabel('Paz', squareSize, gap),
+              _dayLabel(context, 'Pzt', squareSize, gap),
+              _dayLabel(context, 'Sal', squareSize, gap),
+              _dayLabel(context, 'Çar', squareSize, gap),
+              _dayLabel(context, 'Per', squareSize, gap),
+              _dayLabel(context, 'Cum', squareSize, gap),
+              _dayLabel(context, 'Cmt', squareSize, gap),
+              _dayLabel(context, 'Paz', squareSize, gap),
             ],
           ),
         ),
@@ -381,7 +382,7 @@ class _HabitHeatGrid extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textMid,
+                              color: context.colors.textSecondary,
                             ),
                             overflow: TextOverflow.visible,
                             softWrap: false,
@@ -404,11 +405,11 @@ class _HabitHeatGrid extends StatelessWidget {
                     } else if (isFuture) {
                       boxColor = Colors.transparent;
                       boxBorder = Border.all(
-                        color: AppColors.borderGrey.withValues(alpha: 0.25),
+                        color: context.colors.border.withValues(alpha: 0.25),
                         width: 1.0,
                       );
                     } else {
-                      boxColor = isDone ? habitColor : AppColors.borderGrey.withValues(alpha: 0.3);
+                      boxColor = isDone ? habitColor : context.colors.border.withValues(alpha: 0.3);
                       boxBorder = Border.all(
                         color: isDone ? habitColor.withValues(alpha: 0.5) : Colors.transparent,
                         width: 1.0,
@@ -433,7 +434,7 @@ class _HabitHeatGrid extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                   color: isDone
                                       ? Colors.white.withValues(alpha: 0.5)
-                                      : AppColors.textDark.withValues(alpha: 0.2),
+                                      : context.colors.textPrimary.withValues(alpha: 0.2),
                                 ),
                               ),
                             )
@@ -449,7 +450,7 @@ class _HabitHeatGrid extends StatelessWidget {
     );
   }
 
-  Widget _dayLabel(String text, double size, double gap) {
+  Widget _dayLabel(BuildContext context, String text, double size, double gap) {
     return Container(
       height: size,
       margin: EdgeInsets.only(bottom: gap),
@@ -459,9 +460,10 @@ class _HabitHeatGrid extends StatelessWidget {
         style: GoogleFonts.nunito(
           fontSize: 8,
           fontWeight: FontWeight.w600,
-          color: AppColors.textMid,
+          color: context.colors.textSecondary,
         ),
       ),
     );
   }
 }
+

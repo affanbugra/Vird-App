@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../utils/name_utils.dart';
 import 'kullanici_profil_screen.dart';
 
@@ -51,7 +52,7 @@ class EkipGecmisScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.teal,
         foregroundColor: Colors.white,
@@ -115,7 +116,7 @@ class EkipGecmisScreen extends StatelessWidget {
                 return Center(
                   child: Text(
                     'Henüz geçmiş sıralama bulunmuyor.',
-                    style: GoogleFonts.nunito(color: AppColors.textMid),
+                    style: GoogleFonts.nunito(color: context.colors.textSecondary),
                   ),
                 );
               }
@@ -160,14 +161,14 @@ class _LeaderNote extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 14, color: AppColors.textLight),
+          Icon(Icons.info_outline, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               'Tüm geçmiş hafta sıralamalarını ekip liderleri görebilir.',
               style: GoogleFonts.nunito(
                 fontSize: 12,
-                color: AppColors.textLight,
+                color: context.colors.textTertiary,
                 height: 1.4,
               ),
             ),
@@ -243,9 +244,9 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.borderGrey.withValues(alpha: 0.5)),
+        side: BorderSide(color: context.colors.border.withValues(alpha: 0.5)),
       ),
-      color: Colors.white,
+      color: context.colors.surface,
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
@@ -255,7 +256,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
           style: GoogleFonts.nunito(
             fontSize: 15,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
         subtitle: Text(
@@ -263,13 +264,13 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.textMid,
+            color: context.colors.textSecondary,
           ),
         ),
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.tealLight,
+            color: context.colors.tealSurface,
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(Icons.history, color: AppColors.teal, size: 20),
@@ -281,7 +282,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 'Bu hafta hiç okuma yapılmamış.',
-                style: GoogleFonts.nunito(color: AppColors.textMid),
+                style: GoogleFonts.nunito(color: context.colors.textSecondary),
               ),
             )
           else ...[
@@ -321,7 +322,7 @@ class _GecmisWeekCardState extends State<_GecmisWeekCard> {
                       ? 'Herkes bu hafta 100 puanı aştı 🎉'
                       : 'Bu filtreye uyan üye yok.',
                   style: GoogleFonts.nunito(
-                      color: AppColors.textMid, fontSize: 13),
+                      color: context.colors.textSecondary, fontSize: 13),
                 ),
               )
             else
@@ -407,22 +408,31 @@ class _GecmisRow extends StatelessWidget {
     }
   }
 
-  Color get _bgColor {
+  Color _bgColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.22);
+      if (isRed) return AppColors.errorRed.withValues(alpha: 0.10);
+      if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.18);
+      if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.12);
+      if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.07);
+      return Colors.transparent;
+    }
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.48);
     if (isRed) return AppColors.errorBg;
     if (rank == 1) return AppColors.successBg;
     if (rank == 2) return AppColors.successBg.withValues(alpha: 0.6);
     if (rank == 3) return AppColors.successBg.withValues(alpha: 0.3);
-    return AppColors.white;
+    return Colors.transparent;
   }
 
-  Color get _borderColor {
+Color _resolvedBorderColor(BuildContext context) {
     if (isDeepRed) return AppColors.errorRed.withValues(alpha: 0.85);
     if (isRed) return AppColors.errorRed.withValues(alpha: 0.3);
     if (rank == 1) return AppColors.successGreen.withValues(alpha: 0.5);
     if (rank == 2) return AppColors.successGreen.withValues(alpha: 0.3);
     if (rank == 3) return AppColors.successGreen.withValues(alpha: 0.15);
-    return AppColors.borderGrey;
+    return context.colors.border;
   }
 
   @override
@@ -431,8 +441,8 @@ class _GecmisRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: _bgColor,
-        border: Border.all(color: _borderColor),
+        color: _bgColor(context),
+        border: Border.all(color: _resolvedBorderColor(context)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -452,7 +462,7 @@ class _GecmisRow extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: isRed ? AppColors.errorRed : AppColors.textMid,
+                      color: isRed ? AppColors.errorRed : context.colors.textSecondary,
                     ),
                   ),
           ),
@@ -468,7 +478,7 @@ class _GecmisRow extends StatelessWidget {
             ),
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: AppColors.tealLight,
+              backgroundColor: context.colors.tealSurface,
               backgroundImage: avatarSeed != null
                   ? NetworkImage(
                       'https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent',
@@ -495,7 +505,7 @@ class _GecmisRow extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
           ),
@@ -508,14 +518,14 @@ class _GecmisRow extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: hasanat > 0 ? AppColors.gold : AppColors.textLight,
+                  color: hasanat > 0 ? AppColors.gold : context.colors.textTertiary,
                 ),
               ),
               Text(
                 'hasanat',
                 style: GoogleFonts.nunito(
                   fontSize: 9,
-                  color: AppColors.textLight,
+                  color: context.colors.textTertiary,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -552,9 +562,9 @@ class _GecmisFilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? selectedColor.withValues(alpha: 0.12)
-              : AppColors.lightGrey,
+              : context.colors.surfaceVariant,
           border: Border.all(
-            color: selected ? selectedColor : AppColors.borderGrey,
+            color: selected ? selectedColor : context.colors.border,
             width: selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -564,7 +574,7 @@ class _GecmisFilterChip extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: selected ? selectedColor : AppColors.textMid,
+            color: selected ? selectedColor : context.colors.textSecondary,
           ),
         ),
       ),

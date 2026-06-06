@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../app_colors.dart';
 import '../../app_assets.dart';
+import '../../app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -55,9 +56,9 @@ class _ForgotPasswordSheetState extends State<_ForgotPasswordSheet> {
     return Container(
       margin: const EdgeInsets.all(12),
       padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + bottom),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.all(Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(24)),
       ),
       child: _sent ? _SuccessContent() : _FormContent(
         emailController: widget.emailController,
@@ -93,8 +94,8 @@ class _FormContent extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: const BoxDecoration(
-                color: AppColors.tealLight,
+              decoration: BoxDecoration(
+                color: context.colors.tealSurface,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.lock_reset_rounded, color: AppColors.teal, size: 22),
@@ -109,19 +110,19 @@ class _FormContent extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   Text(
                     'Mailine sıfırlama bağlantısı gönderelim',
-                    style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+                    style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
                   ),
                 ],
               ),
             ),
             IconButton(
               onPressed: onClose,
-              icon: const Icon(Icons.close, color: AppColors.textLight),
+              icon: Icon(Icons.close, color: context.colors.textTertiary),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -135,26 +136,26 @@ class _FormContent extends StatelessWidget {
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => onSend(),
           maxLength: 100,
-          style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark),
+          style: GoogleFonts.nunito(fontSize: 15, color: context.colors.textPrimary),
           decoration: InputDecoration(
             labelText: 'E-posta adresi',
-            labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+            labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
             counterText: '',
-            prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textLight, size: 20),
+            prefixIcon: Icon(Icons.mail_outline_rounded, color: context.colors.textTertiary, size: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.borderGrey),
+              borderSide: BorderSide(color: context.colors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.borderGrey),
+              borderSide: BorderSide(color: context.colors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.teal, width: 2),
             ),
             filled: true,
-            fillColor: AppColors.lightGrey,
+            fillColor: context.colors.surfaceVariant,
           ),
         ),
         const SizedBox(height: 20),
@@ -189,14 +190,14 @@ class _SuccessContent extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           'Mailine bir sıfırlama bağlantısı gönderdik.\nBağlantıya tıklayıp yeni şifreni belirle.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+          style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
         ),
         const SizedBox(height: 24),
         SizedBox(
@@ -278,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -293,14 +294,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: context.colors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
               Text(
-                "Düzenli okumalarla Hasanat biriktir,\nkalıcı bir alışkanlık kazan.",
-                style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid, height: 1.5),
+                "Düzenli okumalarla Hasanat biriktirir,\nkalıcı bir alışkanlık kazanırsın.",
+                style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 36),
@@ -330,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: AppColors.textLight,
+                          color: context.colors.textTertiary,
                           size: 20,
                         ),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -366,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Row(
                 children: [
-                  const Expanded(child: Divider(color: AppColors.borderGrey)),
+                  Expanded(child: Divider(color: context.colors.border)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
@@ -374,12 +375,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: GoogleFonts.nunito(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textLight,
+                        color: context.colors.textTertiary,
                         letterSpacing: 0.5,
                       ),
                     ),
                   ),
-                  const Expanded(child: Divider(color: AppColors.borderGrey)),
+                  Expanded(child: Divider(color: context.colors.border)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -391,6 +392,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         final messenger = ScaffoldMessenger.of(context);
                         try {
                           await context.read<AuthProvider>().signInWithGoogle();
+                          if (mounted) {
+                            Navigator.popUntil(context, (route) => route.isFirst);
+                          }
                         } catch (e) {
                           messenger.showSnackBar(
                             SnackBar(content: Text(_parseAuthError(e))),
@@ -405,12 +409,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: GoogleFonts.nunito(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppColors.borderGrey, width: 1.5),
+                  side: BorderSide(color: context.colors.border, width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                 ),
               ),
@@ -420,7 +424,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text(
                     'Hesabın yok mu? ',
-                    style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textMid),
+                    style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textSecondary),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
@@ -482,27 +486,27 @@ class _InputField extends StatelessWidget {
       textInputAction: textInputAction,
       onSubmitted: onSubmitted != null ? (_) => onSubmitted!() : null,
       maxLength: maxLength,
-      style: GoogleFonts.nunito(fontSize: 15, color: AppColors.textDark),
+      style: GoogleFonts.nunito(fontSize: 15, color: context.colors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.nunito(color: AppColors.textMid, fontSize: 14),
+        labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary, fontSize: 14),
         counterText: '',
-        prefixIcon: Icon(icon, color: AppColors.textLight, size: 20),
+        prefixIcon: Icon(icon, color: context.colors.textTertiary, size: 20),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderGrey),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderGrey),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.teal, width: 2),
         ),
         filled: true,
-        fillColor: AppColors.lightGrey,
+        fillColor: context.colors.surfaceVariant,
       ),
     );
   }
@@ -528,7 +532,7 @@ class _PrimaryButton extends StatelessWidget {
         duration: const Duration(milliseconds: 100),
         height: 52,
         decoration: BoxDecoration(
-          color: disabled ? AppColors.borderGrey : AppColors.teal,
+          color: disabled ? context.colors.border : AppColors.teal,
           borderRadius: BorderRadius.circular(999),
           border: Border(
             bottom: BorderSide(
@@ -549,7 +553,7 @@ class _PrimaryButton extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: disabled ? AppColors.textLight : Colors.white,
+                  color: disabled ? context.colors.textTertiary : Colors.white,
                   letterSpacing: 0.5,
                 ),
               ),

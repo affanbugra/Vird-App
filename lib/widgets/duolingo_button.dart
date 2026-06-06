@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../app_theme.dart';
 
 class DuolingoButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final Widget child;
   final Color color;
   final Color bottomColor;
-  final Color disabledColor;
+  final Color? disabledColor;
   final double height;
   final bool isLoading;
   final double borderRadius;
@@ -16,7 +17,7 @@ class DuolingoButton extends StatefulWidget {
     required this.child,
     required this.color,
     required this.bottomColor,
-    this.disabledColor = const Color(0xFFD4D4D4),
+    this.disabledColor,
     this.height = 44.0,
     this.isLoading = false,
     this.borderRadius = 999.0,
@@ -33,9 +34,9 @@ class _DuolingoButtonState extends State<DuolingoButton> {
   Widget build(BuildContext context) {
     const double depth = 4.0;
     final bool isDisabled = widget.onPressed == null || widget.isLoading;
-    
-    final Color topColor = isDisabled ? widget.disabledColor : widget.color;
-    final Color btmColor = isDisabled ? widget.disabledColor : widget.bottomColor;
+    final Color disabledColor = widget.disabledColor ?? context.colors.surfaceVariant;
+    final Color topColor = isDisabled ? disabledColor : widget.color;
+    final Color btmColor = isDisabled ? disabledColor : widget.bottomColor;
 
     return GestureDetector(
       onTapDown: isDisabled ? null : (_) => setState(() => _isPressed = true),

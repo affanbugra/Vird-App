@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
 import '../app_assets.dart';
+import '../app_theme.dart';
 import '../config/team_limits.dart';
 import '../models/team_model.dart';
 import '../widgets/duolingo_button.dart';
@@ -25,9 +26,9 @@ class EkiplerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         centerTitle: true,
         title: Text(
@@ -35,7 +36,7 @@ class EkiplerScreen extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+            color: context.colors.textPrimary,
           ),
         ),
       ),
@@ -66,11 +67,11 @@ class _EkiplerBody extends StatelessWidget {
           title: Text(
             'Ekip Limiti',
             style: GoogleFonts.nunito(
-                fontWeight: FontWeight.w800, color: AppColors.textDark),
+                fontWeight: FontWeight.w800, color: context.colors.textPrimary),
           ),
           content: Text(
             TeamLimits.createLimitMessage(isPro: isPro, isDev: isDeveloper),
-            style: GoogleFonts.nunito(color: AppColors.textMid),
+            style: GoogleFonts.nunito(color: context.colors.textSecondary),
           ),
           actions: [
             TextButton(
@@ -267,9 +268,9 @@ class _EkiplerBody extends StatelessWidget {
 
                 // ── Alt aksiyon çubuğu ──────────────────────────────────────
                 Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.white,
-                    border: Border(top: BorderSide(color: AppColors.borderGrey)),
+                  decoration: BoxDecoration(
+                    color: context.colors.surface,
+                    border: Border(top: BorderSide(color: context.colors.border)),
                   ),
                   child: SafeArea(
                     top: false,
@@ -346,15 +347,15 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shield_outlined,
-                size: 64, color: AppColors.borderGrey),
+            Icon(Icons.shield_outlined,
+                size: 64, color: context.colors.border),
             const SizedBox(height: 16),
             Text(
               'Henüz hiç ekip yok',
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -363,7 +364,7 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
                 fontSize: 14,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -406,19 +407,21 @@ class _TeamCard extends StatelessWidget {
         ),
       );
     }
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: isMyTeam
-            ? AppColors.teal.withValues(alpha: 0.15)
-            : AppColors.lightGrey,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(
-        Icons.shield_outlined,
-        color: isMyTeam ? AppColors.teal : AppColors.textMid,
-        size: 24,
+    return Builder(
+      builder: (context) => Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isMyTeam
+              ? AppColors.teal.withValues(alpha: 0.15)
+              : context.colors.surfaceVariant,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          Icons.shield_outlined,
+          color: isMyTeam ? AppColors.teal : context.colors.textSecondary,
+          size: 24,
+        ),
       ),
     );
   }
@@ -431,9 +434,9 @@ class _TeamCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isMyTeam ? AppColors.tealLight : AppColors.white,
+          color: isMyTeam ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isMyTeam ? AppColors.teal : AppColors.borderGrey,
+            color: isMyTeam ? AppColors.teal : context.colors.border,
             width: isMyTeam ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(16),
@@ -454,7 +457,7 @@ class _TeamCard extends StatelessWidget {
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ),
@@ -497,8 +500,8 @@ class _TeamCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF8E1),
-                            border: Border.all(color: const Color(0xFFFFE082)),
+                            color: AppColors.gold.withValues(alpha: 0.15),
+                            border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -506,15 +509,15 @@ class _TeamCard extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFF59E0B),
+                              color: AppColors.gold,
                             ),
                           ),
                         ),
                       if (team.isPrivate && !isMyTeam && !isPending)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
                           child: Icon(Icons.lock_outline,
-                              size: 14, color: AppColors.textLight),
+                              size: 14, color: context.colors.textTertiary),
                         ),
                     ],
                   ),
@@ -525,21 +528,21 @@ class _TeamCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.nunito(
-                          fontSize: 12, color: AppColors.textMid),
+                          fontSize: 12, color: context.colors.textSecondary),
                     ),
                   ],
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.people_outline,
-                          size: 13, color: AppColors.textLight),
+                      Icon(Icons.people_outline,
+                          size: 13, color: context.colors.textTertiary),
                       const SizedBox(width: 3),
                       Text(
                         '${team.memberCount} üye',
                         style: GoogleFonts.nunito(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textLight,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                       if (pendingCount != null && pendingCount! > 0) ...[
@@ -547,8 +550,8 @@ class _TeamCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            border: Border.all(color: const Color(0xFFFF9800), width: 0.8),
+                            color: AppColors.orange.withValues(alpha: 0.15),
+                            border: Border.all(color: AppColors.orange.withValues(alpha: 0.4), width: 0.8),
                             borderRadius: BorderRadius.circular(99),
                           ),
                           child: Text(
@@ -556,7 +559,7 @@ class _TeamCard extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFE65100),
+                              color: AppColors.orange,
                             ),
                           ),
                         ),
@@ -566,7 +569,7 @@ class _TeamCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textLight),
+            Icon(Icons.chevron_right, color: context.colors.textTertiary),
           ],
         ),
       ),
@@ -621,9 +624,9 @@ class _PendingTeamSheetState extends State<_PendingTeamSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
       child: SafeArea(
@@ -636,7 +639,7 @@ class _PendingTeamSheetState extends State<_PendingTeamSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -644,22 +647,22 @@ class _PendingTeamSheetState extends State<_PendingTeamSheet> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
+                color: AppColors.gold.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFFFE082), width: 1.5),
+                border: Border.all(color: AppColors.gold.withValues(alpha: 0.4), width: 1.5),
               ),
-              child: const Icon(Icons.hourglass_empty_rounded, color: Color(0xFFF59E0B), size: 28),
+              child: const Icon(Icons.hourglass_empty_rounded, color: AppColors.gold, size: 28),
             ),
             const SizedBox(height: 16),
             Text(
               'İsteğin Beklemede',
-              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+              style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               '"${widget.teamName}" ekibine katılma isteğin gönderildi. Ekip lideri isteğini inceleyip onaylayacak.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid, height: 1.5),
+              style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary, height: 1.5),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -725,8 +728,8 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Eksik bilgi', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: AppColors.textDark)),
-        content: Text(msg, style: GoogleFonts.nunito(color: AppColors.textMid)),
+        title: Text('Eksik bilgi', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
+        content: Text(msg, style: GoogleFonts.nunito(color: context.colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -817,7 +820,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -827,7 +830,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -837,7 +840,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             maxLength: 50,
             decoration: InputDecoration(
               labelText: 'Ekip Adı *',
-              labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
               counterText: '',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -854,7 +857,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             maxLength: 300,
             decoration: InputDecoration(
               labelText: 'Açıklama (opsiyonel)',
-              labelStyle: GoogleFonts.nunito(color: AppColors.textMid),
+              labelStyle: GoogleFonts.nunito(color: context.colors.textSecondary),
               counterText: '',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -870,7 +873,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -888,7 +891,7 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMid,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -920,14 +923,14 @@ class _CreateTeamSheetState extends State<_CreateTeamSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Icon(Icons.info_outline,
-                  size: 11, color: Color(0xFFBBAB00)),
+                  size: 11, color: AppColors.gold),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   'Bu ayarlar bir kez belirlenir ve sonradan değiştirilemez. Dikkatle seçin.',
                   style: GoogleFonts.nunito(
                     fontSize: 10,
-                    color: const Color(0xFFAA9000),
+                    color: AppColors.gold,
                     height: 1.4,
                   ),
                 ),
@@ -1182,8 +1185,8 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
             Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
-                  color: AppColors.tealLight, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: context.colors.tealSurface, shape: BoxShape.circle),
               child: const Icon(Icons.check_circle_outline,
                   size: 34, color: AppColors.teal),
             ),
@@ -1192,13 +1195,13 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
                 style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark)),
+                    color: context.colors.textPrimary)),
             const SizedBox(height: 8),
             Text(
                 'Ekip lideri isteğini inceleyecek.\nKabul edilirse bildirim alacaksın.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
-                    fontSize: 13, color: AppColors.textMid, height: 1.5)),
+                    fontSize: 13, color: context.colors.textSecondary, height: 1.5)),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -1247,7 +1250,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1257,13 +1260,13 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
             style: GoogleFonts.nunito(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             'Lider tarafından verilen 6 haneli kodu gir.',
-            style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+            style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -1282,7 +1285,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
               hintText: 'XXXXXX',
               hintStyle: GoogleFonts.nunito(
                 fontSize: 22,
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 letterSpacing: 10,
               ),
               counterText: '',
@@ -1340,9 +1343,9 @@ class _PrivacyToggle extends StatelessWidget {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       padding: const EdgeInsets.all(4),
       child: Stack(
@@ -1357,7 +1360,7 @@ class _PrivacyToggle extends StatelessWidget {
                 widthFactor: 0.5,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.colors.surface,
                     borderRadius: BorderRadius.circular(9),
                     boxShadow: [
                       BoxShadow(
@@ -1384,7 +1387,7 @@ class _PrivacyToggle extends StatelessWidget {
                         fontWeight:
                             isPublic ? FontWeight.w700 : FontWeight.w500,
                         color: isPublic
-                            ? AppColors.textDark
+                            ? context.colors.textPrimary
                             : const Color(0xFF9E9E9E),
                       ),
                       child: const Text('🌐  Herkese Açık'),
@@ -1404,7 +1407,7 @@ class _PrivacyToggle extends StatelessWidget {
                         fontWeight:
                             isPrivate ? FontWeight.w700 : FontWeight.w500,
                         color: isPrivate
-                            ? AppColors.textDark
+                            ? context.colors.textPrimary
                             : const Color(0xFF9E9E9E),
                       ),
                       child: const Text('🔒  Sadece Davet'),
@@ -1466,9 +1469,9 @@ class _GenderPolicyToggle extends StatelessWidget {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       padding: const EdgeInsets.all(4),
       child: Stack(
@@ -1482,7 +1485,7 @@ class _GenderPolicyToggle extends StatelessWidget {
                 widthFactor: 1 / n,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.colors.surface,
                     borderRadius: BorderRadius.circular(9),
                     boxShadow: [
                       BoxShadow(
@@ -1508,7 +1511,7 @@ class _GenderPolicyToggle extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? AppColors.textDark : const Color(0xFF9E9E9E),
+                        color: isSelected ? context.colors.textPrimary : const Color(0xFF9E9E9E),
                       ),
                       child: Text(opt.$2),
                     ),

@@ -4,6 +4,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/hatim_model.dart';
 import 'duolingo_button.dart';
 import '../models/reading_log_model.dart';
@@ -49,11 +50,11 @@ class LogEntryBottomSheet extends StatefulWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Text(
+              Builder(builder: (ctx) => Text(
                 'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
-                style: TextStyle(fontSize: 15, color: AppColors.textMid),
+                style: TextStyle(fontSize: 15, color: ctx.colors.textSecondary),
                 textAlign: TextAlign.center,
-              ),
+              )),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -92,6 +93,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   // ── Devam ──────────────────────────────────────────────────────────
   Hatim? _devamHatim;
   final _devamPagesCtrl = TextEditingController();
+  final _devamStartPageCtrl = TextEditingController();
 
   // ── Sayfa ──────────────────────────────────────────────────────────
   final _startPageCtrl = TextEditingController();
@@ -122,6 +124,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       _sayfaHatim = widget.initialHatim;
       _cuzHatim = widget.initialHatim;
       _globalType = widget.initialHatim!.type;
+      _devamStartPageCtrl.text = _nextPageFor(widget.initialHatim!).toString();
     }
     _fetchHatims();
   }
@@ -130,6 +133,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   void dispose() {
     _tabController.dispose();
     _devamPagesCtrl.dispose();
+    _devamStartPageCtrl.dispose();
     _startPageCtrl.dispose();
     _endPageCtrl.dispose();
     super.dispose();
@@ -157,11 +161,21 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       // Devam sekmesinde tek hatim varsa otomatik seç
       if (widget.initialHatim == null && _hatims.length == 1) {
         _devamHatim = _hatims.first;
+        _devamStartPageCtrl.text = _nextPageFor(_hatims.first).toString();
       }
     });
   }
 
   // ── Yardımcı ───────────────────────────────────────────────────────
+
+  // Hatim için önerilen başlangıç sayfası:
+  // Son logun endPage + 1 — son log 604 ise ve hatim bitmemişse firstUnreadPage.
+  int _nextPageFor(Hatim hatim) {
+    final lastEnd = hatim.lastSessionEndPage;
+    if (lastEnd == 0) return hatim.firstUnreadPage;
+    if (lastEnd >= 604 && !hatim.isCompleted) return hatim.firstUnreadPage;
+    return (lastEnd + 1).clamp(1, 604);
+  }
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -198,9 +212,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         }
         method = LogMethod.hatim;
         type = _devamHatim!.type;
-        startPage = _devamHatim!.lastReadPage >= 604
-            ? _devamHatim!.firstUnreadPage
-            : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+        final startPageInput = int.tryParse(_devamStartPageCtrl.text) ?? 0;
+        if (startPageInput <= 0 || startPageInput > 604) {
+          _showError('Geçerli bir başlangıç sayfası gir (1–604).');
+          return;
+        }
+        startPage = startPageInput;
         endPage = (startPage + entered - 1).clamp(1, 604);
         pagesRead = endPage - startPage + 1; // gerçek sayfa adedi (clamped)
         devamEnteredPages = entered;
@@ -262,12 +279,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           content: Text(
             'Hatimini bitirmene $pagesRead sayfa kaldı.\n\n'
             '$pagesRead sayfa okundu işaretlenecek ve ${pagesRead * 10} hasanat eklenecek.',
-            style: const TextStyle(color: AppColors.textMid),
+            style: TextStyle(color: context.colors.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal', style: TextStyle(color: AppColors.textMid)),
+              child: Text('İptal', style: TextStyle(color: context.colors.textSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -318,7 +335,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
       } else {
         // lastLogDate null — dünkü loglara bak (migration / veri bozulması)
-        // Dizin hatasını / takılmayı önlemek için composite index gerektirmeyen tek alanlı sorgu yapıp
+        // Dizin hatasını önlemek için composite index gerektirmeyen tek alanlı sorgu yapıp
         // bellek içinde filtreliyoruz.
         final hadLogYesterday = lastLogDate == null
             ? await userRef.collection('logs')
@@ -418,107 +435,87 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
       await batch.commit();
 
-      // ── 1. Sheet'i hemen ve kesinlikle kapat (Instant UI Feedback) ────
-      if (!mounted) return;
-      final overlayCtx = Navigator.of(context, rootNavigator: true).context;
-      Navigator.pop(context, false); // Kapatıldı. Artık spinner yok.
+      // lastLogDate null iken dünkü log bulunduysa — gerçek seri uzunluğunu hesapla
+      if (needsSeriRecalculate) {
+        await SeriCalculator.recalculate(user.uid);
+      }
 
-      // ── 2. Post-commit işlemleri — Firestore ve sheet animasyonu paralel ──
-      Future.microtask(() async {
-        // Sheet pop animasyonu (~250ms) ile Firestore işlemleri eş zamanlı başlar
-        final animDelay = Future.delayed(const Duration(milliseconds: 320));
+      bool justCompleted = false;
+      if (hatimId != null) {
+        justCompleted = await HatimCalculator.recalculate(user.uid, hatimId);
+      }
 
+      // ── Tilavet Secdesi kontrolü ─────────────────────────────────────
+      if (mounted) {
+        final secdePages = TilavetSecdeData.secdesInRange(startPage, endPage);
+        for (final sPage in secdePages) {
+          if (!mounted) break;
+          await _showSecdePrompt(user.uid, hatimId, sPage);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────
+
+      // ── Seri animasyonu ──────────────────────────────────────────────
+      // Bug 8: needsSeriRecalculate durumunda da animasyon göster
+      int newSeri;
+      if (seriUpdate.containsKey('seri')) {
+        newSeri = (seriUpdate['seri'] as int);
+      } else if (needsSeriRecalculate) {
+        // recalculate yaptı — Firestore'dan güncel seriyi oku
+        final refreshed = await userRef.get();
+        newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
+      } else {
+        newSeri = displayedSeri; // Bugün zaten okunmuş, değişmedi
+      }
+
+      // Bug 1: prevCount olarak Firestore ham değeri değil, görüntülenen değer kullanılıyor
+      final shouldShowAnimation = newSeri > displayedSeri;
+
+      ({List<bool> filled, List<bool> frozenMask, List<String> labels})? weekData;
+      if (shouldShowAnimation && mounted) {
         try {
-          // ── A. Bağımsız recalculate'ler paralel ──────────────────────────
-          bool justCompleted = false;
-          final recalcFutures = <Future<void>>[];
-          if (needsSeriRecalculate) {
-            recalcFutures.add(SeriCalculator.recalculate(user.uid));
-          }
-          if (hatimId != null) {
-            final hId = hatimId;
-            recalcFutures.add(
-              HatimCalculator.recalculate(user.uid, hId)
-                  .then((v) => justCompleted = v),
+          weekData = await _getWeekFilled(user.uid);
+        } catch (e) {
+          debugPrint('Seri animasyonu yüklenemedi: $e');
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────
+
+      if (!mounted) return;
+
+      // Milestone kontrolü — animasyondan bağımsız her log sonrası çalışır.
+      // Transaction ile idempotent; aynı milestone iki kez claim edilemez.
+      final milestoneResult = await StreakFreezeService.claimMilestones(
+          uid: user.uid, newSeri: newSeri);
+
+      final overlayCtx = Navigator.of(context, rootNavigator: true).context;
+      Navigator.pop(context, justCompleted);
+
+      if (shouldShowAnimation && weekData != null) {
+        final wd = weekData;
+        final milestone = milestoneResult;
+        final ctx = overlayCtx;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!ctx.mounted) return;
+          await StreakAnimationScreen.show(
+            ctx,
+            count: newSeri,
+            prevCount: displayedSeri,
+            filled: wd.filled,
+            frozenMask: wd.frozenMask,
+            dayLabels: wd.labels,
+            todayIndex: 6,
+          );
+          if (milestone.claimed.isNotEmpty && ctx.mounted) {
+            await StreakFreezeRewardScreen.show(
+              ctx,
+              milestoneDays: milestone.claimed.last,
+              freezesGranted: milestone.totalGranted,
             );
           }
-          if (recalcFutures.isNotEmpty) await Future.wait(recalcFutures);
-
-          // ── B. Tilavet Secdesi (UI — sıralı) ─────────────────────────────
-          if (overlayCtx.mounted) {
-            final secdePages = TilavetSecdeData.secdesInRange(startPage ?? 1, endPage ?? 1);
-            for (final sPage in secdePages) {
-              if (!overlayCtx.mounted) break;
-              await _showSecdePrompt(overlayCtx, user.uid, hatimId, sPage);
-            }
-          }
-
-          // ── C. newSeri hesapla ────────────────────────────────────────────
-          int newSeri = displayedSeri;
-          if (seriUpdate.containsKey('seri')) {
-            newSeri = seriUpdate['seri'] as int;
-          } else if (needsSeriRecalculate) {
-            final refreshed = await userRef.get();
-            newSeri = (refreshed.data()?['seri'] as int?) ?? 1;
-          }
-          final shouldShowAnimation = newSeri > displayedSeri;
-
-          // ── D. Week data + milestones PARALEL ────────────────────────────
-          ({List<bool> filled, List<String> labels})? weekData;
-          ({List<int> claimed, int totalGranted})? milestoneResult;
-
-          final dataFutures = <Future<void>>[
-            StreakFreezeService.claimMilestones(uid: user.uid, newSeri: newSeri)
-                .then((v) => milestoneResult = v),
-          ];
-          if (shouldShowAnimation) {
-            dataFutures.add(() async {
-              try {
-                weekData = await _getWeekFilled(user.uid);
-              } catch (e) {
-                debugPrint('Seri animasyonu yüklenemedi: $e');
-              }
-            }());
-          }
-          await Future.wait(dataFutures);
-
-          // ── E. Sheet kapanma animasyonunu bekle (büyük ihtimalle bitti) ───
-          await animDelay;
-
-          // ── F. UI sırayla göster ──────────────────────────────────────────
-          if (overlayCtx.mounted) {
-            // 1. Seri animasyonu
-            if (shouldShowAnimation && weekData != null) {
-              await StreakAnimationScreen.show(
-                overlayCtx,
-                count: newSeri,
-                prevCount: displayedSeri,
-                filled: weekData!.filled,
-                dayLabels: weekData!.labels,
-                todayIndex: 6,
-              );
-            }
-            // 2. Milestone ödülü
-            if (milestoneResult != null &&
-                milestoneResult!.claimed.isNotEmpty &&
-                overlayCtx.mounted) {
-              await StreakFreezeRewardScreen.show(
-                overlayCtx,
-                milestoneDays: milestoneResult!.claimed.last,
-                freezesGranted: milestoneResult!.totalGranted,
-              );
-            }
-            // 3. Hatim tamamlanma tebriği
-            if (justCompleted && overlayCtx.mounted) {
-              await _showHatimCompletedDialog(overlayCtx);
-            }
-          }
-        } catch (e, st) {
-          debugPrint('Arka plan post-commit işlem hatası: $e\n$st');
-        }
-      });
+        });
+      }
     } catch (e, st) {
-      // Pre-commit hatası — veri kaydedilemedi
       debugPrint('LOG KAYDETME HATASI: $e\n$st');
       if (mounted) {
         setState(() => _isLoading = false);
@@ -532,50 +529,6 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     }
   }
 
-  Future<void> _showHatimCompletedDialog(BuildContext dialogContext) async {
-    await showDialog<void>(
-      context: dialogContext,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🎉', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 12),
-            const Text(
-              'Hatim Tamamlandı',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Mâşallah! Bir hatmi tamamladınız. Allah kabul eylesin.',
-              style: TextStyle(fontSize: 15, color: AppColors.textMid),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'Âmin',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Son 7 günlük doluluk verisi (seri animasyonu için) ──────────────
   // Bug 2: .toLocal() eklendi — gece yarısı UTC/yerel fark sorunu giderildi
   // Bug 3: whereIn filtresi — namaz/alışkanlık logları sayılmıyor
@@ -583,7 +536,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
   static const _dayAbbr = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
 
-  Future<({List<bool> filled, List<String> labels})> _getWeekFilled(String uid) async {
+  Future<({List<bool> filled, List<bool> frozenMask, List<String> labels})> _getWeekFilled(String uid) async {
     final now     = DateTime.now();
     final today   = DateTime(now.year, now.month, now.day);
     final startDay = today.subtract(const Duration(days: 6));
@@ -606,21 +559,27 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           [],
     );
 
-    final loggedDays = <String>{...frozenDates};
+    final readDays = <String>{};
     for (final doc in logsSnap.docs) {
       final docData = doc.data() as Map<String, dynamic>?;
       if (docData == null) continue;
       final type = docData['type'] as String?;
       if (type != 'arapca' && type != 'meal') continue;
       final d = (docData['createdAt'] as Timestamp?)?.toDate().toLocal();
-      if (d != null) {
-        loggedDays.add(seriDateKey(d));
-      }
+      if (d != null) readDays.add(seriDateKey(d));
     }
+
+    final loggedDays = <String>{...frozenDates, ...readDays};
 
     final filled = List.generate(7, (i) {
       final day = startDay.add(Duration(days: i));
       return loggedDays.contains(seriDateKey(day));
+    });
+
+    // Dondurulmuş ama okunmamış günler — animasyonda mavi gösterilir
+    final frozenMask = List.generate(7, (i) {
+      final key = seriDateKey(startDay.add(Duration(days: i)));
+      return frozenDates.contains(key) && !readDays.contains(key);
     });
 
     // Bug 5: Gün etiketleri dinamik — bugün daima index 6 (sağda)
@@ -629,17 +588,18 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
       return _dayAbbr[day.weekday - 1];
     });
 
-    return (filled: filled, labels: labels);
+    return (filled: filled, frozenMask: frozenMask, labels: labels);
   }
 
   // ── Tilavet Secdesi Prompt ──────────────────────────────────────────
 
   Future<void> _showSecdePrompt(
-      BuildContext dialogContext, String uid, String? hatimId, int page) async {
+      String uid, String? hatimId, int page) async {
+    if (!mounted) return;
     final label = TilavetSecdeData.secdeLabel(page) ?? 'Tilavet Secdesi';
 
     final result = await showDialog<String>(
-      context: dialogContext,
+      context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -654,13 +614,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
               style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '$label  (Sayfa $page) içeren bir bölüm okudunuz.\nTilavet secdesini yaptınız mı?',
-              style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMid),
+              style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -756,11 +716,11 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
 
     // Eğer initialHatim ile gelindiyse hatim zaten seçili — direk input göster
     if (_devamHatim != null) {
-      final nextPage = _devamHatim!.lastReadPage >= 604
-          ? _devamHatim!.firstUnreadPage
-          : (_devamHatim!.lastReadPage + 1).clamp(1, 604);
+      final startPageVal = int.tryParse(_devamStartPageCtrl.text) ?? _nextPageFor(_devamHatim!);
+      final nextPage = startPageVal.clamp(1, 604);
       final nextCuz = QuranData.cuzForPage(nextPage);
       final nextSurah = QuranData.surahsOnPage(nextPage);
+      final remaining = 604 - _devamHatim!.currentPage;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,7 +729,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.tealLight,
+              color: context.colors.tealSurface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
             ),
@@ -826,31 +786,78 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMid),
-                      children: [
-                        const TextSpan(text: 'Devam: '),
-                        TextSpan(
-                          text: 'Sayfa $nextPage',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.teal),
+                Row(
+                  children: [
+                    const Icon(Icons.play_arrow_rounded, size: 18, color: AppColors.teal),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Başlangıç:',
+                      style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 52,
+                      height: 28,
+                      child: TextField(
+                        controller: _devamStartPageCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 3,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.teal,
                         ),
-                        if (nextCuz != null)
-                          TextSpan(text: ' · ${nextCuz.cuzNo}. cüz'),
-                        if (nextSurah.isNotEmpty)
-                          TextSpan(text: ' · $nextSurah'),
-                      ],
+                        decoration: InputDecoration(
+                          counterText: '',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.5)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(color: AppColors.teal),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.4)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        [
+                          if (nextCuz != null)
+                            '${nextCuz.cuzNo}. cüz, ${nextPage - nextCuz.startPage + 1}. sayfa',
+                          if (nextSurah.isNotEmpty) nextSurah,
+                        ].join(' · '),
+                        style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (remaining > 0) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 26),
+                    child: Text(
+                      'Hatimde $remaining sayfa kaldı',
+                      style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -883,14 +890,14 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.info_outline, color: AppColors.textLight, size: 40),
+            Icon(Icons.info_outline, color: context.colors.textTertiary, size: 40),
             const SizedBox(height: 8),
-            const Text('Aktif hatiminiz yok.',
-                style: TextStyle(color: AppColors.textMid)),
+            Text('Aktif hatiminiz yok.',
+                style: TextStyle(color: context.colors.textSecondary)),
             const SizedBox(height: 4),
-            const Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
+            Text('Sayfa, Cüz veya Sure sekmesinden serbest log girebilirsiniz.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                style: TextStyle(color: context.colors.textTertiary, fontSize: 12)),
           ],
         ),
       );
@@ -899,15 +906,18 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Hangi hatim?',
-            style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+        Text('Hangi hatim?',
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
         const SizedBox(height: 8),
         ..._hatims.map((h) => _HatimSelectCard(
               hatim: h,
               isSelected: false,
               positionText: _hatimPositionText(h),
               surahText: _hatimSurahText(h),
-              onTap: () => setState(() => _devamHatim = h),
+              onTap: () => setState(() {
+                _devamHatim = h;
+                _devamStartPageCtrl.text = _nextPageFor(h).toString();
+              }),
             )),
       ],
     );
@@ -939,13 +949,13 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
                   ),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text('–',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textMid)),
+                        color: context.colors.textSecondary)),
               ),
               Expanded(
                 child: TextField(
@@ -972,8 +982,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -1023,8 +1033,8 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
             _LockedHatimBadge(hatim: widget.initialHatim!),
           ] else if (_hatims.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Hatimle ilişkilendir (opsiyonel):',
-                style: TextStyle(color: AppColors.textMid, fontSize: 13)),
+            Text('Hatimle ilişkilendir (opsiyonel):',
+                style: TextStyle(color: context.colors.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             _OptionalHatimChips(
               hatims: _hatims.where((h) => h.type == _globalType).toList(),
@@ -1084,12 +1094,12 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline, size: 13, color: AppColors.textLight),
+              Icon(Icons.info_outline, size: 13, color: context.colors.textTertiary),
               const SizedBox(width: 4),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Sure logları serbest kaydedilir — hatimle ilişkilendirilemez.',
-                  style: TextStyle(color: AppColors.textLight, fontSize: 11),
+                  style: TextStyle(color: context.colors.textTertiary, fontSize: 11),
                 ),
               ),
             ],
@@ -1104,9 +1114,9 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       child: Column(
@@ -1116,16 +1126,16 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Okuma Kaydet',
+              Text('Okuma Kaydet',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
+                      color: context.colors.textPrimary)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.history, color: AppColors.textMid),
+                    icon: Icon(Icons.history, color: context.colors.textSecondary),
                     onPressed: () => LogHistorySheet.show(context),
                     tooltip: 'Kayıt geçmişi',
                   ),
@@ -1162,7 +1172,7 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
           TabBar(
             controller: _tabController,
             labelColor: AppColors.teal,
-            unselectedLabelColor: AppColors.textLight,
+            unselectedLabelColor: context.colors.textTertiary,
             indicatorColor: AppColors.teal,
             labelPadding: EdgeInsets.zero,
             onTap: (_) => setState(() {}),
@@ -1220,9 +1230,9 @@ class _HatimSelectCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : Colors.white,
+          color: isSelected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -1232,12 +1242,12 @@ class _HatimSelectCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.teal : AppColors.borderGrey,
+                color: isSelected ? AppColors.teal : context.colors.border,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 isArapca ? Icons.menu_book : Icons.translate,
-                color: isSelected ? Colors.white : AppColors.textMid,
+                color: isSelected ? Colors.white : context.colors.textSecondary,
                 size: 18,
               ),
             ),
@@ -1251,13 +1261,13 @@ class _HatimSelectCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: isSelected ? AppColors.teal : AppColors.textDark,
+                      color: isSelected ? AppColors.teal : context.colors.textPrimary,
                     ),
                   ),
                   Text(positionText,
-                      style: const TextStyle(color: AppColors.textMid, fontSize: 12)),
+                      style: TextStyle(color: context.colors.textSecondary, fontSize: 12)),
                   Text(surahText,
-                      style: const TextStyle(color: AppColors.textLight, fontSize: 11)),
+                      style: TextStyle(color: context.colors.textTertiary, fontSize: 11)),
                 ],
               ),
             ),
@@ -1279,7 +1289,7 @@ class _LockedHatimBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.tealLight,
+        color: context.colors.tealSurface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
       ),
@@ -1353,9 +1363,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.tealLight : Colors.white,
+          color: isSelected ? context.colors.tealSurface : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppColors.teal : AppColors.borderGrey,
+            color: isSelected ? AppColors.teal : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(999),
@@ -1363,14 +1373,14 @@ class _Chip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: isSelected ? AppColors.teal : AppColors.textMid),
+            Icon(icon, size: 13, color: isSelected ? AppColors.teal : context.colors.textSecondary),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppColors.teal : AppColors.textMid,
+                color: isSelected ? AppColors.teal : context.colors.textSecondary,
               ),
             ),
           ],
@@ -1421,7 +1431,6 @@ class _SaveButton extends StatelessWidget {
       height: 48, // Toplam 52px (48 + 4 depth)
       color: AppColors.teal,
       bottomColor: AppColors.tealDark,
-      disabledColor: AppColors.borderGrey,
       onPressed: isLoading ? null : onPressed,
       isLoading: isLoading,
       child: const Text(

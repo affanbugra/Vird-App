@@ -1,10 +1,10 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../providers/user_provider.dart';
 import '../data/roadmap_entry.dart';
 
@@ -180,7 +180,7 @@ String _relativeTime(DateTime? dt) {
 
 // ─── Panel Ana Widget ─────────────────────────────────────────────────────────
 
-enum _PanelView { home, backlog, feedback, hafiz, roadmap, errors }
+enum _PanelView { home, backlog, feedback, hafiz, roadmap, errors, broadcast }
 
 class DevPanelScreen extends StatefulWidget {
   const DevPanelScreen({super.key});
@@ -209,9 +209,9 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
   Widget build(BuildContext context) {
     final isDev = context.select<UserProvider, bool>((p) => p.isDeveloper);
     if (!isDev) {
-      return const ColoredBox(
-        color: AppColors.white,
-        child: Center(child: Text('Erişim yok.', style: TextStyle(color: AppColors.textMid))),
+      return ColoredBox(
+        color: context.colors.surface,
+        child: Center(child: Text('Erişim yok.', style: TextStyle(color: context.colors.textSecondary))),
       );
     }
     return AnimatedSwitcher(
@@ -220,11 +220,12 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
       child: switch (_view) {
         _PanelView.home     => _HomeView(
             key: const ValueKey('home'),
-            onBacklogTap:    () => setState(() => _view = _PanelView.backlog),
-            onFeedbackTap:   () => setState(() => _view = _PanelView.feedback),
-            onHafizTap:      () => setState(() => _view = _PanelView.hafiz),
-            onRoadmapTap:    () => setState(() => _view = _PanelView.roadmap),
-            onErrorsTap:     () => setState(() => _view = _PanelView.errors),
+            onBacklogTap:     () => setState(() => _view = _PanelView.backlog),
+            onFeedbackTap:    () => setState(() => _view = _PanelView.feedback),
+            onHafizTap:       () => setState(() => _view = _PanelView.hafiz),
+            onRoadmapTap:     () => setState(() => _view = _PanelView.roadmap),
+            onErrorsTap:      () => setState(() => _view = _PanelView.errors),
+            onBroadcastTap:   () => setState(() => _view = _PanelView.broadcast),
           ),
         _PanelView.backlog  => _BacklogView(
             key: const ValueKey('backlog'),
@@ -246,6 +247,10 @@ class _DevPanelScreenState extends State<DevPanelScreen> {
             key: const ValueKey('errors'),
             onBack: () => setState(() => _view = _PanelView.home),
           ),
+        _PanelView.broadcast => _BroadcastView(
+            key: const ValueKey('broadcast'),
+            onBack: () => setState(() => _view = _PanelView.home),
+          ),
       },
     );
   }
@@ -259,12 +264,13 @@ class _HomeView extends StatelessWidget {
   final VoidCallback onHafizTap;
   final VoidCallback onRoadmapTap;
   final VoidCallback onErrorsTap;
-  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onErrorsTap});
+  final VoidCallback onBroadcastTap;
+  const _HomeView({super.key, required this.onBacklogTap, required this.onFeedbackTap, required this.onHafizTap, required this.onRoadmapTap, required this.onErrorsTap, required this.onBroadcastTap});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
           // Koyu slate header
@@ -325,135 +331,7 @@ class _HomeView extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               child: Column(
                 children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: _PanelCard(
-                            icon: Icons.checklist_rtl_outlined,
-                            title: 'Backlog',
-                            subtitle: 'Bug, plan ve fikirler',
-                            active: true,
-                            onTap: onBacklogTap,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 5,
-                          child: StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('feature_requests')
-                                .snapshots(),
-                            builder: (context, snap) {
-                              final unread = (snap.data?.docs ?? [])
-                                  .where((d) {
-                                    final data = d.data() as Map;
-                                    final archived = data['archived'] as bool? ?? false;
-                                    final folderId = data['folderId'] as String?;
-                                    return !archived && (folderId == null || folderId.isEmpty);
-                                  })
-                                  .length;
-                              return _PanelCard(
-                                icon: Icons.inbox_outlined,
-                                title: 'Feedback',
-                                subtitle: 'Kullanıcı geri bildirimleri',
-                                active: true,
-                                badgeCount: unread,
-                                onTap: onFeedbackTap,
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: _PanelCard(
-                            icon: Icons.rocket_launch_outlined,
-                            title: 'Neler Geldi\nNeler Gelecek',
-                            subtitle: 'Yol haritası yönetimi',
-                            active: true,
-                            onTap: onRoadmapTap,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 4,
-                          child: _PanelCard(
-                            icon: Icons.workspace_premium_outlined,
-                            title: 'Pro\nAyarları',
-                            subtitle: 'Yetki yönetimi',
-                            active: false,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('hafiz_requests')
-                        .where('status', isEqualTo: 'pending')
-                        .snapshots(),
-                    builder: (context, snap) {
-                      final pending = snap.data?.docs.length ?? 0;
-                      return _PanelCard(
-                        icon: Icons.menu_book_outlined,
-                        title: 'Hafız Başvuruları',
-                        subtitle: 'Doğrulama istekleri',
-                        active: true,
-                        badgeCount: pending,
-                        onTap: onHafizTap,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Expanded(
-                          child: _PanelCard(
-                            icon: Icons.campaign_outlined,
-                            title: 'Bildirim\nPaneli',
-                            subtitle: 'Toplu bildirim yönetimi',
-                            active: false,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('app_errors')
-                                .orderBy('createdAt', descending: true)
-                                .limit(1)
-                                .snapshots(),
-                            builder: (context, snap) {
-                              final count = snap.data?.docs.length ?? 0;
-                              return _PanelCard(
-                                icon: Icons.bug_report_outlined,
-                                title: 'Hata\nKayıtları',
-                                subtitle: 'Uygulama hataları',
-                                active: true,
-                                badgeCount: count,
-                                onTap: onErrorsTap,
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const _ConsistencyCheckCard(),
+                  _buildGrid(context),
                 ],
               ),
             ),
@@ -465,296 +343,266 @@ class _HomeView extends StatelessWidget {
               Image.asset(
                 'assets/images/v_logo.png',
                 height: 26,
-                color: AppColors.borderGrey,
+                color: context.colors.border,
                 colorBlendMode: BlendMode.srcIn,
               ),
               const SizedBox(height: 6),
-              const Text('vird dev tools', style: TextStyle(fontSize: 10, color: AppColors.textLight, letterSpacing: 1.2)),
+              Text('vird dev tools', style: TextStyle(fontSize: 10, color: context.colors.textTertiary, letterSpacing: 1.2)),
             ]),
           ),
         ],
       ),
     );
   }
-}
 
-// ─── Tutarlılık Kontrol Kartı ─────────────────────────────────────────────────
-
-class _ConsistencyCheckCard extends StatefulWidget {
-  const _ConsistencyCheckCard();
-
-  @override
-  State<_ConsistencyCheckCard> createState() => _ConsistencyCheckCardState();
-}
-
-class _ConsistencyCheckCardState extends State<_ConsistencyCheckCard> {
-  bool _loading = false;
-
-  Future<void> _run() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    setState(() => _loading = true);
-
-    try {
-      final db = FirebaseFirestore.instance;
-
-      final results = await Future.wait([
-        db.collection('users').doc(user.uid).get(),
-        db.collection('users').doc(user.uid).collection('logs')
-            .where('type', whereIn: ['arapca', 'meal']).get(),
-      ]);
-
-      final userDoc = results[0] as DocumentSnapshot;
-      final logsSnap = results[1] as QuerySnapshot;
-
-      final userData = userDoc.data() as Map<String, dynamic>?;
-      final totalPagesStored = userData?['totalPages'] as int? ?? 0;
-      final hasanatStored    = userData?['hasanat']    as int? ?? 0;
-
-      int sumFromLogs = 0;
-      final int logCount = logsSnap.docs.length;
-      for (final doc in logsSnap.docs) {
-        sumFromLogs += (doc.data() as Map<String, dynamic>)['pagesRead'] as int? ?? 0;
-      }
-
-      final int hasanatFromLogs = sumFromLogs * 10;
-      final int pageDiff    = sumFromLogs - totalPagesStored;
-      final int hasanatDiff = hasanatFromLogs - hasanatStored;
-      final bool allOk = pageDiff == 0 && hasanatDiff == 0;
-
-      if (!mounted) return;
-      setState(() => _loading = false);
-
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Veri Tutarlılığı', style: TextStyle(fontWeight: FontWeight.w700)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _row('Log sayısı', '$logCount kayıt'),
-              const SizedBox(height: 6),
-              _row('Log sayfa toplamı', '$sumFromLogs'),
-              _row('Profil totalPages', '$totalPagesStored'),
-              const SizedBox(height: 6),
-              _row('Beklenen hasanat', '$hasanatFromLogs'),
-              _row('Profil hasanat', '$hasanatStored'),
-              const SizedBox(height: 12),
-              _statusBox(
-                ok: allOk,
-                text: allOk
-                    ? 'Tutarlı — tüm sayaçlar doğru'
-                    : [
-                        if (pageDiff != 0)
-                          pageDiff > 0
-                              ? 'Sayfa: $pageDiff eksik'
-                              : 'Sayfa: ${pageDiff.abs()} fazla',
-                        if (hasanatDiff != 0)
-                          hasanatDiff > 0
-                              ? 'Hasanat: $hasanatDiff eksik'
-                              : 'Hasanat: ${hasanatDiff.abs()} fazla',
-                      ].join(' · '),
-              ),
-            ],
-          ),
-          actions: [
-            if (!allOk)
-              TextButton(
-                onPressed: () async {
-                  await db.collection('users').doc(user.uid).update({
-                    'totalPages': sumFromLogs,
-                    'hasanat': hasanatFromLogs,
-                  });
-                  if (ctx.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text('Düzeltildi → $sumFromLogs sayfa, $hasanatFromLogs hasanat')),
-                    );
-                  }
-                },
-                child: const Text('İkisini Düzelt', style: TextStyle(color: Colors.orange)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Kapat'),
-            ),
+  Widget _buildGrid(BuildContext context) {
+    return Column(
+      children: [
+        // ── Satır 1 ──
+        Row(
+          children: [
+            Expanded(child: _PanelTile(
+              icon: Icons.checklist_rtl_outlined,
+              label: 'Backlog',
+              color: const Color(0xFF6366F1),
+              active: true,
+              onTap: onBacklogTap,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('feature_requests')
+                  .snapshots(),
+              builder: (context, snap) {
+                final unread = (snap.data?.docs ?? [])
+                    .where((d) {
+                      final data = d.data() as Map;
+                      final archived = data['archived'] as bool? ?? false;
+                      final folderId = data['folderId'] as String?;
+                      return !archived && (folderId == null || folderId.isEmpty);
+                    })
+                    .length;
+                return _PanelTile(
+                  icon: Icons.inbox_outlined,
+                  label: 'Feedback',
+                  color: AppColors.teal,
+                  active: true,
+                  badge: unread > 0 ? '$unread' : null,
+                  onTap: onFeedbackTap,
+                );
+              },
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _PanelTile(
+              icon: Icons.rocket_launch_outlined,
+              label: 'Yol Haritası',
+              color: const Color(0xFFF59E0B),
+              active: true,
+              onTap: onRoadmapTap,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('hafiz_requests')
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
+              builder: (context, snap) {
+                final pending = snap.data?.docs.length ?? 0;
+                return _PanelTile(
+                  icon: Icons.menu_book_outlined,
+                  label: 'Hafız',
+                  color: AppColors.emeraldGreen,
+                  active: true,
+                  badge: pending > 0 ? '$pending' : null,
+                  onTap: onHafizTap,
+                );
+              },
+            )),
           ],
         ),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
-      }
-    }
-  }
-
-  Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Row(children: [
-      Text('$label: ', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-      Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-    ]),
-  );
-
-  Widget _statusBox({required bool ok, required String text}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(
-      color: (ok ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: (ok ? Colors.green : Colors.orange).withValues(alpha: 0.3)),
-    ),
-    child: Row(children: [
-      Icon(ok ? Icons.check_circle_outline : Icons.warning_amber_outlined,
-          color: ok ? Colors.green : Colors.orange, size: 16),
-      const SizedBox(width: 8),
-      Expanded(child: Text(text, style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: ok ? Colors.green.shade700 : Colors.orange.shade800,
-      ))),
-    ]),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: _loading ? null : _run,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+        const SizedBox(height: 10),
+        // ── Satır 2 ──
+        Row(
+          children: [
+            Expanded(child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('app_errors')
+                  .orderBy('createdAt', descending: true)
+                  .limit(1)
+                  .snapshots(),
+              builder: (context, snap) {
+                final count = snap.data?.docs.length ?? 0;
+                return _PanelTile(
+                  icon: Icons.bug_report_outlined,
+                  label: 'Hatalar',
+                  color: AppColors.errorRed,
+                  active: true,
+                  badge: count > 0 ? '$count' : null,
+                  onTap: onErrorsTap,
+                );
+              },
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _PanelTile(
+              icon: Icons.workspace_premium_outlined,
+              label: 'Pro',
+              color: AppColors.gold,
+              active: false,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _PanelTile(
+              icon: Icons.campaign_outlined,
+              label: 'Bildirim',
+              color: const Color(0xFF8B5CF6),
+              active: true,
+              onTap: onBroadcastTap,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _PanelTile(
+              icon: Icons.analytics_outlined,
+              label: 'Analitik',
+              color: const Color(0xFF06B6D4),
+              active: false,
+            )),
+          ],
         ),
-        child: Row(children: [
-          const Icon(Icons.verified_outlined, size: 20, color: Color(0xFF64748B)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Veri Tutarlılığı Kontrolü',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-              const Text('totalPages ↔ log toplamı karşılaştır',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            ]),
-          ),
-          if (_loading)
-            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-          else
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-        ]),
-      ),
+      ],
     );
   }
 }
 
-class _PanelCard extends StatelessWidget {
+// ─── Premium küp kart ──────────────────────────────────────────────────────────
+
+class _PanelTile extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final String label;
+  final Color color;
   final bool active;
-  final int badgeCount;
+  final String? badge;
   final VoidCallback? onTap;
 
-  const _PanelCard({
+  const _PanelTile({
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.label,
+    required this.color,
     required this.active,
-    this.badgeCount = 0,
+    this.badge,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (active) {
-      return Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Ink(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.teal, AppColors.tealDark],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : context.colors.border.withValues(alpha: 0.5);
+
+    return GestureDetector(
+      onTap: active ? onTap : null,
+      child: AspectRatio(
+        aspectRatio: 0.82,
+        child: Container(
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+            boxShadow: active ? [
+              BoxShadow(
+                color: color.withValues(alpha: isDark ? 0.15 : 0.10),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.teal.withValues(alpha: 0.30),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(icon, color: Colors.white, size: 26),
-                  if (badgeCount > 0) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$badgeCount yeni',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+            ] : null,
+          ),
+          child: Stack(
+            children: [
+              // Badge
+              if (badge != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
+                  ),
+                ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // İkon dairesi
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? color.withValues(alpha: isDark ? 0.20 : 0.12)
+                            : context.colors.surfaceVariant,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 20,
+                        color: active ? color : context.colors.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Başlık
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        color: active
+                            ? context.colors.textPrimary
+                            : context.colors.textTertiary,
+                      ),
+                    ),
+                    // "Yakında" etiketi
+                    if (!active) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: context.colors.border.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Yakında',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.textTertiary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ]),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800, height: 1.3),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGrey),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.textLight, size: 26),
-          const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: AppColors.textMid, fontSize: 14, fontWeight: FontWeight.w800, height: 1.3)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: AppColors.textLight, fontSize: 11)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
-            child: const Text('Yakında', style: TextStyle(fontSize: 10, color: AppColors.textLight, fontWeight: FontWeight.w600)),
-          ),
-        ],
       ),
     );
   }
@@ -784,7 +632,7 @@ class _TabBtn extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: active ? Colors.white : AppColors.textMid,
+              color: active ? Colors.white : context.colors.textSecondary,
               fontWeight: FontWeight.w800,
               fontSize: 13,
               letterSpacing: 0.5,
@@ -956,20 +804,20 @@ class _BacklogViewState extends State<_BacklogView> {
     final rows = _tab == 'plan' ? _buildRows(displayed) : <Object>[];
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(4, 16, 12, 16),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.colors.border))),
             child: Row(children: [
-              IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark), onPressed: widget.onBack),
-              const Text('Backlog', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: context.colors.textPrimary), onPressed: widget.onBack),
+              Text('Backlog', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
               const Spacer(),
               if (openCount > 0) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+                  decoration: BoxDecoration(color: context.colors.tealSurface, borderRadius: BorderRadius.circular(999)),
                   child: Text('$openCount açık', style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
@@ -989,14 +837,14 @@ class _BacklogViewState extends State<_BacklogView> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(color: const Color(0xFF1E293B).withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8)),
-                    child: Row(children: [const Icon(Icons.archive_outlined, size: 14, color: AppColors.textMid), const SizedBox(width: 4), Text('$archivedCount', style: const TextStyle(fontSize: 11, color: AppColors.textMid, fontWeight: FontWeight.w700))]),
+                    child: Row(children: [Icon(Icons.archive_outlined, size: 14, color: context.colors.textSecondary), const SizedBox(width: 4), Text('$archivedCount', style: TextStyle(fontSize: 11, color: context.colors.textSecondary, fontWeight: FontWeight.w700))]),
                   ),
                 ),
                 const SizedBox(width: 8),
               ],
               GestureDetector(
                 onTap: () => setState(() => _showCompleted = !_showCompleted),
-                child: Icon(_showCompleted ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: _showCompleted ? AppColors.teal : AppColors.textLight),
+                child: Icon(_showCompleted ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: _showCompleted ? AppColors.teal : context.colors.textTertiary),
               ),
             ]),
           ),
@@ -1005,7 +853,7 @@ class _BacklogViewState extends State<_BacklogView> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Container(
               height: 44,
-              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
               child: Row(children: [
                 _TabBtn(label: 'BUGS',    active: _tab == 'bug',  onTap: () => setState(() { _tab = 'bug';  _filterCat = null; })),
                 _TabBtn(label: 'PLAN',    active: _tab == 'plan', onTap: () => setState(() { _tab = 'plan'; _filterCat = null; })),
@@ -1034,7 +882,7 @@ class _BacklogViewState extends State<_BacklogView> {
                       height: 30,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       alignment: Alignment.center,
-                      child: const Icon(Icons.tune_rounded, size: 15, color: AppColors.textMid),
+                      child: Icon(Icons.tune_rounded, size: 15, color: context.colors.textSecondary),
                     ),
                   ),
                 ],
@@ -1146,14 +994,14 @@ class _BacklogViewState extends State<_BacklogView> {
                                     width: MediaQuery.of(ctx).size.width - 32,
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: context.colors.surface,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
                                     ),
                                     child: Row(children: [
                                       Container(width: 3, height: 32, decoration: BoxDecoration(color: _priorityColor(item.priority), borderRadius: BorderRadius.circular(999))),
                                       const SizedBox(width: 10),
-                                      Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                      Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary))),
                                     ]),
                                   ),
                                 ),
@@ -1212,12 +1060,12 @@ class _MilestoneHeader extends StatelessWidget {
       onAcceptWithDetails: (d) => onAcceptDrop?.call(d.data),
       builder: (ctx, candidates, _) {
         final over = candidates.isNotEmpty;
-        final badgeColor = isDone ? AppColors.textMid : AppColors.teal;
+        final badgeColor = isDone ? context.colors.textSecondary : AppColors.teal;
         final bgColor = isDone
-            ? AppColors.lightGrey
+            ? context.colors.surfaceVariant
             : over ? AppColors.teal.withValues(alpha: 0.08) : const Color(0xFF1E293B).withValues(alpha: 0.04);
         final borderColor = isDone
-            ? AppColors.borderGrey
+            ? context.colors.border
             : over ? AppColors.teal.withValues(alpha: 0.45) : const Color(0xFF1E293B).withValues(alpha: 0.08);
         return GestureDetector(
           onTap: onToggle,
@@ -1232,16 +1080,16 @@ class _MilestoneHeader extends StatelessWidget {
             ),
             child: Row(children: [
               if (isDone) ...[
-                const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.textMid),
+                Icon(Icons.check_circle_outline_rounded, size: 13, color: context.colors.textSecondary),
                 const SizedBox(width: 6),
               ],
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(color: badgeColor.withValues(alpha: isDone ? 0.15 : 1.0), borderRadius: BorderRadius.circular(6)),
-                child: Text(milestone.version, style: TextStyle(color: isDone ? AppColors.textMid : Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                child: Text(milestone.version, style: TextStyle(color: isDone ? context.colors.textSecondary : Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(milestone.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDone ? AppColors.textMid : AppColors.textDark))),
+              Expanded(child: Text(milestone.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDone ? context.colors.textSecondary : context.colors.textPrimary))),
               if (over) ...[
                 const Icon(Icons.add_circle_rounded, size: 16, color: AppColors.teal),
                 const SizedBox(width: 6),
@@ -1250,18 +1098,18 @@ class _MilestoneHeader extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isDone ? AppColors.borderGrey : AppColors.tealLight,
+                    color: isDone ? context.colors.border : context.colors.tealSurface,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(isDone ? '$itemCount görev' : '$itemCount açık',
-                      style: TextStyle(fontSize: 10, color: isDone ? AppColors.textMid : AppColors.teal, fontWeight: FontWeight.w700)),
+                      style: TextStyle(fontSize: 10, color: isDone ? context.colors.textSecondary : AppColors.teal, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
               ],
               Icon(
                 isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
                 size: 18,
-                color: over ? AppColors.teal : AppColors.textMid,
+                color: over ? AppColors.teal : context.colors.textSecondary,
               ),
             ]),
           ),
@@ -1293,37 +1141,37 @@ class _UnassignedHeader extends StatelessWidget {
             margin: const EdgeInsets.only(top: 12, bottom: 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: over ? AppColors.textMid.withValues(alpha: 0.08) : AppColors.lightGrey,
+              color: over ? context.colors.textSecondary.withValues(alpha: 0.08) : context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: over ? AppColors.textMid.withValues(alpha: 0.45) : AppColors.borderGrey,
+                color: over ? context.colors.textSecondary.withValues(alpha: 0.45) : context.colors.border,
                 width: over ? 1.5 : 1.0,
               ),
             ),
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
-                child: const Text('—', style: TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+                decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(6)),
+                child: Text('—', style: TextStyle(color: context.colors.textSecondary, fontSize: 10, fontWeight: FontWeight.w800)),
               ),
               const SizedBox(width: 10),
-              const Expanded(child: Text('Milestone\'suz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMid))),
+              Expanded(child: Text('Milestone\'suz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textSecondary))),
               if (over) ...[
-                const Icon(Icons.remove_circle_outline_rounded, size: 16, color: AppColors.textMid),
+                Icon(Icons.remove_circle_outline_rounded, size: 16, color: context.colors.textSecondary),
                 const SizedBox(width: 6),
               ],
               if (itemCount > 0 && !over) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
-                  child: Text('$itemCount açık', style: const TextStyle(fontSize: 10, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                  decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$itemCount açık', style: TextStyle(fontSize: 10, color: context.colors.textSecondary, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
               ],
               Icon(
                 isCollapsed ? Icons.keyboard_arrow_right_rounded : Icons.keyboard_arrow_down_rounded,
                 size: 18,
-                color: AppColors.textMid,
+                color: context.colors.textSecondary,
               ),
             ]),
           ),
@@ -1348,27 +1196,27 @@ class _CompletedDivider extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(top: 16, bottom: 4),
         child: Row(children: [
-          Expanded(child: Container(height: 1, color: AppColors.borderGrey)),
+          Expanded(child: Container(height: 1, color: context.colors.border)),
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppColors.lightGrey,
+              color: context.colors.surfaceVariant,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.borderGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.check_circle_outline_rounded, size: 12, color: AppColors.textMid),
+              Icon(Icons.check_circle_outline_rounded, size: 12, color: context.colors.textSecondary),
               const SizedBox(width: 5),
               Text('Tamamlanan Sürümler ($count)',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
               const SizedBox(width: 4),
               Icon(isOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  size: 14, color: AppColors.textMid),
+                  size: 14, color: context.colors.textSecondary),
             ]),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Container(height: 1, color: AppColors.borderGrey)),
+          Expanded(child: Container(height: 1, color: context.colors.border)),
         ]),
       ),
     );
@@ -1433,9 +1281,9 @@ class _BacklogCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       decoration: BoxDecoration(
-        color: item.completed ? const Color(0xFFF9FAFB) : AppColors.white,
+        color: item.completed ? const Color(0xFFF9FAFB) : context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(11),
@@ -1455,7 +1303,7 @@ class _BacklogCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: item.completed ? AppColors.teal : Colors.transparent,
                       borderRadius: BorderRadius.circular(5),
-                      border: Border.all(color: item.completed ? AppColors.teal : AppColors.borderGrey, width: 1.5),
+                      border: Border.all(color: item.completed ? AppColors.teal : context.colors.border, width: 1.5),
                     ),
                     child: item.completed ? const Icon(Icons.check_rounded, color: Colors.white, size: 13) : null,
                   ),
@@ -1469,9 +1317,9 @@ class _BacklogCard extends StatelessWidget {
                     item.title,
                     style: TextStyle(
                       fontSize: 13.5,
-                      color: item.completed ? AppColors.textLight : AppColors.textDark,
+                      color: item.completed ? context.colors.textTertiary : context.colors.textPrimary,
                       decoration: item.completed ? TextDecoration.lineThrough : null,
-                      decorationColor: AppColors.textLight,
+                      decorationColor: context.colors.textTertiary,
                       fontWeight: FontWeight.w600,
                       height: 1.4,
                     ),
@@ -1481,7 +1329,7 @@ class _BacklogCard extends StatelessWidget {
               const SizedBox(width: 6),
               Center(child: _CatBadge(cat: item.category)),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textLight),
+                icon: Icon(Icons.more_vert, size: 16, color: context.colors.textTertiary),
                 padding: EdgeInsets.zero,
                 onSelected: (val) {
                   if (val == 'edit') onEdit();
@@ -1563,9 +1411,9 @@ class _IdeaList extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 3),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: item.completed ? const Color(0xFFF9FAFB) : AppColors.white,
+              color: item.completed ? const Color(0xFFF9FAFB) : context.colors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(children: [
               GestureDetector(
@@ -1576,7 +1424,7 @@ class _IdeaList extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: item.completed ? AppColors.teal : Colors.transparent,
                     borderRadius: BorderRadius.circular(5),
-                    border: Border.all(color: item.completed ? AppColors.teal : AppColors.borderGrey, width: 1.5),
+                    border: Border.all(color: item.completed ? AppColors.teal : context.colors.border, width: 1.5),
                   ),
                   child: item.completed ? const Icon(Icons.check_rounded, color: Colors.white, size: 13) : null,
                 ),
@@ -1587,9 +1435,9 @@ class _IdeaList extends StatelessWidget {
                   item.title,
                   style: TextStyle(
                     fontSize: 13.5,
-                    color: item.completed ? AppColors.textLight : AppColors.textDark,
+                    color: item.completed ? context.colors.textTertiary : context.colors.textPrimary,
                     decoration: item.completed ? TextDecoration.lineThrough : null,
-                    decorationColor: AppColors.textLight,
+                    decorationColor: context.colors.textTertiary,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
                   ),
@@ -1598,7 +1446,7 @@ class _IdeaList extends StatelessWidget {
               const SizedBox(width: 8),
               _CatBadge(cat: item.category),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textLight),
+                icon: Icon(Icons.more_vert, size: 16, color: context.colors.textTertiary),
                 padding: EdgeInsets.zero,
                 onSelected: (val) {
                   if (val == 'edit') {
@@ -1635,11 +1483,11 @@ class _IdeaList extends StatelessWidget {
               width: MediaQuery.of(context).size.width - 32,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
               ),
-              child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+              child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
             ),
           ),
           childWhenDragging: Opacity(opacity: 0.3, child: dismissible),
@@ -1712,14 +1560,14 @@ class _BugList extends StatelessWidget {
               width: MediaQuery.of(ctx).size.width - 32,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 1.5),
               ),
               child: Row(children: [
                 Container(width: 3, height: 32, decoration: BoxDecoration(color: _priorityColor(item.priority), borderRadius: BorderRadius.circular(999))),
                 const SizedBox(width: 10),
-                Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary))),
               ]),
             ),
           ),
@@ -1816,11 +1664,11 @@ class _ArchiveViewState extends State<_ArchiveView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection(_col).snapshots(),
         builder: (context, snap) {
-          if (snap.hasError) return const Center(child: Text('Yükleme hatası', style: TextStyle(color: AppColors.textMid)));
+          if (snap.hasError) return Center(child: Text('Yükleme hatası', style: TextStyle(color: context.colors.textSecondary)));
           final allItems = (snap.data?.docs ?? []).map((d) => _BacklogItem.fromDoc(d)).toList()
               ..sort((a, b) => a.order.compareTo(b.order));
           final tabItems = allItems.where((i) {
@@ -1833,21 +1681,21 @@ class _ArchiveViewState extends State<_ArchiveView> {
             children: [
               Container(
                 padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.colors.border))),
                 child: Row(children: [
-                  IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark), onPressed: widget.onBack),
-                  const Icon(Icons.archive_outlined, size: 18, color: AppColors.textDark),
+                  IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: context.colors.textPrimary), onPressed: widget.onBack),
+                  Icon(Icons.archive_outlined, size: 18, color: context.colors.textPrimary),
                   const SizedBox(width: 8),
-                  const Text('Arşiv', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  Text('Arşiv', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
                   const Spacer(),
-                  Text('${tabItems.length} öğe', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                  Text('${tabItems.length} öğe', style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
                 ]),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Container(
                   height: 44,
-                  decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
                   child: Row(children: [
                     _TabBtn(label: 'BUGS',    active: _tab == 'bug',  onTap: () => setState(() => _tab = 'bug')),
                     _TabBtn(label: 'PLAN',    active: _tab == 'plan', onTap: () => setState(() => _tab = 'plan')),
@@ -1860,10 +1708,10 @@ class _ArchiveViewState extends State<_ArchiveView> {
                 child: snap.connectionState == ConnectionState.waiting
                     ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
                     : tabItems.isEmpty
-                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(Icons.archive_outlined, size: 48, color: AppColors.borderGrey),
-                            SizedBox(height: 12),
-                            Text('Arşiv boş', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+                        ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.archive_outlined, size: 48, color: context.colors.border),
+                            const SizedBox(height: 12),
+                            Text('Arşiv boş', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
                           ]))
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
@@ -1888,16 +1736,16 @@ class _ArchiveViewState extends State<_ArchiveView> {
                                 child: Container(
                                   margin: const EdgeInsets.symmetric(vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: AppColors.white,
+                                    color: context.colors.surface,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.borderGrey),
+                                    border: Border.all(color: context.colors.border),
                                   ),
                                   child: Row(children: [
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 13),
-                                        child: Text(item.title, style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, fontWeight: FontWeight.w600, height: 1.4)),
+                                        child: Text(item.title, style: TextStyle(fontSize: 13.5, color: context.colors.textPrimary, fontWeight: FontWeight.w600, height: 1.4)),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -1975,7 +1823,7 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection(_col).snapshots(),
         builder: (context, snap) {
@@ -1989,15 +1837,15 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
               // Header
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.colors.border))),
                 child: Row(children: [
-                  const Icon(Icons.flag_outlined, size: 20, color: AppColors.textDark),
+                  Icon(Icons.flag_outlined, size: 20, color: context.colors.textPrimary),
                   const SizedBox(width: 10),
-                  const Text('Milestones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  Text('Milestones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: AppColors.textMid, size: 20),
+                    icon: Icon(Icons.close_rounded, color: context.colors.textSecondary, size: 20),
                   ),
                 ]),
               ),
@@ -2006,12 +1854,12 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                 child: snap.connectionState == ConnectionState.waiting
                     ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
                     : milestones.isEmpty
-                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(Icons.flag_outlined, size: 48, color: AppColors.borderGrey),
-                            SizedBox(height: 12),
-                            Text('Milestone yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
-                            SizedBox(height: 4),
-                            Text('Aşağıdan yeni milestone ekle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                        ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.flag_outlined, size: 48, color: context.colors.border),
+                            const SizedBox(height: 12),
+                            Text('Milestone yok', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text('Aşağıdan yeni milestone ekle', style: TextStyle(color: context.colors.textTertiary, fontSize: 12)),
                           ]))
                         : ReorderableListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -2025,14 +1873,14 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                                 margin: const EdgeInsets.symmetric(vertical: 4),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.white,
+                                  color: context.colors.surface,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.borderGrey),
+                                  border: Border.all(color: context.colors.border),
                                 ),
                                 child: Row(children: [
                                   ReorderableDragStartListener(
                                     index: i,
-                                    child: Icon(Icons.drag_indicator_rounded, color: AppColors.textLight.withValues(alpha: 0.5), size: 18),
+                                    child: Icon(Icons.drag_indicator_rounded, color: context.colors.textTertiary.withValues(alpha: 0.5), size: 18),
                                   ),
                                   const SizedBox(width: 10),
                                   Container(
@@ -2041,7 +1889,7 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                                     child: Text(ms.version, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
                                   ),
                                   const SizedBox(width: 10),
-                                  Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                  Expanded(child: Text(ms.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary))),
                                   // Tamamlandı
                                   IconButton(
                                     tooltip: 'Tamamlandı olarak işaretle',
@@ -2059,12 +1907,12 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                                           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
                                           TextButton(
                                             onPressed: () { Navigator.pop(ctx); _archiveMilestone(ms.id); },
-                                            child: const Text('Arşivle', style: TextStyle(color: AppColors.textMid)),
+                                            child: Text('Arşivle', style: TextStyle(color: context.colors.textSecondary)),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    icon: const Icon(Icons.archive_outlined, size: 18, color: AppColors.textLight),
+                                    icon: Icon(Icons.archive_outlined, size: 18, color: context.colors.textTertiary),
                                   ),
                                   // Sil
                                   IconButton(
@@ -2082,7 +1930,7 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                                         ],
                                       ),
                                     ),
-                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textLight),
+                                    icon: Icon(Icons.delete_outline, size: 18, color: context.colors.textTertiary),
                                   ),
                                 ]),
                               );
@@ -2092,20 +1940,20 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
 
               // Tamamlanan milestone'lar — daraltılabilir
               if (completed.isNotEmpty) ...[
-                const Divider(height: 1, color: AppColors.borderGrey),
+                Divider(height: 1, color: context.colors.border),
                 InkWell(
                   onTap: () => setState(() => _showCompleted = !_showCompleted),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                     child: Row(children: [
-                      const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textMid),
+                      Icon(Icons.check_circle_outline_rounded, size: 14, color: context.colors.textSecondary),
                       const SizedBox(width: 6),
                       Text('Tamamlananlar (${completed.length})',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
                       const Spacer(),
                       Icon(
                         _showCompleted ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        size: 16, color: AppColors.textMid,
+                        size: 16, color: context.colors.textSecondary,
                       ),
                     ]),
                   ),
@@ -2115,18 +1963,18 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                     margin: const EdgeInsets.fromLTRB(16, 2, 16, 2),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.lightGrey,
+                      color: context.colors.surfaceVariant,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.borderGrey),
+                      border: Border.all(color: context.colors.border),
                     ),
                     child: Row(children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(6)),
-                        child: Text(ms.version, style: const TextStyle(color: AppColors.textMid, fontSize: 10, fontWeight: FontWeight.w800)),
+                        decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(6)),
+                        child: Text(ms.version, style: TextStyle(color: context.colors.textSecondary, fontSize: 10, fontWeight: FontWeight.w800)),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(ms.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMid))),
+                      Expanded(child: Text(ms.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textSecondary))),
                       TextButton(
                         onPressed: () => _reactivateMilestone(ms.id),
                         style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
@@ -2144,7 +1992,7 @@ class _MilestoneManagerSheetState extends State<_MilestoneManagerSheet> {
                             ],
                           ),
                         ),
-                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textLight),
+                        icon: Icon(Icons.delete_outline, size: 16, color: context.colors.textTertiary),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                       ),
@@ -2233,7 +2081,7 @@ class _NewMilestoneSheetState extends State<_NewMilestoneSheet> {
   Widget build(BuildContext context) {
     final canSave = _titleCtrl.text.trim().isNotEmpty && _versionCtrl.text.trim().isNotEmpty;
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       resizeToAvoidBottomInset: false,
       body: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -2241,9 +2089,9 @@ class _NewMilestoneSheetState extends State<_NewMilestoneSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)))),
             const SizedBox(height: 16),
-            const Text('Yeni Milestone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            Text('Yeni Milestone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
             const SizedBox(height: 16),
             // Version
             _InputField(controller: _versionCtrl, hint: 'Versiyon (örn: v1.1)', onChanged: (_) => setState(() {}), maxLines: 1),
@@ -2343,9 +2191,9 @@ class _FeedbackViewState extends State<_FeedbackView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: AppColors.white,
-        body: Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)),
+      return Scaffold(
+        backgroundColor: context.colors.surface,
+        body: const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)),
       );
     }
 
@@ -2353,23 +2201,23 @@ class _FeedbackViewState extends State<_FeedbackView> {
     final inboxCount = _items.where((f) => f.folderId == null || f.folderId!.isEmpty).length;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.colors.border))),
             child: Row(children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+                icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: context.colors.textPrimary),
                 onPressed: widget.onBack,
               ),
-              const Text('Feedback', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              Text('Feedback', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
               const Spacer(),
               if (inboxCount > 0) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(999)),
+                  decoration: BoxDecoration(color: context.colors.tealSurface, borderRadius: BorderRadius.circular(999)),
                   child: Text('$inboxCount bekliyor', style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
@@ -2379,14 +2227,14 @@ class _FeedbackViewState extends State<_FeedbackView> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.lightGrey,
+                    color: context.colors.surfaceVariant,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderGrey),
+                    border: Border.all(color: context.colors.border),
                   ),
-                  child: const Row(children: [
-                    Icon(Icons.folder_outlined, size: 14, color: AppColors.textMid),
-                    SizedBox(width: 4),
-                    Text('Klasörler', style: TextStyle(fontSize: 11, color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                  child: Row(children: [
+                    Icon(Icons.folder_outlined, size: 14, color: context.colors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text('Klasörler', style: TextStyle(fontSize: 11, color: context.colors.textSecondary, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ),
@@ -2401,7 +2249,7 @@ class _FeedbackViewState extends State<_FeedbackView> {
               children: [
                 _CatChip(label: 'Gelen Kutusu', color: AppColors.teal, active: _activeFilter == '__inbox', onTap: () => setState(() => _activeFilter = '__inbox')),
                 const SizedBox(width: 8),
-                _CatChip(label: 'Tümü', color: AppColors.textMid, active: _activeFilter == '__all', onTap: () => setState(() => _activeFilter = '__all')),
+                _CatChip(label: 'Tümü', color: context.colors.textSecondary, active: _activeFilter == '__all', onTap: () => setState(() => _activeFilter = '__all')),
                 ..._labels.map((l) => Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: _CatChip(label: l.name, color: l.color, active: _activeFilter == l.id, onTap: () => setState(() => _activeFilter = l.id)),
@@ -2417,12 +2265,12 @@ class _FeedbackViewState extends State<_FeedbackView> {
                 ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(
                       _activeFilter == '__inbox' ? Icons.mark_email_read_outlined : Icons.folder_open_outlined,
-                      size: 48, color: AppColors.borderGrey,
+                      size: 48, color: context.colors.border,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       _activeFilter == '__inbox' ? 'Gelen kutusu boş — tüm feedbackler klasörlendi' : 'Bu klasörde feedback yok',
-                      style: const TextStyle(color: AppColors.textMid, fontSize: 15),
+                      style: TextStyle(color: context.colors.textSecondary, fontSize: 15),
                       textAlign: TextAlign.center,
                     ),
                   ]))
@@ -2544,9 +2392,9 @@ class _FeedbackCardState extends State<_FeedbackCard> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: widget.item.isRead ? AppColors.white : AppColors.tealLight.withValues(alpha: 0.5),
+            color: widget.item.isRead ? context.colors.surface : context.colors.tealSurface.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: widget.item.isRead ? AppColors.borderGrey : AppColors.teal.withValues(alpha: 0.3)),
+            border: Border.all(color: widget.item.isRead ? context.colors.border : AppColors.teal.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2556,14 +2404,14 @@ class _FeedbackCardState extends State<_FeedbackCard> {
                 Container(
                   width: 8, height: 8,
                   decoration: BoxDecoration(
-                    color: widget.item.isRead ? AppColors.borderGrey : AppColors.teal,
+                    color: widget.item.isRead ? context.colors.border : AppColors.teal,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _userName ?? '...',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
                 ),
                 const Spacer(),
                 Builder(builder: (context) {
@@ -2579,17 +2427,17 @@ class _FeedbackCardState extends State<_FeedbackCard> {
                     child: Text(label.name, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: label.color)),
                   );
                 }),
-                Text(_relativeTime(widget.item.createdAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                Text(_relativeTime(widget.item.createdAt), style: TextStyle(fontSize: 11, color: context.colors.textTertiary)),
                 const SizedBox(width: 6),
                 Icon(
                   _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  size: 16, color: AppColors.textLight,
+                  size: 16, color: context.colors.textTertiary,
                 ),
               ]),
               const SizedBox(height: 8),
               Text(
                 widget.item.text,
-                style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, height: 1.4),
+                style: TextStyle(fontSize: 13.5, color: context.colors.textPrimary, height: 1.4),
                 maxLines: _expanded ? null : 2,
                 overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
               ),
@@ -2597,28 +2445,28 @@ class _FeedbackCardState extends State<_FeedbackCard> {
               // Aksiyon butonları (açıkken)
               if (_expanded) ...[
                 const SizedBox(height: 12),
-                const Divider(height: 1, color: AppColors.borderGrey),
+                Divider(height: 1, color: context.colors.border),
                 const SizedBox(height: 10),
                 Row(children: [
                   _PromoteBtn(label: 'Bug Ekle', color: AppColors.errorRed, onTap: () => _promote(context, 'bug')),
                   const SizedBox(width: 8),
-                  _PromoteBtn(label: 'Fikre Ekle', color: AppColors.textMid, onTap: () => _promote(context, 'idea')),
+                  _PromoteBtn(label: 'Fikre Ekle', color: context.colors.textSecondary, onTap: () => _promote(context, 'idea')),
                   const SizedBox(width: 8),
                   _PromoteBtn(label: 'Plana Ekle', color: AppColors.teal, onTap: () => _promote(context, 'plan')),
                   const Spacer(),
                   GestureDetector(
                     onTap: widget.onArchive,
-                    child: const Icon(Icons.archive_outlined, size: 18, color: AppColors.textLight),
+                    child: Icon(Icons.archive_outlined, size: 18, color: context.colors.textTertiary),
                   ),
                 ]),
                 if (widget.labels.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  const Divider(height: 1, color: AppColors.borderGrey),
+                  Divider(height: 1, color: context.colors.border),
                   const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Text('Klasör', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                      Text('Klasör', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Wrap(
@@ -2630,10 +2478,10 @@ class _FeedbackCardState extends State<_FeedbackCard> {
                                 duration: const Duration(milliseconds: 150),
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: widget.item.folderId == null ? AppColors.textMid : AppColors.borderGrey,
+                                  color: widget.item.folderId == null ? context.colors.textSecondary : context.colors.border,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: Text('Yok', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: widget.item.folderId == null ? Colors.white : AppColors.textMid)),
+                                child: Text('Yok', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: widget.item.folderId == null ? Colors.white : context.colors.textSecondary)),
                               ),
                             ),
                             ...widget.labels.map((l) => GestureDetector(
@@ -2712,7 +2560,7 @@ class _LabelManagerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection(_col).snapshots(),
         builder: (context, snap) {
@@ -2721,25 +2569,25 @@ class _LabelManagerSheet extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderGrey))),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.colors.border))),
                 child: Row(children: [
-                  const Icon(Icons.folder_outlined, size: 20, color: AppColors.textDark),
+                  Icon(Icons.folder_outlined, size: 20, color: context.colors.textPrimary),
                   const SizedBox(width: 10),
-                  const Text('Klasörler', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  Text('Klasörler', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
                   const Spacer(),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: AppColors.textMid, size: 20)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, color: context.colors.textSecondary, size: 20)),
                 ]),
               ),
               Expanded(
                 child: snap.connectionState == ConnectionState.waiting
                     ? const Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2))
                     : labels.isEmpty
-                        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(Icons.folder_open_outlined, size: 48, color: AppColors.borderGrey),
-                            SizedBox(height: 12),
-                            Text('Klasör yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
-                            SizedBox(height: 4),
-                            Text('Aşağıdan yeni klasör ekle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                        ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.folder_open_outlined, size: 48, color: context.colors.border),
+                            const SizedBox(height: 12),
+                            Text('Klasör yok', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text('Aşağıdan yeni klasör ekle', style: TextStyle(color: context.colors.textTertiary, fontSize: 12)),
                           ]))
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -2751,9 +2599,9 @@ class _LabelManagerSheet extends StatelessWidget {
                                 margin: const EdgeInsets.symmetric(vertical: 4),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.white,
+                                  color: context.colors.surface,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.borderGrey),
+                                  border: Border.all(color: context.colors.border),
                                 ),
                                 child: Row(children: [
                                   Container(
@@ -2761,7 +2609,7 @@ class _LabelManagerSheet extends StatelessWidget {
                                     decoration: BoxDecoration(color: label.color, shape: BoxShape.circle),
                                   ),
                                   const SizedBox(width: 12),
-                                  Expanded(child: Text(label.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark))),
+                                  Expanded(child: Text(label.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary))),
                                   IconButton(
                                     onPressed: () => showDialog(
                                       context: context,
@@ -2777,7 +2625,7 @@ class _LabelManagerSheet extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textLight),
+                                    icon: Icon(Icons.delete_outline, size: 18, color: context.colors.textTertiary),
                                   ),
                                 ]),
                               );
@@ -2865,7 +2713,7 @@ class _NewLabelSheetState extends State<_NewLabelSheet> {
   Widget build(BuildContext context) {
     final canSave = _nameCtrl.text.trim().isNotEmpty;
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       resizeToAvoidBottomInset: false,
       body: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -2873,13 +2721,13 @@ class _NewLabelSheetState extends State<_NewLabelSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)))),
             const SizedBox(height: 16),
-            const Text('Yeni Klasör', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            Text('Yeni Klasör', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
             const SizedBox(height: 16),
             _InputField(controller: _nameCtrl, hint: 'Klasör adı (örn: Dualar)', onChanged: (_) => setState(() {}), maxLines: 1),
             const SizedBox(height: 16),
-            const Text('Renk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+            Text('Renk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 10, runSpacing: 10,
@@ -2893,7 +2741,7 @@ class _NewLabelSheetState extends State<_NewLabelSheet> {
                     decoration: BoxDecoration(
                       color: _hex(h),
                       shape: BoxShape.circle,
-                      border: selected ? Border.all(color: AppColors.textDark, width: 2.5) : null,
+                      border: selected ? Border.all(color: context.colors.textPrimary, width: 2.5) : null,
                       boxShadow: selected ? [BoxShadow(color: _hex(h).withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))] : null,
                     ),
                     child: selected ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
@@ -2941,12 +2789,12 @@ class _EmptyState extends StatelessWidget {
         Icon(
           tab == 'bug' ? Icons.bug_report_outlined : tab == 'plan' ? Icons.checklist_outlined : Icons.lightbulb_outline_rounded,
           size: 48,
-          color: AppColors.borderGrey,
+          color: context.colors.border,
         ),
         const SizedBox(height: 12),
         Text(
           tab == 'bug' ? 'Bug yok! 🎉' : tab == 'plan' ? 'Yapılacak yok!' : 'Fikir yok henüz',
-          style: const TextStyle(color: AppColors.textMid, fontSize: 15),
+          style: TextStyle(color: context.colors.textSecondary, fontSize: 15),
         ),
       ]),
     );
@@ -3008,9 +2856,9 @@ class _InputField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: TextField(
         controller: controller,
@@ -3021,9 +2869,9 @@ class _InputField extends StatelessWidget {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(14),
           hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 14),
+          hintStyle: TextStyle(color: context.colors.textTertiary, fontSize: 14),
         ),
-        style: const TextStyle(fontSize: 14, color: AppColors.textDark, height: 1.5),
+        style: TextStyle(fontSize: 14, color: context.colors.textPrimary, height: 1.5),
       ),
     );
   }
@@ -3126,7 +2974,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         resizeToAvoidBottomInset: false,
         body: SingleChildScrollView(
           child: Padding(
@@ -3135,16 +2983,16 @@ class _AddItemSheetState extends State<_AddItemSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)))),
                 const SizedBox(height: 16),
-                Text(_isEdit ? 'Düzenle' : 'Yeni Ekle', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                Text(_isEdit ? 'Düzenle' : 'Yeni Ekle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
                 const SizedBox(height: 16),
 
                 // Tip toggle
                 SizedBox(
                   height: 42,
                   child: Container(
-                    decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(11)),
+                    decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(11)),
                     child: Row(children: [
                       _TabBtn(label: 'BUG',     active: _type == 'bug',  onTap: () => setState(() => _type = 'bug')),
                       _TabBtn(label: 'PLAN',    active: _type == 'plan', onTap: () => setState(() => _type = 'plan')),
@@ -3160,7 +3008,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
 
                 // Priority (FİKİR için gösterilmez)
                 if (_type != 'idea') ...[
-                  const Text('Öncelik', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  Text('Öncelik', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                   const SizedBox(height: 8),
                   Row(children: [
                     for (final p in [('critical', 'Kritik'), ('normal', 'Normal'), ('low', 'Düşük')]) ...[
@@ -3208,7 +3056,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Milestone', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                          Text('Milestone', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8, runSpacing: 8,
@@ -3219,10 +3067,10 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                                   duration: const Duration(milliseconds: 150),
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: _selMilestoneId == null ? AppColors.textMid : AppColors.borderGrey,
+                                    color: _selMilestoneId == null ? context.colors.textSecondary : context.colors.border,
                                     borderRadius: BorderRadius.circular(999),
                                   ),
-                                  child: Text('Yok', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _selMilestoneId == null ? Colors.white : AppColors.textMid)),
+                                  child: Text('Yok', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _selMilestoneId == null ? Colors.white : context.colors.textSecondary)),
                                 ),
                               ),
                               for (final ms in milestones)
@@ -3251,7 +3099,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                 ],
 
                 // Kategori
-                const Text('Kategori', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                Text('Kategori', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8, runSpacing: 8,
@@ -3282,11 +3130,11 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             hintText: 'Yeni kategori...',
-                            hintStyle: const TextStyle(fontSize: 11, color: AppColors.textLight),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppColors.borderGrey)),
+                            hintStyle: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: context.colors.border)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppColors.teal)),
                           ),
-                          style: const TextStyle(fontSize: 12, color: AppColors.textDark),
+                          style: TextStyle(fontSize: 12, color: context.colors.textPrimary),
                         ),
                       ),
                   ],
@@ -3396,34 +3244,34 @@ class _CatManagerSheetState extends State<_CatManagerSheet> {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: context.colors.surface,
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 12),
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)))),
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Kategori Yönetimi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Kategori Yönetimi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
             ),
             const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Kategorileri yeniden adlandır veya sil.', style: TextStyle(fontSize: 12, color: AppColors.textMid)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Kategorileri yeniden adlandır veya sil.', style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
             ),
             const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.borderGrey),
+            Divider(height: 1, color: context.colors.border),
             if (_loading)
               const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)))
             else if (_cats.isEmpty)
-              const Expanded(child: Center(child: Text('Henüz kategori yok.', style: TextStyle(color: AppColors.textLight, fontSize: 14))))
+              Expanded(child: Center(child: Text('Henüz kategori yok.', style: TextStyle(color: context.colors.textTertiary, fontSize: 14))))
             else
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                   itemCount: _cats.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.borderGrey),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: context.colors.border),
                   itemBuilder: (ctx, i) {
                     final cat = _cats[i];
                     return _CatRow(
@@ -3490,7 +3338,7 @@ class _CatRowState extends State<_CatRow> {
                 ? TextField(
                     controller: _ctrl,
                     autofocus: true,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colors.textPrimary),
                     decoration: const InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(vertical: 4),
@@ -3498,7 +3346,7 @@ class _CatRowState extends State<_CatRow> {
                       focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.teal, width: 2)),
                     ),
                   )
-                : Text(widget.cat, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                : Text(widget.cat, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
           ),
           if (_editing) ...[
             if (_saving)
@@ -3517,14 +3365,14 @@ class _CatRowState extends State<_CatRow> {
                 },
               ),
             IconButton(
-              icon: const Icon(Icons.close_rounded, color: AppColors.textLight, size: 20),
+              icon: Icon(Icons.close_rounded, color: context.colors.textTertiary, size: 20),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               onPressed: () => setState(() { _editing = false; _ctrl.text = widget.cat; }),
             ),
           ] else ...[
             IconButton(
-              icon: const Icon(Icons.edit_outlined, color: AppColors.textMid, size: 18),
+              icon: Icon(Icons.edit_outlined, color: context.colors.textSecondary, size: 18),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               onPressed: () => setState(() => _editing = true),
@@ -3580,7 +3428,7 @@ class _HafizViewState extends State<_HafizView> with SingleTickerProviderStateMi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: StreamBuilder<QuerySnapshot>(
         stream: _pendingStream,
         builder: (context, snap) {
@@ -3679,7 +3527,7 @@ class _HafizViewState extends State<_HafizView> with SingleTickerProviderStateMi
           children: [
             Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
             const SizedBox(height: 12),
-            const Text('Bekleyen doğrulama başvurusu yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+            Text('Bekleyen doğrulama başvurusu yok', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
           ],
         ),
       );
@@ -3703,7 +3551,7 @@ class _HafizViewState extends State<_HafizView> with SingleTickerProviderStateMi
           children: [
             Icon(Icons.check_circle_outline_rounded, color: AppColors.successGreen, size: 48),
             const SizedBox(height: 12),
-            const Text('Bekleyen iptal başvurusu yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+            Text('Bekleyen iptal başvurusu yok', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
           ],
         ),
       );
@@ -3729,9 +3577,9 @@ class _HafizViewState extends State<_HafizView> with SingleTickerProviderStateMi
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.person_off_outlined, color: AppColors.textLight, size: 48),
+                Icon(Icons.person_off_outlined, color: context.colors.textTertiary, size: 48),
                 const SizedBox(height: 12),
-                const Text('Henüz hafız yok', style: TextStyle(color: AppColors.textMid, fontSize: 15)),
+                Text('Henüz hafız yok', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
               ],
             ),
           );
@@ -3873,9 +3721,9 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
         ],
@@ -3890,22 +3738,22 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                 backgroundImage: avatarSeed != null
                     ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
                     : null,
-                backgroundColor: AppColors.lightGrey,
-                child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
+                backgroundColor: context.colors.surfaceVariant,
+                child: avatarSeed == null ? Icon(Icons.person, size: 18, color: context.colors.textSecondary) : null,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
+                    Text(name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: context.colors.textPrimary)),
                     if (username.isNotEmpty)
-                      Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                      Text('@$username', style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
                   ],
                 ),
               ),
               if (requestedAt != null)
-                Text(_relativeTime(requestedAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                Text(_relativeTime(requestedAt), style: TextStyle(fontSize: 11, color: context.colors.textTertiary)),
             ],
           ),
           const SizedBox(height: 12),
@@ -3913,12 +3761,12 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(8)),
-              child: const Row(
+              decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(8)),
+              child: Row(
                 children: [
-                  Icon(Icons.notes_rounded, size: 16, color: AppColors.textLight),
-                  SizedBox(width: 6),
-                  Text('Belge veya not paylaşılmadı', style: TextStyle(fontSize: 12, color: AppColors.textLight, fontStyle: FontStyle.italic)),
+                  Icon(Icons.notes_rounded, size: 16, color: context.colors.textTertiary),
+                  const SizedBox(width: 6),
+                  Text('Belge veya not paylaşılmadı', style: TextStyle(fontSize: 12, color: context.colors.textTertiary, fontStyle: FontStyle.italic)),
                 ],
               ),
             )
@@ -3933,7 +3781,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(8)),
                 child: Row(
                   children: [
                     const Icon(Icons.link_rounded, size: 16, color: AppColors.teal),
@@ -3946,7 +3794,7 @@ class _HafizRequestCardState extends State<_HafizRequestCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.copy_rounded, size: 14, color: AppColors.textLight),
+                    Icon(Icons.copy_rounded, size: 14, color: context.colors.textTertiary),
                   ],
                 ),
               ),
@@ -4115,7 +3963,7 @@ class _HafizRevokeCardState extends State<_HafizRevokeCard> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.4)),
         boxShadow: [
@@ -4134,8 +3982,8 @@ class _HafizRevokeCardState extends State<_HafizRevokeCard> {
                     backgroundImage: avatarSeed != null
                         ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
                         : null,
-                    backgroundColor: AppColors.lightGrey,
-                    child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
+                    backgroundColor: context.colors.surfaceVariant,
+                    child: avatarSeed == null ? Icon(Icons.person, size: 18, color: context.colors.textSecondary) : null,
                   ),
                   Positioned(
                     bottom: 0,
@@ -4156,7 +4004,7 @@ class _HafizRevokeCardState extends State<_HafizRevokeCard> {
                   children: [
                     Row(
                       children: [
-                        Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
+                        Text(name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: context.colors.textPrimary)),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -4169,12 +4017,12 @@ class _HafizRevokeCardState extends State<_HafizRevokeCard> {
                       ],
                     ),
                     if (username.isNotEmpty)
-                      Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                      Text('@$username', style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
                   ],
                 ),
               ),
               if (requestedAt != null)
-                Text(_relativeTime(requestedAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                Text(_relativeTime(requestedAt), style: TextStyle(fontSize: 11, color: context.colors.textTertiary)),
             ],
           ),
           const SizedBox(height: 10),
@@ -4205,7 +4053,7 @@ class _HafizRevokeCardState extends State<_HafizRevokeCard> {
                       Expanded(
                         child: Text(
                           userNote,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textDark, height: 1.4),
+                          style: TextStyle(fontSize: 12, color: context.colors.textPrimary, height: 1.4),
                         ),
                       ),
                     ],
@@ -4307,12 +4155,12 @@ class _HafizUserCardState extends State<_HafizUserCard> {
     if (_revoked) {
       return Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
-        child: const Row(
+        decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
+        child: Row(
           children: [
-            Icon(Icons.remove_circle_outline_rounded, color: AppColors.textLight, size: 16),
-            SizedBox(width: 6),
-            Text('Statü kaldırıldı', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
+            Icon(Icons.remove_circle_outline_rounded, color: context.colors.textTertiary, size: 16),
+            const SizedBox(width: 6),
+            Text('Statü kaldırıldı', style: TextStyle(color: context.colors.textTertiary, fontSize: 13)),
           ],
         ),
       );
@@ -4326,7 +4174,7 @@ class _HafizUserCardState extends State<_HafizUserCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.emeraldGreen.withValues(alpha: 0.3)),
       ),
@@ -4339,8 +4187,8 @@ class _HafizUserCardState extends State<_HafizUserCard> {
                 backgroundImage: avatarSeed != null
                     ? NetworkImage('https://api.dicebear.com/7.x/micah/png?seed=$avatarSeed&backgroundColor=transparent')
                     : null,
-                backgroundColor: AppColors.lightGrey,
-                child: avatarSeed == null ? const Icon(Icons.person, size: 18, color: AppColors.textMid) : null,
+                backgroundColor: context.colors.surfaceVariant,
+                child: avatarSeed == null ? Icon(Icons.person, size: 18, color: context.colors.textSecondary) : null,
               ),
               Positioned(
                 bottom: 0,
@@ -4359,9 +4207,9 @@ class _HafizUserCardState extends State<_HafizUserCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name.isEmpty ? '(İsimsiz)' : name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textDark)),
+                Text(name.isEmpty ? '(İsimsiz)' : name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: context.colors.textPrimary)),
                 if (username.isNotEmpty)
-                  Text('@$username', style: const TextStyle(fontSize: 12, color: AppColors.textMid)),
+                  Text('@$username', style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
               ],
             ),
           ),
@@ -4424,7 +4272,7 @@ class _ErrorLogsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
           Container(
@@ -4466,13 +4314,13 @@ class _ErrorLogsView extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator(color: AppColors.teal));
                 }
                 if (docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_outline, size: 48, color: AppColors.teal),
-                        SizedBox(height: 12),
-                        Text('Hata kaydı yok', style: TextStyle(color: AppColors.textMid, fontWeight: FontWeight.w700)),
+                        const Icon(Icons.check_circle_outline, size: 48, color: AppColors.teal),
+                        const SizedBox(height: 12),
+                        Text('Hata kaydı yok', style: TextStyle(color: context.colors.textSecondary, fontWeight: FontWeight.w700)),
                       ],
                     ),
                   );
@@ -4480,7 +4328,7 @@ class _ErrorLogsView extends StatelessWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
                     final error = data['error'] as String? ?? 'Bilinmeyen hata';
@@ -4568,7 +4416,7 @@ class _RoadmapViewState extends State<_RoadmapView> {
         .listen((s) {
       final all = s.docs.map(RoadmapEntry.fromDoc).toList();
       setState(() {
-        _released = all.where((e) => e.type == 'released').toList();
+        _released = all.where((e) => e.type == 'released').toList().reversed.toList();
         _upcoming = all.where((e) => e.type == 'upcoming').toList();
         _loading = false;
       });
@@ -4590,10 +4438,13 @@ class _RoadmapViewState extends State<_RoadmapView> {
     list.insert(newIndex, moved);
 
     final batch = FirebaseFirestore.instance.batch();
+    final isReleased = _tab == 'released';
     for (var i = 0; i < list.length; i++) {
+      // Released is displayed newest-first (reversed), so assign descending order
+      final order = isReleased ? (list.length - 1 - i) : i;
       batch.update(
         FirebaseFirestore.instance.collection('roadmap_entries').doc(list[i].id),
-        {'order': i},
+        {'order': order},
       );
     }
     await batch.commit();
@@ -4668,7 +4519,7 @@ class _RoadmapViewState extends State<_RoadmapView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
           Container(
@@ -4707,7 +4558,7 @@ class _RoadmapViewState extends State<_RoadmapView> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Container(
               height: 40,
-              decoration: BoxDecoration(color: AppColors.lightGrey, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: context.colors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
               child: Row(
                 children: [
                   _TabBtn(label: 'Yayında', active: _tab == 'released', onTap: () => setState(() => _tab = 'released')),
@@ -4725,9 +4576,9 @@ class _RoadmapViewState extends State<_RoadmapView> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.rocket_launch_outlined, size: 40, color: AppColors.borderGrey),
+                            Icon(Icons.rocket_launch_outlined, size: 40, color: context.colors.border),
                             const SizedBox(height: 12),
-                            const Text('Henüz kart yok', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
+                            Text('Henüz kart yok', style: TextStyle(color: context.colors.textTertiary, fontSize: 14)),
                             const SizedBox(height: 6),
                             TextButton(
                               onPressed: _openForm,
@@ -4737,7 +4588,7 @@ class _RoadmapViewState extends State<_RoadmapView> {
                               const SizedBox(height: 4),
                               TextButton(
                                 onPressed: _seedInitialData,
-                                child: const Text('Başlangıç verilerini yükle', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                                child: Text('Başlangıç verilerini yükle', style: TextStyle(color: context.colors.textTertiary, fontSize: 12)),
                               ),
                             ],
                           ],
@@ -4792,14 +4643,14 @@ class _RoadmapDevCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isReleased = entry.type == 'released';
     final barColor   = !entry.published
-        ? AppColors.borderGrey
+        ? context.colors.border
         : isReleased ? const Color(0xFF58CC02) : AppColors.teal;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        border: Border.all(color: AppColors.borderGrey),
+        color: context.colors.surfaceVariant,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(14),
       ),
       child: IntrinsicHeight(
@@ -4824,13 +4675,13 @@ class _RoadmapDevCard extends StatelessWidget {
                     Row(
                       children: [
                         if (entry.version != null) ...[
-                          Text(entry.version!, style: const TextStyle(fontSize: 11, color: AppColors.textLight, fontWeight: FontWeight.w700)),
+                          Text(entry.version!, style: TextStyle(fontSize: 11, color: context.colors.textTertiary, fontWeight: FontWeight.w700)),
                           const SizedBox(width: 6),
                         ],
                         Expanded(
                           child: Text(
                             entry.title,
-                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
                           ),
                         ),
                         GestureDetector(
@@ -4838,7 +4689,7 @@ class _RoadmapDevCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: entry.published ? const Color(0xFFD7FFB8) : AppColors.borderGrey,
+                              color: entry.published ? const Color(0xFFD7FFB8) : context.colors.border,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
@@ -4846,7 +4697,7 @@ class _RoadmapDevCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: entry.published ? const Color(0xFF58CC02) : AppColors.textLight,
+                                color: entry.published ? const Color(0xFF58CC02) : context.colors.textTertiary,
                               ),
                             ),
                           ),
@@ -4857,13 +4708,13 @@ class _RoadmapDevCard extends StatelessWidget {
                       const SizedBox(height: 1),
                       Text(
                         entry.date ?? entry.eta ?? '',
-                        style: const TextStyle(fontSize: 10.5, color: AppColors.textLight, fontWeight: FontWeight.w600),
+                        style: TextStyle(fontSize: 10.5, color: context.colors.textTertiary, fontWeight: FontWeight.w600),
                       ),
                     ],
                     if (entry.bullets.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       for (final b in entry.bullets)
-                        Text('· $b', style: const TextStyle(fontSize: 11.5, color: AppColors.textMid, height: 1.35)),
+                        Text('· $b', style: TextStyle(fontSize: 11.5, color: context.colors.textSecondary, height: 1.35)),
                     ],
                   ],
                 ),
@@ -4874,7 +4725,7 @@ class _RoadmapDevCard extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMid),
+                  icon: Icon(Icons.edit_outlined, size: 18, color: context.colors.textSecondary),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   constraints: const BoxConstraints(),
                 ),
@@ -4886,9 +4737,9 @@ class _RoadmapDevCard extends StatelessWidget {
                 ),
                 ReorderableDragStartListener(
                   index: index,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Icon(Icons.drag_handle_rounded, size: 18, color: AppColors.textLight),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Icon(Icons.drag_handle_rounded, size: 18, color: context.colors.textTertiary),
                   ),
                 ),
               ],
@@ -4983,9 +4834,9 @@ class _RoadmapFormState extends State<_RoadmapForm> {
   Widget build(BuildContext context) {
     final isEdit = widget.entry != null;
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
@@ -4997,13 +4848,13 @@ class _RoadmapFormState extends State<_RoadmapForm> {
             Center(
               child: Container(
                 width: 40, height: 4,
-                decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(999)),
+                decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(999)),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               isEdit ? 'Kartı Düzenle' : 'Yeni Kart',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
             ),
             const SizedBox(height: 16),
 
@@ -5029,22 +4880,22 @@ class _RoadmapFormState extends State<_RoadmapForm> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Maddeler (her satır ayrı)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+                Text('Maddeler (her satır ayrı)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _bullets,
                   maxLines: 5,
-                  style: const TextStyle(fontSize: 13.5, color: AppColors.textDark),
+                  style: TextStyle(fontSize: 13.5, color: context.colors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Seri hataları giderildi\nEkip liderboard güncellendi',
-                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
+                    hintStyle: TextStyle(fontSize: 13, color: context.colors.textTertiary),
                     filled: true,
-                    fillColor: AppColors.lightGrey,
+                    fillColor: context.colors.surfaceVariant,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderGrey),
+                      borderSide: BorderSide(color: context.colors.border),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -5062,14 +4913,14 @@ class _RoadmapFormState extends State<_RoadmapForm> {
                   value: _published,
                   onChanged: (v) => setState(() => _published = v),
                   activeThumbColor: AppColors.teal,
-                  activeTrackColor: AppColors.tealLight,
+                  activeTrackColor: context.colors.tealSurface,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _published ? 'Yayında — kullanıcılar görebilir' : 'Taslak — sadece sen görürsün',
                   style: TextStyle(
                     fontSize: 13,
-                    color: _published ? AppColors.teal : AppColors.textLight,
+                    color: _published ? AppColors.teal : context.colors.textTertiary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -5115,16 +4966,16 @@ class _TypeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.teal : AppColors.lightGrey,
+          color: selected ? AppColors.teal : context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: selected ? AppColors.teal : AppColors.borderGrey),
+          border: Border.all(color: selected ? AppColors.teal : context.colors.border),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.textMid,
+            color: selected ? Colors.white : context.colors.textSecondary,
           ),
         ),
       ),
@@ -5143,20 +4994,20 @@ class _FormField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: const TextStyle(fontSize: 13.5, color: AppColors.textDark),
+          style: TextStyle(fontSize: 13.5, color: context.colors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
+            hintStyle: TextStyle(fontSize: 13, color: context.colors.textTertiary),
             filled: true,
-            fillColor: AppColors.lightGrey,
+            fillColor: context.colors.surfaceVariant,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.borderGrey),
+              borderSide: BorderSide(color: context.colors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -5165,6 +5016,527 @@ class _FormField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Broadcast Bildirimi ──────────────────────────────────────────────────────
+
+enum _BroadcastTarget { all, team, user }
+
+class _BroadcastView extends StatefulWidget {
+  final VoidCallback onBack;
+  const _BroadcastView({super.key, required this.onBack});
+
+  @override
+  State<_BroadcastView> createState() => _BroadcastViewState();
+}
+
+class _BroadcastViewState extends State<_BroadcastView> {
+  final _titleCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  final _filterCtrl = TextEditingController();
+
+  _BroadcastTarget _target = _BroadcastTarget.all;
+  bool _sending = false;
+  String? _statusMsg;
+  bool _statusSuccess = false;
+  List<Map<String, dynamic>> _recent = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    _filterCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRecent() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('app_broadcasts')
+        .orderBy('createdAt', descending: true)
+        .limit(5)
+        .get();
+    if (!mounted) return;
+    setState(() {
+      _recent = snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+    });
+  }
+
+  Future<void> _send() async {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty || body.isEmpty) {
+      setState(() { _statusMsg = 'Başlık ve içerik boş olamaz.'; _statusSuccess = false; });
+      return;
+    }
+
+    setState(() { _sending = true; _statusMsg = null; });
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final List<String> uids;
+      String confirmLabel;
+
+      // ── 1. Hedef UIDs bul (dry-run) ──
+      if (_target == _BroadcastTarget.all) {
+        final snap = await db.collection('users').limit(100).get();
+        uids = snap.docs.map((d) => d.id).toList();
+        confirmLabel = '${uids.length} kullanıcıya';
+
+      } else if (_target == _BroadcastTarget.team) {
+        final filter = _filterCtrl.text.trim();
+        if (filter.isEmpty) {
+          if (mounted) setState(() { _statusMsg = 'Ekip adı gir.'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final teamSnap = await db.collection('teams')
+            .where('name', isEqualTo: filter)
+            .limit(1)
+            .get();
+        if (!mounted) return;
+        if (teamSnap.docs.isEmpty) {
+          setState(() { _statusMsg = '"$filter" adında ekip bulunamadı. (Büyük/küçük harf önemli)'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final teamId = teamSnap.docs.first.id;
+        final teamName = (teamSnap.docs.first.data())['name'] as String? ?? filter;
+        final userSnap = await db.collection('users')
+            .where('teamIds', arrayContains: teamId)
+            .get();
+        uids = userSnap.docs.map((d) => d.id).toList();
+        confirmLabel = '"$teamName" ekibinin ${uids.length} üyesine';
+
+      } else {
+        final filter = _filterCtrl.text.trim();
+        if (filter.isEmpty) {
+          if (mounted) setState(() { _statusMsg = 'Kullanıcı adı gir.'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        final userSnap = await db.collection('users')
+            .where('username', isEqualTo: filter)
+            .limit(1)
+            .get();
+        if (!mounted) return;
+        if (userSnap.docs.isEmpty) {
+          setState(() { _statusMsg = '"$filter" kullanıcısı bulunamadı. (Büyük/küçük harf önemli)'; _sending = false; _statusSuccess = false; });
+          return;
+        }
+        uids = [userSnap.docs.first.id];
+        confirmLabel = '@$filter kullanıcısına';
+      }
+
+      if (uids.isEmpty) {
+        if (mounted) setState(() { _statusMsg = 'Hedef kullanıcı bulunamadı.'; _sending = false; _statusSuccess = false; });
+        return;
+      }
+
+      // ── 2. Onay diyaloğu ──
+      if (!mounted) return;
+      setState(() { _sending = false; });
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ctx.colors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.campaign_outlined, color: Color(0xFF8B5CF6), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Bildirim Gönder',
+              style: TextStyle(fontWeight: FontWeight.w800, color: ctx.colors.textPrimary, fontSize: 16),
+            ),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$confirmLabel gönderilecek:',
+                style: TextStyle(fontSize: 13, color: ctx.colors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ctx.colors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ctx.colors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: ctx.colors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      body,
+                      style: TextStyle(fontSize: 12, color: ctx.colors.textSecondary),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Vazgeç', style: TextStyle(fontWeight: FontWeight.w700, color: ctx.colors.textSecondary)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+              child: const Text('Gönder', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+      if (!mounted) return;
+      setState(() { _sending = true; });
+
+      // ── 3. Batch gönder ──
+      WriteBatch batch = db.batch();
+      int opCount = 0;
+
+      for (final uid in uids) {
+        final ref = db.collection('users').doc(uid).collection('notifications').doc();
+        batch.set(ref, {
+          'type': 'announcement',
+          'title': title,
+          'body': body,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        opCount++;
+        if (opCount >= 490) {
+          await batch.commit();
+          batch = db.batch();
+          opCount = 0;
+        }
+      }
+      if (opCount > 0) await batch.commit();
+
+      // ── 4. Audit logu ──
+      await db.collection('app_broadcasts').add({
+        'title': title,
+        'body': body,
+        'target': _target.name,
+        'targetFilter': _target == _BroadcastTarget.all ? null : _filterCtrl.text.trim(),
+        'recipientCount': uids.length,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      _titleCtrl.clear();
+      _bodyCtrl.clear();
+      _filterCtrl.clear();
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _statusMsg = '${uids.length} kullanıcıya gönderildi ✓';
+        _statusSuccess = true;
+      });
+      await _loadRecent();
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _statusMsg = 'Hata: $e';
+        _statusSuccess = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.colors.surface,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 22),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1E1B3A), Color(0xFF2D1B69)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.campaign_outlined, color: Color(0xFF8B5CF6), size: 22),
+                const SizedBox(width: 10),
+                const Text(
+                  'Bildirim Gönder',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Hedef seçici
+                  _BroadcastSectionLabel('Hedef'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: _BroadcastTarget.values.map((t) {
+                      final labels = {
+                        _BroadcastTarget.all: 'Herkese',
+                        _BroadcastTarget.team: 'Ekip',
+                        _BroadcastTarget.user: 'Kişi',
+                      };
+                      final selected = _target == t;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => setState(() { _target = t; _filterCtrl.clear(); }),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selected ? const Color(0xFF8B5CF6) : context.colors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: selected ? const Color(0xFF8B5CF6) : context.colors.border,
+                              ),
+                            ),
+                            child: Text(
+                              labels[t]!,
+                              style: TextStyle(
+                                color: selected ? Colors.white : context.colors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  // Filtre alanı (Ekip/Kişi seçiliyse)
+                  if (_target != _BroadcastTarget.all) ...[
+                    const SizedBox(height: 16),
+                    _BroadcastSectionLabel(_target == _BroadcastTarget.team ? 'Ekip Adı' : 'Kullanıcı Adı'),
+                    const SizedBox(height: 8),
+                    _BroadcastTextField(
+                      controller: _filterCtrl,
+                      hint: _target == _BroadcastTarget.team ? 'Ekip adını gir...' : 'Kullanıcı adını gir...',
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Büyük/küçük harf ve boşluk önemlidir — Firestore\'da nasıl yazıyorsa öyle yaz.',
+                      style: TextStyle(color: context.colors.textTertiary, fontSize: 11),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+                  _BroadcastSectionLabel('Başlık'),
+                  const SizedBox(height: 8),
+                  _BroadcastTextField(controller: _titleCtrl, hint: 'Bildirim başlığı...'),
+
+                  const SizedBox(height: 16),
+                  _BroadcastSectionLabel('İçerik'),
+                  const SizedBox(height: 8),
+                  _BroadcastTextField(controller: _bodyCtrl, hint: 'Bildirim metni...', maxLines: 4),
+
+                  const SizedBox(height: 24),
+
+                  // Gönder butonu
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _sending ? null : _send,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: _sending
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send_rounded, size: 18),
+                      label: Text(
+                        _sending ? 'Gönderiliyor...' : 'Gönder',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                    ),
+                  ),
+
+                  // Durum mesajı
+                  if (_statusMsg != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: (_statusSuccess ? AppColors.successGreen : AppColors.errorRed).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (_statusSuccess ? AppColors.successGreen : AppColors.errorRed).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        _statusMsg!,
+                        style: TextStyle(
+                          color: _statusSuccess ? AppColors.successGreen : AppColors.errorRed,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Son gönderilen bildirimler
+                  if (_recent.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    _BroadcastSectionLabel('Son Gönderilenler'),
+                    const SizedBox(height: 10),
+                    ..._recent.map((b) {
+                      final ts = b['createdAt'] as Timestamp?;
+                      final dt = ts?.toDate().toLocal();
+                      final count = b['recipientCount'] as int? ?? 0;
+                      final target = b['target'] as String? ?? 'all';
+                      final filter = b['targetFilter'] as String?;
+                      final targetLabel = target == 'all'
+                          ? 'Herkese ($count)'
+                          : target == 'team'
+                              ? 'Ekip: ${filter ?? ''} ($count)'
+                              : 'Kişi: ${filter ?? ''}';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: context.colors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.colors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Expanded(
+                                child: Text(
+                                  b['title'] as String? ?? '',
+                                  style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w700, fontSize: 13),
+                                ),
+                              ),
+                              if (dt != null)
+                                Text(_relativeTime(dt), style: TextStyle(color: context.colors.textTertiary, fontSize: 11)),
+                            ]),
+                            const SizedBox(height: 4),
+                            Text(
+                              b['body'] as String? ?? '',
+                              style: TextStyle(color: context.colors.textSecondary, fontSize: 12),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                targetLabel,
+                                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BroadcastSectionLabel extends StatelessWidget {
+  final String text;
+  const _BroadcastSectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: context.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+class _BroadcastTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final int maxLines;
+
+  const _BroadcastTextField({
+    required this.controller,
+    required this.hint,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: context.colors.textTertiary, fontSize: 14),
+        filled: true,
+        fillColor: context.colors.surfaceVariant,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: context.colors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+        ),
+      ),
     );
   }
 }

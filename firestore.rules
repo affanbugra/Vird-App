@@ -33,7 +33,7 @@ service cloud.firestore {
                         .affectedKeys().hasOnly(['cinsiyet', 'streakFreezes']))
                     || (isAdmin() && request.resource.data.diff(resource.data)
                         .affectedKeys().hasOnly(['isHafiz']));
-      allow delete: if false;
+      allow delete: if isOwner(userId) || isDeveloper();
 
       // Okuma logları — herkes okuyabilir (liderboard için), sadece sahibi yazabilir
       match /logs/{logId} {
@@ -126,6 +126,12 @@ service cloud.firestore {
 
     // ── Uygulama meta verileri (migration flag'leri vb.) ─────────────────
     match /app_meta/{docId} {
+      allow read: if isDeveloper();
+      allow write: if isDeveloper();
+    }
+
+    // ── Yayın bildirimleri (admin audit logu) ─────────────────────────────────
+    match /app_broadcasts/{broadcastId} {
       allow read: if isDeveloper();
       allow write: if isDeveloper();
     }

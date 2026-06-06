@@ -67,6 +67,11 @@ class SeriCalculator {
 
     if (mostRecentLogDay == null) return 0;
 
+    // En son aktif gün dünden eskiyse seri görsel olarak zaten 0 —
+    // simülasyon da aynı sonucu vermelidir.
+    final yesterday = todayMidnight.subtract(const Duration(days: 1));
+    if (mostRecentLogDay.isBefore(yesterday)) return 0;
+
     int seri = 0;
     final anchorOffset = todayMidnight.difference(mostRecentLogDay).inDays;
     for (int i = anchorOffset; i <= 365; i++) {

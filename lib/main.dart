@@ -11,12 +11,14 @@ import 'firebase_options.dart';
 import 'app_colors.dart';
 import 'app_theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'widgets/mandatory_setup_sheet.dart';
 import 'screens/auth/magic_link_confirm_screen.dart';
+import 'screens/auth/profile_setup_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
@@ -100,9 +102,13 @@ void main() async {
 
   final showHome = prefs.getBool('showHome') ?? false;
 
+  final themeProvider = ThemeProvider();
+  await themeProvider.init();
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProxyProvider<AuthProvider, UserProvider>(
           create: (_) => UserProvider(),
@@ -124,15 +130,13 @@ class VirdApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
     return MaterialApp(
       title: 'Vird',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal),
-        textTheme: GoogleFonts.nunitoTextTheme(),
-        scaffoldBackgroundColor: AppColors.white,
-        extensions: const [VirdColors.light],
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeProvider.themeMode,
       home: AuthWrapper(initialShowHome: showHome, pendingMagicLink: pendingMagicLink),
     );
   }
@@ -164,6 +168,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, auth, child) {
         if (auth.isLoading) return const SplashScreen();
         if (auth.isAuthenticated) {
+          if (auth.needsProfileSetup) {
+            return ProfileSetupScreen(name: auth.user?.displayName ?? '', requiresCinsiyet: true);
+          }
           return const MainScreen();
         }
         // Farklı cihazdan açılan magic link
@@ -190,6 +197,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  bool _mandatorySetupShown = false;
 
   final List<Widget> _screens = const [
     HatimlerimScreen(),
@@ -198,64 +206,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ProfilScreen(),
   ];
 
-  bool _mandatorySheetShown = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _triggerAutoFreeze();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkMandatorySetup());
-  }
-
-  Future<void> _checkMandatorySetup() async {
-    if (_mandatorySheetShown) return;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    try {
-      final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
-      final doc = await docRef.get();
-      Map<String, dynamic> data;
-
-      if (!doc.exists || doc.data() == null) {
-        // Google ile giriş yapılmış ama Firestore'a profil yazılamamış
-        final user = FirebaseAuth.instance.currentUser!;
-        data = {
-          'name': user.displayName ?? '',
-          'email': user.email ?? '',
-          'city': '',
-          'university': '',
-          'createdAt': FieldValue.serverTimestamp(),
-          'isPro': false,
-          'proExpiresAt': null,
-          'hasanat': 0,
-          'seri': 0,
-          'totalPages': 0,
-          'hatimCount': 0,
-        };
-        await docRef.set(data, SetOptions(merge: true));
-      } else {
-        data = doc.data()!;
-      }
-
-      final cinsiyet = data['cinsiyet'] as String?;
-      final username = data['username'] as String?;
-
-      final missingCinsiyet = cinsiyet == null || cinsiyet.isEmpty;
-      final missingUsername = username == null || username.isEmpty;
-
-      if (missingCinsiyet || missingUsername) {
-        if (!mounted) return;
-        _mandatorySheetShown = true;
-        await MandatorySetupSheet.show(context, data);
-        // Sheet kapandıktan sonra tekrar kontrol et (belki kullanıcı tamamlamadı)
-        _mandatorySheetShown = false;
-        if (mounted) _checkMandatorySetup();
-      }
-    } catch (e) {
-      debugPrint('Mandatory setup check error: $e');
-    }
   }
 
   @override
@@ -282,8 +237,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// UserProvider veri gelince zorunlu kurulum ekranını tetikle
+  void _checkMandatorySetup(UserProvider userProvider) {
+    if (!userProvider.needsMandatorySetup || _mandatorySetupShown) return;
+    _mandatorySetupShown = true;
+    // Firestore'dan son veriyi al
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final userData = doc.data() ?? {};
+      if (!mounted) return;
+      await MandatorySetupSheet.show(context, userData);
+      // Sheet kapandıktan sonra flag sıfırla (tekrar açılabilsin gerekirse)
+      _mandatorySetupShown = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // UserProvider izle — zorunlu kurulum kontrolü
+    final userProvider = context.watch<UserProvider>();
+    _checkMandatorySetup(userProvider);
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -356,7 +333,7 @@ class _MainBottomNav extends StatelessWidget {
     return BottomAppBar(
       notchMargin: 8,
       shape: const CircularNotchedRectangle(),
-      color: AppColors.white,
+      color: context.colors.surface,
       elevation: 8,
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -429,7 +406,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.teal : AppColors.textLight;
+    final color = active ? AppColors.teal : context.colors.textTertiary;
 
     return Expanded(
       child: GestureDetector(
@@ -478,7 +455,7 @@ class _AppErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.colors.surface,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -494,19 +471,19 @@ class _AppErrorWidget extends StatelessWidget {
                 child: const Icon(Icons.error_outline, size: 36, color: Color(0xFFEF4444)),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Bir şeyler ters gitti',
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2937),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Beklenmedik bir hata oluştu.\nGeliştirici bilgilendirildi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14, color: Color(0xFF6B7280), height: 1.5,
+                  fontSize: 14, color: context.colors.textSecondary, height: 1.5,
                 ),
               ),
               const SizedBox(height: 28),
