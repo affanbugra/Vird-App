@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -293,7 +293,7 @@ class _ProfileHeader extends StatelessWidget {
             Container(
               height: bannerH,
               width: double.infinity,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -2878,7 +2878,7 @@ class _MagicLinkSheetState extends State<_MagicLinkSheet> {
           if (_sent) ...[
             Container(
               width: 64, height: 64,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.successBg, shape: BoxShape.circle,
               ),
               child: const Icon(Icons.mark_email_read_outlined,
@@ -3016,8 +3016,8 @@ class _KaynakcaSheet extends StatelessWidget {
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -3028,7 +3028,7 @@ class _KaynakcaSheet extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: AppColors.borderGrey,
+              color: context.colors.border,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -3042,11 +3042,11 @@ class _KaynakcaSheet extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textMid, size: 20),
+                  icon: Icon(Icons.close, color: context.colors.textSecondary, size: 20),
                   onPressed: () => Navigator.pop(context),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -3066,7 +3066,7 @@ class _KaynakcaSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppColors.tealLight,
+                      color: context.colors.tealSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                           color: AppColors.teal.withValues(alpha: 0.3)),
@@ -3095,7 +3095,7 @@ class _KaynakcaSheet extends StatelessWidget {
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                             height: 1.55,
                           ),
                         ),
@@ -3106,7 +3106,7 @@ class _KaynakcaSheet extends StatelessWidget {
 
                   // ── HADİS KOLEKSİYONLARI ───────────────────────────────
                   _kaynakSection(
-                    'Hadis Koleksiyonları',
+                    context, 'Hadis Koleksiyonları',
                     [
                       _Kaynak('Sahîh-i Buhârî',
                           'İmam Muhammed b. İsmâil el-Buhârî (ö. 256/870). Hadis ilminin en güvenilir ve muteber kaynağı; "Sahîhayn"ın birincisi.'),
@@ -3131,7 +3131,7 @@ class _KaynakcaSheet extends StatelessWidget {
 
                   // ── KUR'AN MEALİ ────────────────────────────────────────
                   _kaynakSection(
-                    'Kur\'an-ı Kerîm Meali',
+                    context, 'Kur\'an-ı Kerîm Meali',
                     [
                       _Kaynak('Diyanet İşleri Başkanlığı Meali',
                           'Uygulamada yer alan tüm ayet mealleri Diyanet İşleri Başkanlığı\'nın resmî Türkçe meali esas alınarak verilmiştir.'),
@@ -3140,7 +3140,7 @@ class _KaynakcaSheet extends StatelessWidget {
 
                   // ── FETVA KAYNAKLARI ────────────────────────────────────
                   _kaynakSection(
-                    'Fetva ve Fıkıh Kaynakları',
+                    context, 'Fetva ve Fıkıh Kaynakları',
                     [
                       _Kaynak('Kerahat Vakitleri',
                           'Alışkanlıklar → Namaz Bilgileri → Kerahat Vakitleri bölümündeki fıkhî kurallar şu kaynaklara dayanmaktadır:\n• diyanet.gov.tr — Din İşleri Yüksek Kurulu fetvaları\n• islamansiklopedisi.org.tr — "Vakit" ve "Kerahat" maddeleri'),
@@ -3153,14 +3153,14 @@ class _KaynakcaSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.lightGrey,
+                      color: context.colors.surfaceVariant,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.info_outline_rounded,
-                            size: 14, color: AppColors.textMid),
+                            size: 14, color: context.colors.textSecondary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -3168,7 +3168,7 @@ class _KaynakcaSheet extends StatelessWidget {
                             style: GoogleFonts.nunito(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textMid,
+                              color: context.colors.textSecondary,
                               height: 1.5,
                               fontStyle: FontStyle.italic,
                             ),
@@ -3186,7 +3186,7 @@ class _KaynakcaSheet extends StatelessWidget {
     );
   }
 
-  Widget _kaynakSection(String title, List<_Kaynak> items) {
+  Widget _kaynakSection(BuildContext context, String title, List<_Kaynak> items) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(
@@ -3206,9 +3206,9 @@ class _KaynakcaSheet extends StatelessWidget {
           ),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderGrey),
+              border: Border.all(color: context.colors.border),
             ),
             child: Column(
               children: [
@@ -3236,7 +3236,7 @@ class _KaynakcaSheet extends StatelessWidget {
                                 style: GoogleFonts.nunito(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textDark,
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -3245,7 +3245,7 @@ class _KaynakcaSheet extends StatelessWidget {
                                 style: GoogleFonts.nunito(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.textMid,
+                                  color: context.colors.textSecondary,
                                   height: 1.5,
                                 ),
                               ),
@@ -3258,7 +3258,7 @@ class _KaynakcaSheet extends StatelessWidget {
                   if (i < items.length - 1)
                     Divider(
                       height: 1,
-                      color: AppColors.borderGrey.withValues(alpha: 0.6),
+                      color: context.colors.border.withValues(alpha: 0.6),
                     ),
                 ],
               ],
@@ -3275,3 +3275,4 @@ class _Kaynak {
   final String desc;
   const _Kaynak(this.name, this.desc);
 }
+

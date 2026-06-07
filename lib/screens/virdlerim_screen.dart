@@ -1,10 +1,11 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/vird_model.dart';
 import '../utils/seri_calculator.dart';
 import 'vird_library_screen.dart';
@@ -482,13 +483,13 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           buildCategoryGroup('SURELER', AppColors.teal, sures, 'sure'),
           buildCategoryGroup('ZİKİRLER', AppColors.orange, zikirs, 'zikir'),
           buildCategoryGroup('DUALAR', AppColors.infoBlue, duas, 'dua'),
-          buildCategoryGroup('DİĞER', AppColors.textMid, others, 'other'),
+          buildCategoryGroup('DİĞER', context.colors.textSecondary, others, 'other'),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(
               children: [
-                const Icon(Icons.bookmark_border_rounded, size: 13, color: AppColors.textLight),
+                Icon(Icons.bookmark_border_rounded, size: 13, color: context.colors.textTertiary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -496,7 +497,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                     style: GoogleFonts.nunito(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textLight,
+                      color: context.colors.textTertiary,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -517,7 +518,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         children: [
@@ -533,7 +534,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   builder: (context, animVal, _) => CircularProgressIndicator(
                     value: animVal,
                     strokeWidth: 6,
-                    backgroundColor: AppColors.lightGrey,
+                    backgroundColor: context.colors.surfaceVariant,
                     color: progress == 1.0 ? AppColors.successGreen : AppColors.gold,
                   ),
                 ),
@@ -543,7 +544,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textDark,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 )
@@ -564,14 +565,14 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 Text(
                   '"Allah katında amellerin en sevimlisi, az da olsa devamlı olanıdır." (Buhârî, Teheccüd 18; Müslim, Müsâfirîn 216)',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
-                    color: AppColors.textMid,
+                    color: context.colors.textSecondary,
                   ),
                 )
               ],
@@ -605,7 +606,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                 ),
                 Text(
                   'Bugün Kehf suresi okumak sünnettir ve büyük bir nurdur.',
-                  style: GoogleFonts.nunito(fontSize: 11.5, color: AppColors.textDark, fontWeight: FontWeight.w500),
+                  style: GoogleFonts.nunito(fontSize: 11.5, color: context.colors.textPrimary, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -647,15 +648,15 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.lightGrey,
+          color: context.colors.surfaceVariant,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderGrey),
+          border: Border.all(color: context.colors.border),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             IconButton(
-              icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textDark, size: 22),
+              icon: Icon(Icons.chevron_left_rounded, color: context.colors.textPrimary, size: 22),
               onPressed: () {
                 setState(() {
                   _selectedDate = _selectedDate.subtract(const Duration(days: 1));
@@ -677,7 +678,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
             ),
             if (_selectedDate.isBefore(todayClean))
               IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textDark, size: 22),
+                icon: Icon(Icons.chevron_right_rounded, color: context.colors.textPrimary, size: 22),
                 onPressed: () {
                   final next = _selectedDate.add(const Duration(days: 1));
                   if (!next.isAfter(todayClean)) {
@@ -722,7 +723,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
         break;
       default:
         categoryIcon = Icons.bookmark_rounded;
-        categoryColor = AppColors.textMid;
+        categoryColor = context.colors.textSecondary;
     }
 
     // Son 7 günlük haftalık gösterge
@@ -760,7 +761,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       }
 
       if (isSelectedDay && !(dClean == todayClean && count == 0)) {
-        dotBorder = Border.all(color: AppColors.textDark.withValues(alpha: 0.45), width: 1.2);
+        dotBorder = Border.all(color: context.colors.textPrimary.withValues(alpha: 0.45), width: 1.2);
       }
 
       dotWidgets.add(
@@ -782,11 +783,11 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       margin: const EdgeInsets.symmetric(vertical: 3),
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: isDone ? categoryColor.withValues(alpha: 0.18) : AppColors.white,
+        color: isDone ? categoryColor.withValues(alpha: 0.18) : context.colors.surface,
         border: Border.all(
           color: isDone
               ? categoryColor.withValues(alpha: 0.33)
-              : AppColors.borderGrey,
+              : context.colors.border,
           width: 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -829,7 +830,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                       style: GoogleFonts.nunito(
                         fontSize: 14.0,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
+                        color: context.colors.textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -838,20 +839,20 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                       children: [
                         Text(
                           item.recommendedTime,
-                          style: GoogleFonts.nunito(fontSize: 10.0, color: AppColors.textLight, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.nunito(fontSize: 10.0, color: context.colors.textTertiary, fontWeight: FontWeight.w600),
                         ),
                         if (item.arabicTitle != null) ...[
                           const SizedBox(width: 6),
                           Text(
                             '•',
-                            style: TextStyle(fontSize: 8, color: AppColors.textLight.withValues(alpha: 0.5)),
+                            style: TextStyle(fontSize: 8, color: context.colors.textTertiary.withValues(alpha: 0.5)),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             item.arabicTitle!,
                             style: GoogleFonts.amiri(
                               fontSize: 10.5,
-                              color: AppColors.textLight,
+                              color: context.colors.textTertiary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1421,13 +1422,13 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
           const SizedBox(height: 12),
           Text(
             'Aktif Virdiniz Bulunmuyor',
-            style: GoogleFonts.nunito(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textDark),
+            style: GoogleFonts.nunito(fontSize: 12.5, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
           ),
           const SizedBox(height: 6),
           Text(
             'Vird Kütüphanesi\'nden dilediğiniz sure, dua ve zikirleri listenize ekleyebilirsiniz.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 12.5, color: AppColors.textLight, height: 1.5),
+            style: GoogleFonts.nunito(fontSize: 12.5, color: context.colors.textTertiary, height: 1.5),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
@@ -1522,7 +1523,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGrey),
+        border: Border.all(color: context.colors.border),
       ),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       child: Column(
@@ -1554,11 +1555,11 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                       style: GoogleFonts.nunito(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMid,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.textMid),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 10, color: context.colors.textSecondary),
                   ],
                 ),
               ),
@@ -1587,16 +1588,16 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: AppColors.lightGrey,
+                              color: context.colors.surfaceVariant,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.borderGrey, width: 1.5),
+                              border: Border.all(color: context.colors.border, width: 1.5),
                             ),
                             child: const Icon(Icons.more_horiz_rounded, color: AppColors.teal, size: 20),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Tümü',
-                            style: GoogleFonts.nunito(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textMid),
+                            style: GoogleFonts.nunito(fontSize: 9, fontWeight: FontWeight.w600, color: context.colors.textSecondary),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -1689,7 +1690,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                           style: GoogleFonts.nunito(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w700,
-                            color: isSpecial ? const Color(0xFFB8860B) : AppColors.textDark,
+                            color: isSpecial ? const Color(0xFFB8860B) : context.colors.textPrimary,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
@@ -1715,17 +1716,17 @@ class VirdlerimScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.colors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Günlük Virdlerim',
-          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
         ),
         actions: [
           IconButton(
@@ -1924,3 +1925,5 @@ class _TopNotificationOverlayState extends State<_TopNotificationOverlay>
     );
   }
 }
+
+
