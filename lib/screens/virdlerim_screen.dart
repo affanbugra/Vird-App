@@ -270,9 +270,9 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     super.build(context);
 
     if (_loadingPreferences) {
-      return const Material(
-        color: Colors.white,
-        child: Center(
+      return Material(
+        color: context.colors.surface,
+        child: const Center(
           child: CircularProgressIndicator(color: AppColors.teal),
         ),
       );
@@ -286,7 +286,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
 
     if (activeVirds.isEmpty) {
       return Material(
-        color: Colors.white,
+        color: context.colors.surface,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           children: [
@@ -467,7 +467,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     final others = applyCustomOrder(othersAll, 'other');
 
     return Material(
-      color: Colors.white,
+      color: context.colors.surface,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         children: [
@@ -516,7 +516,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       margin: const EdgeInsets.only(bottom: 16, top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.colors.border),
       ),
@@ -748,16 +748,16 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
       Border? dotBorder;
 
       if (dClean.isAfter(todayClean)) {
-        dotColor = const Color(0xFFE5ECEE);
+        dotColor = context.colors.surfaceVariant;
       } else if (count >= item.targetCount) {
         dotColor = categoryColor;
       } else if (count > 0) {
         dotColor = categoryColor.withValues(alpha: 0.6); // Kısmi ilerleme
       } else if (dClean == todayClean) {
-        dotColor = Colors.white;
+        dotColor = context.colors.surface;
         dotBorder = Border.all(color: categoryColor, width: 1.0);
       } else {
-        dotColor = const Color(0xFFE5ECEE);
+        dotColor = context.colors.surfaceVariant;
       }
 
       if (isSelectedDay && !(dClean == todayClean && count == 0)) {
@@ -930,10 +930,10 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
                   height: 32,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isDone ? categoryColor : Colors.white,
+                    color: isDone ? categoryColor : context.colors.surface,
                     border: isDone
                         ? Border.all(color: categoryColor, width: 2.0)
-                        : Border.all(color: const Color(0xFFD0D9DD), width: 2.0),
+                        : Border.all(color: context.colors.border, width: 2.0),
                   ),
                   child: isDone
                       ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
@@ -1521,7 +1521,7 @@ class _VirdlerimContentWidgetState extends State<VirdlerimContentWidget>
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.colors.border),
       ),

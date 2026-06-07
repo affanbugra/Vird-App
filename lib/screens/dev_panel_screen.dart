@@ -493,12 +493,8 @@ class _PanelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : context.colors.border.withValues(alpha: 0.5);
+    final cardBg = context.colors.surface;
+    final borderColor = context.colors.border.withValues(alpha: 0.5);
 
     return GestureDetector(
       onTap: active ? onTap : null,

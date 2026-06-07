@@ -830,10 +830,10 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       } else if (isDone) {
                         dotColor = habit.color;
                       } else if (dCleanOnDot == todayClean) {
-                        dotColor = Colors.white;
+                        dotColor = context.colors.surface;
                         dotBorder = Border.all(color: habit.color, width: 1.0);
                       } else {
-                        dotColor = const Color(0xFFE5ECEE);
+                        dotColor = context.colors.surfaceVariant;
                       }
 
                       // Seçili gün göstergesi — bugün+tamamlanmamış stilini bozmuyor
@@ -868,10 +868,10 @@ class _HabitTrackerWidgetState extends State<HabitTrackerWidget>
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDoneToday ? habit.color : Colors.white,
+                        color: isDoneToday ? habit.color : context.colors.surface,
                         border: isDoneToday
                             ? Border.all(color: habit.color, width: 2.0)
-                            : Border.all(color: const Color(0xFFD0D9DD), width: 2.0),
+                            : Border.all(color: context.colors.border, width: 2.0),
                       ),
                       child: isDoneToday
                           ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)

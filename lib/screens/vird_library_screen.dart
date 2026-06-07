@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../app_colors.dart';
+import '../app_theme.dart';
 import '../models/vird_model.dart';
 import '../data/quran_cuz.dart';
 
@@ -128,14 +129,14 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Virdi Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textDark)),
-        content: Text('"${item.title}" virdini kalıcı olarak silmek istiyor musunuz?', style: GoogleFonts.nunito(color: AppColors.textMid)),
+        title: Text('Virdi Sil', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+        content: Text('"${item.title}" virdini kalıcı olarak silmek istiyor musunuz?', style: GoogleFonts.nunito(color: context.colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Vazgeç', style: GoogleFonts.nunito(color: AppColors.textLight)),
+            child: Text('Vazgeç', style: GoogleFonts.nunito(color: context.colors.textTertiary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -192,11 +193,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         builder: (sCtx, setModalState) {
           InputDecoration field(String hint) => InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.nunito(fontSize: 14, color: AppColors.textLight),
+            hintStyle: GoogleFonts.nunito(fontSize: 14, color: context.colors.textTertiary),
             contentPadding: const EdgeInsets.only(bottom: 8),
             isDense: true,
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.borderGrey, width: 1),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: sCtx.colors.border, width: 1),
             ),
             focusedBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: AppColors.teal, width: 1.5),
@@ -204,9 +205,9 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           );
 
           return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            decoration: BoxDecoration(
+              color: sCtx.colors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(sCtx).viewInsets.bottom + 24,
@@ -222,7 +223,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                   Center(
                     child: Container(
                       width: 36, height: 3,
-                      decoration: BoxDecoration(color: AppColors.borderGrey, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -232,11 +233,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                     children: [
                       Text(
                         'Yeni vird ekle',
-                        style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                        style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(sCtx),
-                        child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textLight),
+                        child: Icon(Icons.close_rounded, size: 20, color: sCtx.colors.textTertiary),
                       ),
                     ],
                   ),
@@ -246,7 +247,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                   Container(
                     height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.lightGrey,
+                      color: context.colors.surfaceVariant,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Stack(
@@ -265,7 +266,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                             child: Container(
                               margin: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: sCtx.colors.surface,
                                 borderRadius: BorderRadius.circular(7),
                                 boxShadow: [
                                   BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 4, offset: const Offset(0, 1)),
@@ -331,7 +332,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                                         width: 26, height: 26,
                                         decoration: BoxDecoration(
                                           color: isDisabled
-                                              ? AppColors.borderGrey.withValues(alpha: 0.4)
+                                              ? context.colors.border.withValues(alpha: 0.4)
                                               : AppColors.teal.withValues(alpha: 0.1),
                                           shape: BoxShape.circle,
                                         ),
@@ -341,7 +342,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w800,
-                                              color: isDisabled ? AppColors.textLight : AppColors.teal,
+                                              color: isDisabled ? context.colors.textTertiary : AppColors.teal,
                                             ),
                                           ),
                                         ),
@@ -353,14 +354,14 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                                           style: TextStyle(
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.w600,
-                                            color: isDisabled ? AppColors.textLight : AppColors.textDark,
+                                            color: isDisabled ? context.colors.textTertiary : context.colors.textPrimary,
                                           ),
                                         ),
                                       ),
                                       if (isDisabled)
                                         Text(
                                           'Eklendi',
-                                          style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textLight),
+                                          style: GoogleFonts.nunito(fontSize: 11, color: context.colors.textTertiary),
                                         ),
                                     ],
                                   ),
@@ -370,11 +371,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                             decoratorProps: DropDownDecoratorProps(
                               decoration: InputDecoration(
                                 hintText: 'Sure seç',
-                                hintStyle: GoogleFonts.nunito(fontSize: 14, color: AppColors.textLight),
+                                hintStyle: GoogleFonts.nunito(fontSize: 14, color: context.colors.textTertiary),
                                 contentPadding: const EdgeInsets.only(bottom: 8),
                                 isDense: true,
-                                enabledBorder: const UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.borderGrey, width: 1),
+                                enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: sCtx.colors.border, width: 1),
                                 ),
                                 focusedBorder: const UnderlineInputBorder(
                                   borderSide: BorderSide(color: AppColors.teal, width: 1.5),
@@ -385,13 +386,13 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                         else
                           TextField(
                             controller: titleController,
-                            style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                            style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textPrimary),
                             decoration: field(category == 'zikir' ? 'Zikir adı (örn: Sübhanallah)' : 'Dua adı'),
                           ),
                         if (category != 'sure')
                           TextField(
                             controller: arabicController,
-                            style: GoogleFonts.amiri(fontSize: 16, color: AppColors.textDark),
+                            style: GoogleFonts.amiri(fontSize: 16, color: context.colors.textPrimary),
                             textAlign: TextAlign.right,
                             decoration: field('Arapça yazılışı (opsiyonel)'),
                           ),
@@ -405,7 +406,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                                   controller: targetController,
                                   keyboardType: TextInputType.number,
                                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                  style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                                  style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textPrimary),
                                   decoration: field('Hedef'),
                                 ),
                               ),
@@ -413,16 +414,16 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                             ],
                             Expanded(
                               child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(bottom: BorderSide(color: AppColors.borderGrey, width: 1)),
+                                decoration: BoxDecoration(
+                                  border: Border(bottom: BorderSide(color: sCtx.colors.border, width: 1)),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: time,
                                     isExpanded: true,
                                     isDense: true,
-                                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textLight),
-                                    style: GoogleFonts.nunito(fontSize: 13.5, color: AppColors.textDark),
+                                    icon: Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sCtx.colors.textTertiary),
+                                    style: GoogleFonts.nunito(fontSize: 13.5, color: context.colors.textPrimary),
                                     items: [
                                       'Sabah Namazı Sonrası',
                                       'Öğle Namazı Sonrası',
@@ -434,7 +435,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                                       'Her Zaman',
                                     ].map((v) => DropdownMenuItem(
                                       value: v,
-                                      child: Text(v, style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textDark)),
+                                      child: Text(v, style: GoogleFonts.nunito(fontSize: 13, color: context.colors.textPrimary)),
                                     )).toList(),
                                     onChanged: (val) {
                                       if (val != null) setModalState(() => time = val);
@@ -448,7 +449,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                         TextField(
                           controller: descController,
                           maxLines: 2,
-                          style: GoogleFonts.nunito(fontSize: 14, color: AppColors.textDark),
+                          style: GoogleFonts.nunito(fontSize: 14, color: context.colors.textPrimary),
                           decoration: field('Açıklama / fazileti (opsiyonel)'),
                         ),
                       ],
@@ -533,7 +534,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? AppColors.teal : AppColors.textMid,
+              color: active ? AppColors.teal : context.colors.textSecondary,
             ),
           ),
         ),
@@ -544,13 +545,13 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
   InputDecoration _buildInputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight),
+      hintStyle: GoogleFonts.nunito(fontSize: 14.5, color: context.colors.textTertiary),
       filled: true,
-      fillColor: AppColors.lightGrey,
+      fillColor: context.colors.surfaceVariant,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.borderGrey, width: 1.5),
+        borderSide: BorderSide(color: context.colors.border, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -564,11 +565,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Hedef Adeti Değiştir',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textDark, fontSize: 16),
+          style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: context.colors.textPrimary, fontSize: 16),
         ),
         content: TextField(
           controller: controller,
@@ -580,7 +581,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Vazgeç', style: GoogleFonts.nunito(color: AppColors.textLight)),
+            child: Text('Vazgeç', style: GoogleFonts.nunito(color: context.colors.textTertiary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -602,17 +603,17 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.colors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Vird Kütüphanesi',
-          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
+          style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
         ),
         actions: [
           IconButton(
@@ -625,7 +626,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           controller: _tabController,
           indicatorColor: AppColors.teal,
           labelColor: AppColors.teal,
-          unselectedLabelColor: AppColors.textLight,
+          unselectedLabelColor: context.colors.textTertiary,
           labelStyle: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.bold),
           unselectedLabelStyle: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.w600),
           tabs: const [
@@ -678,11 +679,11 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.menu_book_rounded, size: 64, color: AppColors.borderGrey),
+          Icon(Icons.menu_book_rounded, size: 64, color: context.colors.border),
           const SizedBox(height: 12),
           Text(
             'Kütüphane Yüklenemedi',
-            style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textMid),
+            style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: context.colors.textSecondary),
           ),
         ],
       ),
@@ -695,7 +696,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: AppColors.tealLight,
+          color: context.colors.tealSurface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
         ),
@@ -733,7 +734,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
           child: Text(
             'Bu kategoride vird bulunamadı.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(fontSize: 14.5, color: AppColors.textLight, height: 1.5),
+            style: GoogleFonts.nunito(fontSize: 14.5, color: context.colors.textTertiary, height: 1.5),
           ),
         ),
       );
@@ -757,7 +758,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
             children: [
               Expanded(
                 child: Divider(
-                  color: AppColors.borderGrey.withValues(alpha: 0.8),
+                  color: context.colors.border.withValues(alpha: 0.8),
                   thickness: 1.2,
                   endIndent: 12,
                 ),
@@ -767,13 +768,13 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                 style: GoogleFonts.nunito(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textLight,
+                  color: context.colors.textTertiary,
                   letterSpacing: 1.0,
                 ),
               ),
               Expanded(
                 child: Divider(
-                  color: AppColors.borderGrey.withValues(alpha: 0.8),
+                  color: context.colors.border.withValues(alpha: 0.8),
                   thickness: 1.2,
                   indent: 12,
                 ),
@@ -819,14 +820,14 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
         break;
       default:
         categoryIcon = Icons.bookmark_rounded;
-        categoryColor = AppColors.textMid;
+        categoryColor = context.colors.textSecondary;
     }
 
     return Container(
       decoration: BoxDecoration(
         border: isLast ? null : Border(
           bottom: BorderSide(
-            color: AppColors.borderGrey.withValues(alpha: 0.5),
+            color: context.colors.border.withValues(alpha: 0.5),
             width: 1.0,
           ),
         ),
@@ -872,7 +873,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                           style: GoogleFonts.nunito(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
+                            color: context.colors.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -883,7 +884,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                               item.recommendedTime,
                               style: GoogleFonts.nunito(
                                   fontSize: 10.0,
-                                  color: AppColors.textLight,
+                                  color: context.colors.textTertiary,
                                   fontWeight: FontWeight.w600,
                                 ),
                             ),
@@ -891,14 +892,14 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                               const SizedBox(width: 6),
                               Text(
                                 '•',
-                                style: TextStyle(fontSize: 8, color: AppColors.textLight.withValues(alpha: 0.5)),
+                                style: TextStyle(fontSize: 8, color: context.colors.textTertiary.withValues(alpha: 0.5)),
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 item.arabicTitle!,
                                 style: GoogleFonts.amiri(
                                   fontSize: 12.0,
-                                  color: AppColors.textLight,
+                                  color: context.colors.textTertiary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -919,7 +920,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.tealLight,
+                              color: context.colors.tealSurface,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
                             ),
@@ -947,16 +948,16 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                         child: Switch(
                           value: item.active,
                           activeColor: AppColors.teal,
-                          activeTrackColor: AppColors.tealLight,
-                          inactiveThumbColor: AppColors.textLight,
-                          inactiveTrackColor: AppColors.borderGrey,
+                          activeTrackColor: context.colors.tealSurface,
+                          inactiveThumbColor: context.colors.textTertiary,
+                          inactiveTrackColor: context.colors.border,
                           onChanged: (active) => _toggleVird(item, active),
                         ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
                         isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textLight,
+                        color: context.colors.textTertiary,
                         size: 18,
                       ),
                     ],
@@ -979,7 +980,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                     item.description,
                     style: GoogleFonts.nunito(
                       fontSize: 12.5,
-                      color: AppColors.textMid,
+                      color: context.colors.textSecondary,
                       height: 1.45,
                     ),
                   ),
@@ -989,9 +990,9 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGrey,
+                        color: context.colors.surfaceVariant,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.borderGrey.withValues(alpha: 0.5)),
+                        border: Border.all(color: context.colors.border.withValues(alpha: 0.5)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1009,7 +1010,7 @@ class _VirdLibraryScreenState extends State<VirdLibraryScreen> with SingleTicker
                             item.hadith!,
                             style: GoogleFonts.nunito(
                               fontSize: 11.5,
-                              color: AppColors.textDark,
+                              color: context.colors.textPrimary,
                               height: 1.4,
                               fontStyle: FontStyle.italic,
                             ),
