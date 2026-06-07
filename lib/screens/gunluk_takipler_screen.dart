@@ -1,14 +1,17 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../app_colors.dart';
 import '../app_theme.dart';
 import '../providers/user_provider.dart';
 import '../widgets/habit_tracker_widget.dart';
 import '../widgets/regl_calendar_sheet.dart';
+import 'virdlerim_screen.dart';
 
 enum PrayerStatus { none, onTime, kaza, cemaat, regl }
 enum PrayerTime { sabah, ogle, ikindi, aksam, yatsi }
@@ -29,28 +32,61 @@ class GunlukTakiplerScreen extends StatefulWidget {
   State<GunlukTakiplerScreen> createState() => _GunlukTakiplerScreenState();
 }
 
-class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
+class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen>
+    with TickerProviderStateMixin {
   final Map<DateTime, DayRecord> _allRecords = {};
-  bool _isLoading = false;
+  // Hangi hafta/ay periyodunun Firestore'dan çekildiğini tutar.
+  // _allRecords.containsKey yerine bunu kullanmak, build sırasında
+  // _getRecordForDate'in oluşturduğu boş kayıtların fetch'i atlatmasını önler.
+  final Set<String> _fetchedPeriods = {};
+  DateTime? _userCreatedAt;
 
   late final PageController _pageController;
   final int _initialPage = 10000;
   int _currentPage = 10000;
 
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _initialPage);
-    
-    // Uygulama ilk açıldığında mevcut haftayı (offset = 0) ve önceki haftayı (offset = -1) önden yükleyelim
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _saveTab(_tabController.index);
+      }
+    });
     _fetchWeekData(0);
     _fetchWeekData(-1);
+    _fetchUserCreatedAt();
+
+    // Cari ay verilerini arka planda önceden yükle (hızlandırma için)
+    final now = DateTime.now();
+    _fetchMonthData(now.year, now.month);
+
+    _loadSavedTab();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedTab() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('takipler_tab_index') ?? 0;
+    if (mounted && saved != 0) {
+      _tabController.animateTo(saved, duration: Duration.zero);
+    }
+  }
+
+  void _saveTab(int index) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt('takipler_tab_index', index);
+    });
   }
 
   int get _weekOffset => _currentPage - _initialPage;
@@ -91,6 +127,19 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
     }
   }
 
+  Future<void> _fetchUserCreatedAt() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final ts = (doc.data() as Map<String, dynamic>?)?['createdAt'] as Timestamp?;
+      if (ts != null && mounted) {
+        final d = ts.toDate();
+        setState(() => _userCreatedAt = DateTime(d.year, d.month, d.day));
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchWeekData(int targetOffset) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -100,10 +149,22 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
     final currentMonday = todayClean.subtract(Duration(days: todayClean.weekday - 1));
     final targetMonday = currentMonday.add(Duration(days: targetOffset * 7));
 
-    // 7 günün verilerini paralel olarak çekelim
+    // Aynı haftayı tekrar çekme — _allRecords.containsKey kullanmıyoruz çünkü
+    // build sırasında _getRecordForDate boş kayıt oluşturarak fetch'i atlatabiliyor.
+    final weekKey = 'week_${targetMonday.year}-${targetMonday.month}-${targetMonday.day}';
+    if (_fetchedPeriods.contains(weekKey)) return;
+    _fetchedPeriods.add(weekKey);
+
+    final daysToFetch = <DateTime>[];
+    for (int i = 0; i < 7; i++) {
+      final d = targetMonday.add(Duration(days: i));
+      if (d.isAfter(todayClean)) break;
+      daysToFetch.add(d);
+    }
+    if (daysToFetch.isEmpty) return;
+
     try {
-      final futures = List.generate(7, (index) {
-        final d = targetMonday.add(Duration(days: index));
+      final futures = daysToFetch.map((d) {
         final dateStr = "prayer_${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
         return FirebaseFirestore.instance
             .collection('users')
@@ -111,7 +172,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
             .collection('logs')
             .doc(dateStr)
             .get();
-      });
+      }).toList();
 
       final snapshots = await Future.wait(futures);
       bool hasChanges = false;
@@ -119,8 +180,11 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
       for (var doc in snapshots) {
         if (!doc.exists) continue;
         final data = doc.data()!;
-        final dateStr = (data['date'] as String).replaceAll('prayer_', '');
+        final rawDate = data['date'];
+        if (rawDate == null) continue;
+        final dateStr = (rawDate as String).replaceAll('prayer_', '');
         final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
         final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
         
         final Map<String, dynamic> pMap = data['prayers'] ?? {};
@@ -165,13 +229,12 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
         setState(() {});
       }
     } catch (e) {
-      debugPrint("Error fetching prayers: \$e");
+      debugPrint("Error fetching prayers: $e");
     }
   }
 
   Future<void> _updatePrayer(DayRecord record, PrayerTime time, PrayerStatus status) async {
     record.prayers[time] = status;
-    setState(() {});
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -211,7 +274,18 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
            }
         }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint("Error updating prayer: \$e");
+      debugPrint("Error updating prayer: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kayıt sırasında sorun oluştu. İnternet bağlantını kontrol et.',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: AppColors.errorRed,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -265,7 +339,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
     return months[month];
   }
 
-  void _showPrayerPopup(DayRecord record) {
+  Future<void> _showPrayerPopup(DayRecord record) async {
     final cinsiyet = context.read<UserProvider>().cinsiyet;
     PrayerTime selectedTime = PrayerTime.sabah;
     
@@ -277,7 +351,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
     else if (hour >= 19 && hour < 21) selectedTime = PrayerTime.aksam;
     else selectedTime = PrayerTime.yatsi;
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -291,11 +365,17 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
             final isKaza = status == PrayerStatus.kaza;
             final isCemaat = status == PrayerStatus.cemaat;
 
+            final bottomInset = MediaQuery.of(context).viewPadding.bottom;
             return Container(
-              padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 20),
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 16,
+                right: 16,
+                bottom: 20 + bottomInset + 16,
+              ),
               decoration: BoxDecoration(
                 color: context.colors.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -315,16 +395,23 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           onSelected: (val) {
                             if (val == 'all') {
-                              setModalState(() {
-                                for (var time in PrayerTime.values) {
-                                  record.prayers[time] = PrayerStatus.regl;
-                                  _updatePrayer(record, time, PrayerStatus.regl);
-                                }
-                              });
+                              for (var time in PrayerTime.values) {
+                                record.prayers[time] = PrayerStatus.regl;
+                                record.sunnahs[time] = _defaultSunnahs(time);
+                                record.tesbihats[time] = false;
+                              }
+                              setModalState(() {});
                               setState(() {});
+                              _updatePrayer(record, PrayerTime.sabah, PrayerStatus.regl);
                             } else if (val == 'current') {
                               final newStatus = isRegl ? PrayerStatus.none : PrayerStatus.regl;
-                              setModalState(() { record.prayers[selectedTime] = newStatus; });
+                              setModalState(() {
+                                record.prayers[selectedTime] = newStatus;
+                                if (newStatus == PrayerStatus.regl) {
+                                  record.sunnahs[selectedTime] = _defaultSunnahs(selectedTime);
+                                  record.tesbihats[selectedTime] = false;
+                                }
+                              });
                               setState(() {});
                               _updatePrayer(record, selectedTime, newStatus);
                             } else if (val == 'calendar') {
@@ -378,10 +465,10 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.filter_vintage, size: 14, color: isRegl ? Colors.pink.shade400 : context.colors.textTertiary),
+                                Icon(Icons.filter_vintage, size: 14, color: isRegl ? Colors.pink.shade400 : Colors.grey),
                                 const SizedBox(width: 4),
-                                Text('Muaf', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: isRegl ? Colors.pink.shade400 : context.colors.textTertiary)),
-                                Icon(Icons.arrow_drop_down, size: 16, color: context.colors.textTertiary),
+                                Text('Muaf', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: isRegl ? Colors.pink.shade400 : Colors.grey)),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey),
                               ],
                             ),
                           ),
@@ -438,7 +525,13 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                             activeTextColor: AppColors.tealDark,
                             onTap: () {
                               final next = isKaza ? PrayerStatus.none : PrayerStatus.kaza;
-                              setModalState(() { record.prayers[selectedTime] = next; });
+                              setModalState(() {
+                                record.prayers[selectedTime] = next;
+                                if (next == PrayerStatus.kaza) {
+                                  record.sunnahs[selectedTime] = _defaultSunnahs(selectedTime);
+                                  record.tesbihats[selectedTime] = false;
+                                }
+                              });
                               setState(() {});
                               _updatePrayer(record, selectedTime, next);
                             },
@@ -495,6 +588,7 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                             activeColor: AppColors.gold,
                             activeTextColor: Colors.white,
                             fontSize: 11,
+                            isEnabled: !(isKaza || isRegl),
                             onTap: () {
                               setModalState(() { record.tesbihats[selectedTime] = !isTesbihat; });
                               setState(() {});
@@ -508,8 +602,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                           final sName = sNameRaw == 'Vitir' ? 'Vitir Namazı' : sNameRaw;
                           final isDone = record.sunnahs[selectedTime]![idx];
                           
-                          // Kaza seçiliyse pasif görünüm
-                          final isPassive = isKaza;
+                          // Kaza veya Regl seçiliyse pasif görünüm
+                          final isPassive = isKaza || isRegl;
 
                           return Expanded(
                             child: Padding(
@@ -540,6 +634,8 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
         );
       },
     );
+    // Popup kapandıktan sonra namaz bloğundaki pasta grafiklerini güncellemek için tek bir setState
+    if (mounted) setState(() {});
   }
 
   Widget _buildActionButton({
@@ -554,7 +650,12 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
     bool isEnabled = true,
   }) {
     return GestureDetector(
-      onTap: isEnabled ? onTap : null,
+      onTap: isEnabled
+          ? () {
+              HapticFeedback.selectionClick();
+              onTap();
+            }
+          : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 200),
         opacity: isEnabled ? 1.0 : 0.5,
@@ -604,364 +705,1357 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
   }
 
   void _showKerahatInfoSheet(BuildContext context) {
+    String? selectedSector;
+    bool kerahatExpanded = true;
+    final kerahatController = ExpansionTileController();
+    const double chartSize = 270;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          padding: const EdgeInsets.only(top: 16, bottom: 24),
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top bar line
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: context.colors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            String? sectorAt(Offset localPos) {
+              final center = const Offset(chartSize / 2, chartSize / 2);
+              final dx = localPos.dx - center.dx;
+              final dy = localPos.dy - center.dy;
+              final distance = math.sqrt(dx * dx + dy * dy);
+              final innerR = KerahatChartPainter.innerR;
+              final outerR = chartSize / 2 - 42;
+              if (distance < innerR || distance > outerR + 4) return null;
+              double deg = math.atan2(dy, dx) * 180 / math.pi;
+              deg = (deg % 360 + 360) % 360;
+              if (deg >= 350 || deg < 10) return 'green'; // Akşam → Yatsı
+              if (deg < 135) return 'green';
+              if (deg < 180) return 'yellow';
+              if (deg < 200) return 'red';
+              if (deg < 255) return 'green';
+              if (deg < 270) return 'red';
+              if (deg < 315) return 'green';
+              if (deg < 335) return 'blue';  // İkindi başı
+              if (deg < 350) return 'red';   // Akşam öncesi kerahat
+              return null;
+            }
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetCtx).size.height * 0.92,
               ),
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Kerahat Vakitleri Bilgisi',
-                      style: GoogleFonts.nunito(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: context.colors.textPrimary,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: context.colors.textSecondary),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
+              padding: const EdgeInsets.only(top: 12, bottom: 24),
+              decoration: BoxDecoration(
+                color: context.colors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              const Divider(height: 1),
-              // Scrolling content
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        'KERAHAT VAKİTLERİ ÇİZELGESİ',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.nunito(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: context.colors.textPrimary,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Responsive Vektörel Çark
-                      Center(
-                        child: SizedBox(
-                          width: 280,
-                          height: 280,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Çark Painter
-                              Positioned.fill(
-                                child: CustomPaint(
-                                  painter: KerahatChartPainter(),
-                                ),
-                              ),
-                              // Orta Daire ve Yazı
-                              Container(
-                                width: 115,
-                                height: 115,
-                                decoration: BoxDecoration(
-                                  color: context.colors.surface,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.08),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'NAMAZ ve\nKERAHAT\nVAKİTLERİ',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ),
-                              // Dış etiketler (Positioned) - Çemberin tamamen dışına yerleştirildi (beyaz kutular kaldırıldı)
-                              // Öğle (Üstte)
-                              Positioned(
-                                top: 6,
-                                child: Text(
-                                  'Öğle',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // İkindi (Üst Sağ)
-                              Positioned(
-                                top: 36,
-                                right: 18,
-                                child: Text(
-                                  'İkindi',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // Akşam (Orta Sağ)
-                              Positioned(
-                                right: 0,
-                                top: 130,
-                                child: Text(
-                                  'Akşam',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // Yatsı (Alt Sağ)
-                              Positioned(
-                                bottom: 36,
-                                right: 32,
-                                child: Text(
-                                  'Yatsı',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // İmsak (Alt Sol)
-                              Positioned(
-                                bottom: 36,
-                                left: 32,
-                                child: Text(
-                                  'İmsak',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // Güneş (Orta Sol)
-                              Positioned(
-                                left: 0,
-                                top: 130,
-                                child: Text(
-                                  'Güneş',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // Kerahat Süre Etiketleri (40-45 dk) - Konumları yeni çember boyutuna göre ayarlandı
-                              // Güneş Yanı (Güneş sonrası kerahet)
-                              Positioned(
-                                top: 110,
-                                left: 32,
-                                child: RotationTransition(
-                                  turns: const AlwaysStoppedAnimation(200 / 360),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: context.colors.surface,
-                                      border: Border.all(color: context.colors.border),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
-                                  ),
-                                ),
-                              ),
-                              // Öğle Yanı (Zeval vakti)
-                              Positioned(
-                                top: 45,
-                                left: 104,
-                                child: RotationTransition(
-                                  turns: const AlwaysStoppedAnimation(262 / 360),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: context.colors.surface,
-                                      border: Border.all(color: context.colors.border),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
-                                  ),
-                                ),
-                              ),
-                              // Akşam Yanı (Akşam öncesi kerahet)
-                              Positioned(
-                                top: 110,
-                                right: 32,
-                                child: RotationTransition(
-                                  turns: const AlwaysStoppedAnimation(360 / 360),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: context.colors.surface,
-                                      border: Border.all(color: context.colors.border),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text('40 - 45 dk', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w700, color: context.colors.textSecondary)),
-                                  ),
-                                ),
-                              ),
-                            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: context.colors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Namaz Bilgileri',
+                          style: GoogleFonts.nunito(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: context.colors.textPrimary,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      
-                      // Açıklamalar (Kart Tasarımları)
-                      _buildKerahatInfoCard(
-                        title: 'Hiçbir Namaz Kılınmayan Kerahet Vakitleri',
-                        color: AppColors.errorRed,
-                        bgColor: AppColors.errorBg,
-                        rules: [
-                          'Güneş doğduktan sonraki ilk 40-45 dakikalık süre.',
-                          'Öğle namazı vaktinden önceki 40-45 dakikalık süre (Zeval vakti).',
-                          'Akşam namazı vaktinden önceki 40-45 dakikalık süre. (Not: Sadece o günün ikindi namazının farzı kılınmamışsa kılınabilir).',
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildKerahatInfoCard(
-                        title: 'İkindi Namazı Sonrası Sınırlama',
-                        color: AppColors.teal,
-                        bgColor: context.colors.tealSurface,
-                        rules: [
-                          'İkindi namazının farzı kılındıktan sonra nafile namaz kılınmaz.',
-                          'Ancak akşam kerahat vakti (son 40-45 dk) girinceye kadar kaza namazları kılınabilir.',
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildKerahatInfoCard(
-                        title: 'Sabah Namazı Vakti Sınırlaması',
-                        color: AppColors.gold,
-                        bgColor: AppColors.goldSoft.withValues(alpha: 0.15),
-                        rules: [
-                          'İmsak ile Güneş arasındaki vakitte, sadece sabah namazının sünneti kılınabilir.',
-                          'Bu süre içerisinde sabahın sünneti hariç başka hiçbir nafile namaz kılınmaz.',
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildKerahatInfoCard(
-                        title: 'Namaz Kılınabilen Vakitler (Mübah)',
-                        color: AppColors.successGreen,
-                        bgColor: AppColors.successBg.withValues(alpha: 0.35),
-                        rules: [
-                          'Yeşil renkle gösterilen tüm zaman dilimlerinde (Öğle-İkindi arası, Akşam-İmsak arası vb.) kaza veya nafile olarak her türlü namaz serbestçe kılınabilir.',
-                        ],
-                      ),
-                    ],
+                        IconButton(
+                          icon: Icon(Icons.close, color: context.colors.textSecondary, size: 20),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // === İnteraktif Kerahat Çarkı ===
+                          Center(
+                            child: SizedBox(
+                              width: chartSize,
+                              height: chartSize,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Positioned.fill(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTapDown: (details) {
+                                        final s = sectorAt(details.localPosition);
+                                        if (s == null) return;
+                                        HapticFeedback.selectionClick();
+                                        if (!kerahatExpanded) {
+                                          kerahatController.expand();
+                                          kerahatExpanded = true;
+                                        }
+                                        setSheetState(() => selectedSector = s);
+                                      },
+                                      child: CustomPaint(
+                                        painter: KerahatChartPainter(
+                                            highlightSector: selectedSector,
+                                            textColor: context.colors.textPrimary),
+                                      ),
+                                    ),
+                                  ),
+                                  IgnorePointer(
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        color: context.colors.surface,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'NAMAZ ve\nKERAHAT\nVAKİTLERİ',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: context.colors.textPrimary,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // === Accordion Kartları ===
+                          _buildInfoAccordion(
+                            emoji: '🚫',
+                            emojiColor: AppColors.errorRed,
+                            title: 'Kerahat Kuralları',
+                            initiallyExpanded: true,
+                            controller: kerahatController,
+                            onExpansionChanged: (expanded) {
+                              kerahatExpanded = expanded;
+                            },
+                            content: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Günün belirli vakitlerinde namaz kılmak ya tamamen yasaktır ya da bazı namazlarla sınırlıdır. Bu zamanlara "kerahat vakitleri" denir.',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.colors.textPrimary,
+                                    height: 1.55,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: context.colors.tealSurface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color:
+                                            AppColors.teal.withValues(alpha: 0.25)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.touch_app_rounded,
+                                          size: 16, color: AppColors.teal),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Detayı görmek için yukarıdaki haritada renkli bir alana tıklayın.',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.tealDark,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOutCubic,
+                                  child: selectedSector == null
+                                      ? const SizedBox(height: 0)
+                                      : Padding(
+                                          padding: const EdgeInsets.only(top: 12),
+                                          child: AnimatedSwitcher(
+                                            duration: const Duration(milliseconds: 220),
+                                            switchInCurve: Curves.easeOutCubic,
+                                            child: _buildSectorContent(
+                                              selectedSector!,
+                                              key: ValueKey(selectedSector),
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '🕌',
+                            emojiColor: AppColors.gold,
+                            title: 'Cemaat ile Namaz',
+                            content: _buildCemaatContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '🌅',
+                            emojiColor: AppColors.orange,
+                            title: 'Sabah Namazının Sünneti',
+                            content: _buildSabahSunnetContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '📿',
+                            emojiColor: AppColors.teal,
+                            title: 'Neden Her Vakitten Sonra Tesbihat?',
+                            content: _buildTesbihatContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '📖',
+                            emojiColor: AppColors.teal,
+                            title: 'Amellerin En Faziletlisi?',
+                            content: _buildNamazFaziletContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '⚖️',
+                            emojiColor: AppColors.errorRed,
+                            title: 'Kıyamette İlk Hesap',
+                            content: _buildKiyametHesapContent(sheetCtx),
+                          ),
+                          _buildInfoAccordion(
+                            emoji: '🕐',
+                            emojiColor: AppColors.gold,
+                            title: 'İkindi: Orta Namaz',
+                            content: _buildIkindiContent(sheetCtx),
+                          ),
+                          const SizedBox(height: 4),
+                          _buildKaynakcaFooter(sheetCtx),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildKerahatInfoCard({
-    required String title,
-    required Color color,
-    required Color bgColor,
-    required List<String> rules,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
+  // ── Sektör içerik (kırmızı/sarı/yeşil/mavi)
+  Widget _buildSectorContent(String sector, {Key? key}) {
+    Color color;
+    String title;
+    String emoji;
+    Widget body;
+    switch (sector) {
+      case 'red':
+        color = AppColors.errorRed;
+        title = 'Hiçbir Namazın Kılınmadığı 3 Vakit';
+        emoji = '🚫';
+        body = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bu vakitlerde farz dahil hiçbir namaz kılınmaz:',
+              style: GoogleFonts.nunito(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: context.colors.textPrimary,
+                height: 1.5,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: context.colors.textPrimary,
+            ),
+            const SizedBox(height: 8),
+            _bullet('Güneş doğarken — Güneş ufuktan göründüğü andan, gözle bakılamayacak parlaklığa erişene kadar (yaklaşık 45-50 dk).'),
+            _bullet('Güneş tam tepedeyken — Öğle ezanından önceki son 10-20 dakika (zeval vakti).'),
+            _bullet('Güneş batarken — Güneşin sararıp doğrudan bakılabilir hale gelmesinden batışına kadar (yaklaşık 45-50 dk).'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.goldSoft.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('⚠️ ', style: TextStyle(fontSize: 14)),
+                  Expanded(
+                    child: Text(
+                      'Tek istisna: O günün ikindi farzı henüz kılınmamışsa, güneş batarken bile sadece o ikindinin farzı kılınabilir. Namazı kasten bu vakte ertelemek günahtır.',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textPrimary,
+                        height: 1.5,
+                      ),
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
+          ],
+        );
+        break;
+      case 'yellow':
+        color = AppColors.gold;
+        title = 'Sabah Vaktinde';
+        emoji = '🌅';
+        body = Text.rich(
+          TextSpan(
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.6,
+            ),
+            children: [
+              const TextSpan(text: 'İmsak vakti girdikten sonra güneş doğana kadar '),
+              TextSpan(
+                text: 'sadece sabahın iki rekât sünneti',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+              ),
+              const TextSpan(text: ' kılınır. Başka nafile namaz yoktur. '),
+              TextSpan(
+                text: 'Sabahın farzı bu vakit içinde her zaman kılınabilir.',
+                style: GoogleFonts.nunito(fontStyle: FontStyle.italic, color: context.colors.textSecondary),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ...rules.map((rule) => Padding(
-            padding: const EdgeInsets.only(left: 18, bottom: 4),
+        );
+        break;
+      case 'blue':
+        color = AppColors.teal;
+        title = 'İkindiden Sonra';
+        emoji = '🔵';
+        body = Text.rich(
+          TextSpan(
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.6,
+            ),
+            children: [
+              const TextSpan(text: 'İkindinin farzı kılındıktan sonra, akşam ezanından yaklaşık '),
+              TextSpan(
+                text: '45 dakika öncesine',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+              ),
+              const TextSpan(text: ' kadar '),
+              TextSpan(
+                text: 'nafile namaz kılınmaz',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+              ),
+              const TextSpan(text: '. Ancak bu süre içinde '),
+              TextSpan(
+                text: 'kaza namazları kılınabilir.',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        );
+        break;
+      case 'green':
+      default:
+        color = AppColors.successGreen;
+        title = 'Serbest Vakitler';
+        emoji = '🟢';
+        body = Text(
+          'Yukarıdaki kısıtlamalar dışında kalan tüm vakitlerde (Öğle-İkindi arası, Akşam-Yatsı arası, Yatsı-İmsak arası) kaza ve nafile namazlar serbestçe kılınabilir.',
+          style: GoogleFonts.nunito(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: context.colors.textPrimary,
+            height: 1.55,
+          ),
+        );
+        break;
+    }
+    return Container(
+      key: key,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(11),
+                topRight: Radius.circular(11),
+              ),
+            ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('• ', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+                Text(emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    rule,
+                    title,
                     style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      color: context.colors.textPrimary,
-                      height: 1.4,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: color,
                     ),
                   ),
                 ),
               ],
             ),
-          )),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: body,
+          ),
         ],
       ),
     );
   }
+
+  Widget _bullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, left: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.colors.textSecondary,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: context.colors.textPrimary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Hadis kartı (alıntı bloğu)
+  Widget _hadithCard(String text, String source, {Color? accent}) {
+    final color = accent ?? AppColors.teal;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceVariant,
+        borderRadius: BorderRadius.circular(10),
+        border: Border(left: BorderSide(color: color, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text,
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            source,
+            style: GoogleFonts.nunito(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: context.colors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCemaatContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _hadithCard(
+          '"Cemaatle kılınan namaz, tek başına kılınan namazdan yirmi yedi derece daha faziletlidir."',
+          '— Buhârî, Ezân, 30; Müslim, Mesâcid, 249',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          'Resûlullah (sav.) Efendimiz: "—Güçlüklere rağmen abdesti güzelce almak, mescitlere doğru çokça adım atmak ve bir namazdan sonra diğerini gözlemektir. İşte, bekleyeceğiniz en faziletli nöbet (ribât) budur" buyurdu.',
+          '— Müslim, Tahâret, 41',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          '"Sizden biri, abdestini bozmadan namaz kıldığı yerde oturduğu müddetçe, melekler kendisine: «Allah\'ım, onu bağışla, Allah\'ım ona rahmetinle muamele eyle!» diye dua eder."',
+          '— Buhârî, Ezân, 36',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          '"İmam Fatiha\'yı bitirip «Âmîn» dediğinde siz de «Âmîn» deyiniz. Kimin âmini meleklerin âmin demesine muvâfık düşerse, onun geçmiş (küçük) günahları mağfiret edilir/örtülür."',
+          '— Buhârî, Ezân, 111; Müslim, Salât, 72',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          '"Münafıklara sabah ve yatsı namazından daha ağır gelen hiçbir namaz yoktur. Onlar, bu iki namazda ne kadar çok ecir ve sevap olduğunu bilselerdi, emekleyerek de olsa cemaate gelirlerdi."',
+          '— Buhârî, Ezân, 34; Müslim, Mesâcid, 252; İbn-i Mâce, Mesâcid, 18',
+          accent: AppColors.gold,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSabahSunnetContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Sabah namazının iki rekât sünneti, Peygamber Efendimiz\'in (sav.) hiç terk etmediği, ümmeti için en kıymetli müekked sünnetlerden biridir.',
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.55,
+            ),
+          ),
+        ),
+        _hadithCard(
+          '"Sabah namazının iki rek\'at sünneti, dünya ve dünyadaki her şeyden daha hayırlıdır."',
+          '— Müslim, Müsâfirîn, 96',
+          accent: AppColors.orange,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTesbihatContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _hadithCard(
+          '"Kim her namazın peşinden otuz üç defa \'Sübhânallah\', otuz üç defa \'Elhamdülillâh\', otuz üç defa \'Allâhü ekber\' der, sonra da yüze tamamlamak için; \'Lâ ilâhe illallâhü vahdehû lâ şerîke leh, lehü\'l-mülkü ve lehü\'l-hamdü ve hüve alâ külli şey\'in kadîr\' derse, günahları deniz köpüğü kadar çok olsa bile affedilir."',
+          '— Müslim, Mesâcid, 146; Ebû Dâvûd, Vitir, 24',
+          accent: AppColors.teal,
+        ),
+        _hadithCard(
+          'Fakir Muhacirler Resûlullah\'a (sav.) gelerek zengin kardeşlerinin hac, umre, cihad ve sadaka ile yüksek dereceleri aldıklarını söyleyince Efendimiz şöyle buyurdu: "—Size bir şey öğreteyim mi? Onun sayesinde sizi geçenlere yetişir, sizden sonrakileri de geçersiniz. Her namazın peşinden otuz üç defa Sübhânallah, otuz üç defa Elhamdülillâh, otuz üç defa Allâhü ekber dersiniz."',
+          '— Buhârî, Ezân, 155; Müslim, Mesâcid, 142',
+          accent: AppColors.teal,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNamazFaziletContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _hadithCard(
+          '"Hz. Abdullah b. Mes\'ûd anlatıyor: Resûlullah\'a (sav.) \'Allah katında amellerin en faziletlisi hangisidir?\' diye sordum. \'Vaktinde kılınan namazdır\' buyurdu. \'Sonra hangisidir?\' dedim; \'Anne babaya iyilik\' buyurdu."',
+          '— Buhârî, Mevâkît, 5; Müslim, Îmân, 137',
+          accent: AppColors.teal,
+        ),
+        _hadithCard(
+          '"Ebû Hüreyre\'den: Resûlullah (sav.) sordu: \'Birinizin kapısının önünden bir nehir geçse ve onda her gün beş defa yıkansa, bu o kimsenin kirinden bir şey bırakır mı?\' Sahâbe: \'Hiçbir şey bırakmaz\' dedi. \'İşte beş vakit namaz da böyledir; Allah onlarla günahları yok eder.\' buyurdu."',
+          '— Buhârî, Mevâkît, 6; Müslim, Mesâcid, 282',
+          accent: AppColors.teal,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKiyametHesapContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Kıyamet gününde kulun ilk hesap vereceği amel namazdır. Farzlarda eksik çıkarsa nâfile namazlar o eksiği kapatır — sünnetleri neden takip ettiğimizin en güçlü gerekçesidir.',
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.55,
+            ),
+          ),
+        ),
+        _hadithCard(
+          '"Kıyamet gününde kulun hesaba çekileceği ilk ameli namazdır. Eğer namazı düzgün olursa kurtulur ve kazançlı çıkar. Farzlarından bir eksik çıkarsa Rabbi: \'Kulumun nâfile namazları var mı?\' der; eksik, nâfilelerle tamamlanır."',
+          '— Tirmizî, Mevâkît, 188; Ebû Dâvûd, Salât, 149',
+          accent: AppColors.errorRed,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIkindiContent(BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Kur\'an\'da namazlar içinde ikindi özel olarak anılır. Gündüzün en yoğun vaktine denk geldiği için kaçırılma riski en yüksek namazdır.',
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              height: 1.55,
+            ),
+          ),
+        ),
+        _hadithCard(
+          '"Namazlara ve orta namaza devam edin; gönülden boyun eğerek Allah için namaza durun."',
+          '— Bakara Sûresi, 2/238',
+          accent: AppColors.gold,
+        ),
+        _hadithCard(
+          '"Kim ikindi namazını kaçırırsa, sanki ailesini ve malını kaybetmiş gibidir."',
+          '— Buhârî, Mevâkît, 14; Müslim, Mesâcid, 200',
+          accent: AppColors.gold,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKaynakcaFooter(BuildContext ctx) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.bookmark_border_rounded,
+              size: 13, color: context.colors.textTertiary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Tüm kaynaklar Ayarlar > Kaynakça bölümündedir.',
+              style: GoogleFonts.nunito(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: context.colors.textTertiary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoAccordion({
+    required String emoji,
+    required Color emojiColor,
+    required String title,
+    required Widget content,
+    bool initiallyExpanded = false,
+    ExpansionTileController? controller,
+    ValueChanged<bool>? onExpansionChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.colors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: emojiColor.withValues(alpha: 0.06),
+          highlightColor: emojiColor.withValues(alpha: 0.04),
+        ),
+        child: ExpansionTile(
+          controller: controller,
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          iconColor: context.colors.textSecondary,
+          collapsedIconColor: context.colors.textSecondary,
+          leading: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: emojiColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(emoji, style: const TextStyle(fontSize: 16)),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: context.colors.textPrimary,
+            ),
+          ),
+          onExpansionChanged: (expanded) {
+            HapticFeedback.selectionClick();
+            onExpansionChanged?.call(expanded);
+          },
+          children: [content],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _fetchMonthData(int year, int month) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // Aynı ayı tekrar çekme
+    final monthKey = 'month_$year-$month';
+    if (_fetchedPeriods.contains(monthKey)) return;
+    _fetchedPeriods.add(monthKey);
+
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
+    if (DateTime(year, month, 1).isAfter(todayClean)) return;
+
+    try {
+      // 30 ayrı read yerine tek range sorgusu — çok daha hızlı
+      final monthStr = '$year-${month.toString().padLeft(2, '0')}';
+      final querySnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('logs')
+          .where(FieldPath.documentId, isGreaterThanOrEqualTo: 'prayer_${monthStr}-01')
+          .where(FieldPath.documentId, isLessThanOrEqualTo: 'prayer_${monthStr}-31')
+          .get();
+      bool hasChanges = false;
+      for (var doc in querySnap.docs) {
+        final data = doc.data();
+        final rawDate = data['date'] as String? ?? '';
+        final dateStr = rawDate.replaceAll('prayer_', '');
+        if (dateStr.isEmpty) continue;
+        final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
+        final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        if (d.isAfter(todayClean)) continue;
+        final Map<String, dynamic> pMap = data['prayers'] ?? {};
+        final Map<String, dynamic> tMap = data['tesbihats'] ?? {};
+        final Map<String, dynamic> sMap = data['sunnahs'] ?? {};
+        List<bool> getSunnahList(PrayerTime pt, String key) {
+          if (sMap[key] != null) return List<bool>.from(sMap[key]);
+          return _defaultSunnahs(pt);
+        }
+        _allRecords[d] = DayRecord(
+          date: d,
+          prayers: {
+            PrayerTime.sabah: _statusFromString(pMap['sabah']),
+            PrayerTime.ogle: _statusFromString(pMap['ogle']),
+            PrayerTime.ikindi: _statusFromString(pMap['ikindi']),
+            PrayerTime.aksam: _statusFromString(pMap['aksam']),
+            PrayerTime.yatsi: _statusFromString(pMap['yatsi']),
+          },
+          tesbihats: {
+            PrayerTime.sabah: tMap['sabah'] ?? false,
+            PrayerTime.ogle: tMap['ogle'] ?? false,
+            PrayerTime.ikindi: tMap['ikindi'] ?? false,
+            PrayerTime.aksam: tMap['aksam'] ?? false,
+            PrayerTime.yatsi: tMap['yatsi'] ?? false,
+          },
+          sunnahs: {
+            PrayerTime.sabah: getSunnahList(PrayerTime.sabah, 'sabah'),
+            PrayerTime.ogle: getSunnahList(PrayerTime.ogle, 'ogle'),
+            PrayerTime.ikindi: getSunnahList(PrayerTime.ikindi, 'ikindi'),
+            PrayerTime.aksam: getSunnahList(PrayerTime.aksam, 'aksam'),
+            PrayerTime.yatsi: getSunnahList(PrayerTime.yatsi, 'yatsi'),
+          },
+        );
+        hasChanges = true;
+      }
+      if (hasChanges && mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Error fetching month: $e");
+    }
+  }
+
+  void _showMonthlyViewSheet(BuildContext context) {
+    final cinsiyet = context.read<UserProvider>().cinsiyet ?? 'bey';
+    final now = DateTime.now();
+    int displayYear = now.year;
+    int displayMonth = now.month;
+    bool initialFetched = false;
+    bool isMonthLoading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            Future<void> ensureMonthLoaded() async {
+              final monthKey = 'month_$displayYear-$displayMonth';
+              final alreadyFetched = _fetchedPeriods.contains(monthKey);
+
+              if (!alreadyFetched) {
+                isMonthLoading = true;
+                if (sheetCtx.mounted) setSheetState(() {});
+                await _fetchMonthData(displayYear, displayMonth);
+                if (!sheetCtx.mounted) return;
+                isMonthLoading = false;
+                setSheetState(() {});
+              } else {
+                if (sheetCtx.mounted) setSheetState(() {});
+              }
+            }
+
+            if (!initialFetched) {
+              initialFetched = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ensureMonthLoaded();
+              });
+            }
+
+            final isCurrentMonth =
+                displayYear == now.year && displayMonth == now.month;
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetCtx).size.height * 0.85,
+              ),
+              padding: const EdgeInsets.only(top: 12, bottom: 20),
+              decoration: BoxDecoration(
+                color: context.colors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: context.colors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 40,
+                    width: double.infinity,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 220,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () {
+                                  setSheetState(() {
+                                    displayMonth--;
+                                    if (displayMonth < 1) {
+                                      displayMonth = 12;
+                                      displayYear--;
+                                    }
+                                  });
+                                  ensureMonthLoaded();
+                                },
+                                child: Padding(
+                                  padding: EdgeInsets.all(6),
+                                  child: Icon(Icons.chevron_left_rounded,
+                                      color: context.colors.textPrimary, size: 22),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  '${_getMonthName(displayMonth)} $displayYear',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: context.colors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              isCurrentMonth
+                                  ? const SizedBox(width: 34)
+                                  : InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        setSheetState(() {
+                                          displayMonth++;
+                                          if (displayMonth > 12) {
+                                            displayMonth = 1;
+                                            displayYear++;
+                                          }
+                                        });
+                                        ensureMonthLoaded();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Icon(Icons.chevron_right_rounded,
+                                            color: context.colors.textPrimary, size: 22),
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          right: 16,
+                          child: IconButton(
+                            icon: Icon(Icons.close,
+                                color: context.colors.textSecondary, size: 20),
+                            onPressed: () => Navigator.pop(sheetCtx),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragEnd: (details) {
+                          final v = details.primaryVelocity ?? 0;
+                          if (v.abs() < 200) return;
+                          if (v > 0) {
+                            setSheetState(() {
+                              displayMonth--;
+                              if (displayMonth < 1) {
+                                displayMonth = 12;
+                                displayYear--;
+                              }
+                            });
+                            ensureMonthLoaded();
+                          } else if (!isCurrentMonth) {
+                            setSheetState(() {
+                              displayMonth++;
+                              if (displayMonth > 12) {
+                                displayMonth = 1;
+                                displayYear++;
+                              }
+                            });
+                            ensureMonthLoaded();
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                          child: Column(
+                            children: [
+                              _buildMonthlyStats(
+                                  displayYear, displayMonth, cinsiyet,
+                                  isLoading: isMonthLoading),
+                              const SizedBox(height: 10),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                child: Row(
+                                  children: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+                                      .map((d) => Expanded(
+                                            child: Text(
+                                              d,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.nunito(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: context.colors.textTertiary,
+                                              ),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
+                              _buildMonthlyGrid(
+                                  displayYear,
+                                  displayMonth,
+                                  cinsiyet,
+                                  sheetCtx,
+                                  () => setSheetState(() {})),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthlyStats(int year, int month, String cinsiyet, {bool isLoading = false}) {
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final isCurrentMonth = year == today.year && month == today.month;
+    final lastDay = isCurrentMonth ? today.day : daysInMonth;
+
+    int eligiblePrayers = 0;
+    int onTimeCount = 0;
+    int cemaatCount = 0;
+    int doneSunnahs = 0;
+    int eligibleSunnahs = 0;
+    int doneTesbihats = 0;
+    int eligibleTesbihats = 0;
+
+    for (int day = 1; day <= lastDay; day++) {
+      final d = DateTime(year, month, day);
+      if (d.isAfter(todayClean)) continue;
+      final cleanD = DateTime(d.year, d.month, d.day);
+      // Kullanıcı kaydolmadan önceki günler istatistiğe dahil edilmez
+      if (_userCreatedAt != null && cleanD.isBefore(_userCreatedAt!)) continue;
+      final record = _allRecords[cleanD];
+      if (record == null) {
+        // Default eligible (kayıt yoksa hiçbiri tamamlanmamış)
+        eligiblePrayers += 5;
+        // Sünnet sayısı (Vitir hariç): 1+2+1+1+2 = 7
+        eligibleSunnahs += 7;
+        eligibleTesbihats += 5;
+        continue;
+      }
+
+      for (var time in PrayerTime.values) {
+        final status = record.prayers[time] ?? PrayerStatus.none;
+        if (status == PrayerStatus.regl) continue; // hanım için muaf, sayıma alınmaz
+        eligiblePrayers += 1;
+        if (status == PrayerStatus.onTime || status == PrayerStatus.cemaat) {
+          onTimeCount += 1;
+        }
+        if (status == PrayerStatus.cemaat) cemaatCount += 1;
+
+        // Sünnetler — Vitir hariç (yatsı'da son eleman)
+        final sunnahList = record.sunnahs[time] ?? [];
+        final names = _getSunnahNames(time);
+        for (int i = 0; i < sunnahList.length; i++) {
+          if (names[i] == 'Vitir') continue;
+          eligibleSunnahs += 1;
+          if (sunnahList[i]) doneSunnahs += 1;
+        }
+
+        // Tesbihat
+        eligibleTesbihats += 1;
+        if (record.tesbihats[time] == true) doneTesbihats += 1;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceVariant,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            child: isLoading
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: AppColors.teal,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Hesaplanıyor…',
+                          style: GoogleFonts.nunito(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: context.colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _gaugeCell(
+                  label: 'Vaktinde',
+                  done: onTimeCount,
+                  total: eligiblePrayers,
+                  detail: '$onTimeCount/$eligiblePrayers',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _gaugeCell(
+                  label: 'Cemaat',
+                  done: cemaatCount,
+                  total: eligiblePrayers,
+                  detail: '$cemaatCount/$eligiblePrayers',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _gaugeCell(
+                  label: 'Sünnet',
+                  done: doneSunnahs,
+                  total: eligibleSunnahs,
+                  detail: '$doneSunnahs/$eligibleSunnahs',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _gaugeCell(
+                  label: 'Tesbihat',
+                  done: doneTesbihats,
+                  total: eligibleTesbihats,
+                  detail: '$doneTesbihats/$eligibleTesbihats',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _gaugeColorFor(int pctInt) {
+    if (pctInt < 50) return AppColors.errorRed;
+    if (pctInt < 70) return AppColors.orange;
+    if (pctInt < 85) return AppColors.gold;
+    return AppColors.successGreen;
+  }
+
+  Widget _gaugeCell({
+    required String label,
+    required int done,
+    required int total,
+    required String detail,
+  }) {
+    final hasData = total > 0;
+    final ratio = hasData ? (done / total).clamp(0.0, 1.0) : 0.0;
+    final pctInt = (ratio * 100).round();
+    final ringColor =
+        hasData ? _gaugeColorFor(pctInt) : context.colors.border;
+
+    return Semantics(
+      label: '$label %$pctInt — $detail',
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: hasData ? ratio : 0.0),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeOutCubic,
+                builder: (context, animValue, _) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        painter: _RingGaugePainter(
+                          progress: animValue,
+                          color: ringColor,
+                          backgroundColor:
+                              context.colors.border.withValues(alpha: 0.45),
+                          strokeWidth: 4.0,
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          hasData ? '%${(animValue * 100).round()}' : '—',
+                          style: GoogleFonts.nunito(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: context.colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: context.colors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w600,
+                color: context.colors.textTertiary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthlyGrid(int year, int month, String cinsiyet, BuildContext sheetCtx, VoidCallback onRecordChanged) {
+    final firstDay = DateTime(year, month, 1);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final leadingEmpty = firstDay.weekday - 1; // Pzt=1
+    final totalCells = leadingEmpty + daysInMonth;
+    final rows = (totalCells / 7).ceil();
+
+    final today = DateTime.now();
+    final todayClean = DateTime(today.year, today.month, today.day);
+
+    return Column(
+      children: List.generate(rows, (rowIdx) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: List.generate(7, (colIdx) {
+              final cellIdx = rowIdx * 7 + colIdx;
+              final dayNum = cellIdx - leadingEmpty + 1;
+
+              if (dayNum < 1 || dayNum > daysInMonth) {
+                return const Expanded(child: SizedBox(height: 44));
+              }
+
+              final cellDate = DateTime(year, month, dayNum);
+              final cellClean = DateTime(cellDate.year, cellDate.month, cellDate.day);
+              final isFuture = cellClean.isAfter(todayClean);
+              final isToday = cellClean.isAtSameMomentAs(todayClean);
+              final record = _getRecordForDate(cellDate);
+
+              return Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: isFuture
+                      ? null
+                      : () async {
+                          HapticFeedback.selectionClick();
+                          await _showPrayerPopup(record);
+                          if (!sheetCtx.mounted) return;
+                          onRecordChanged();
+                        },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Opacity(
+                      opacity: isFuture ? 0.35 : 1.0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$dayNum',
+                            style: GoogleFonts.nunito(
+                              fontSize: 9.5,
+                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                              color: isToday ? AppColors.teal : context.colors.textTertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: CustomPaint(
+                              painter: PrayerPieChartPainter(
+                                record.prayers,
+                                cinsiyet,
+                                record.tesbihats,
+                                record.sunnahs,
+                                surfaceColor: context.colors.surface,
+                                borderColor: context.colors.border,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cinsiyet = context.read<UserProvider>().cinsiyet ?? 'bey';
@@ -985,45 +2079,30 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
           ),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-        : SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Haftalık Namaz Takibi',
-                    style: GoogleFonts.nunito(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showKerahatInfoSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: context.colors.tealSurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: AppColors.teal,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.fromLTRB(4, 12, 4, 20),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: GestureDetector(
+                behavior: HitTestBehavior.deferToChild,
+                onHorizontalDragEnd: (details) {
+                  final v = details.primaryVelocity ?? 0;
+                  if (v.abs() < 200) return;
+                  if (v > 0) {
+                    _pageController.previousPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  } else if (_weekOffset < 0) {
+                    _pageController.nextPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                },
+                child: Container(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                 decoration: BoxDecoration(
                   color: context.colors.surface,
                   borderRadius: BorderRadius.circular(16),
@@ -1039,142 +2118,250 @@ class _GunlukTakiplerScreenState extends State<GunlukTakiplerScreen> {
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 6.0),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.chevron_left, color: context.colors.textPrimary),
-                            onPressed: () {
-                              _pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            },
-                          ),
+                          // Sol: chevron + küçük ay yazısı (önceki hafta)
                           Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              child: Text(
-                                currentMonthText,
-                                key: ValueKey(currentMonthText),
-                                textAlign: TextAlign.right,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    _pageController.previousPage(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(Icons.chevron_left_rounded,
+                                        size: 20, color: context.colors.textSecondary),
+                                  ),
+                                ),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => _showMonthlyViewSheet(context),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 4),
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 300),
+                                      child: Text(
+                                        currentMonthText,
+                                        key: ValueKey(currentMonthText),
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: context.colors.textTertiary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Orta: Başlık + info ikonu
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Namaz Takibi',
                                 style: GoogleFonts.nunito(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
-                                  color: context.colors.textSecondary,
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
+                              const SizedBox(width: 6),
+                              GestureDetector(
+                                onTap: () => _showKerahatInfoSheet(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: context.colors.tealSurface,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.info_outline,
+                                    size: 12,
+                                    color: AppColors.teal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Sağ: aylık takvim ikonu + (geçmişteyse) sağ chevron
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => _showMonthlyViewSheet(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: Icon(
+                                      Icons.calendar_month_rounded,
+                                      size: 18,
+                                      color: AppColors.teal,
+                                    ),
+                                  ),
+                                ),
+                                if (_weekOffset < 0)
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () {
+                                      _pageController.nextPage(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(6),
+                                      child: Icon(Icons.chevron_right_rounded,
+                                          size: 20, color: context.colors.textSecondary),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          if (_weekOffset < 0)
-                            IconButton(
-                              icon: Icon(Icons.chevron_right, color: context.colors.textPrimary),
-                              onPressed: () {
-                                _pageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                            )
-                          else
-                            const SizedBox(width: 48),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 100, // Daireler ve metinler için yeterli yükseklik (overflow'u önlemek için artırıldı)
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: _initialPage + 1, // Max sayfa _initialPage (geleceğe gidiş yok)
-                        onPageChanged: (page) {
-                          setState(() {
-                            _currentPage = page;
-                          });
-                          _fetchWeekData(_weekOffset);
-                        },
-                        itemBuilder: (context, index) {
-                          final pageOffset = index - _initialPage;
-                          final pageRecords = _getWeekRecordsForOffset(pageOffset);
+                    const SizedBox(height: 10),
+                        SizedBox(
+                          height: 78,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: _initialPage + 1,
+                            onPageChanged: (page) {
+                              setState(() {
+                                _currentPage = page;
+                              });
+                              _fetchWeekData(_weekOffset);
+                            },
+                            itemBuilder: (context, index) {
+                              final pageOffset = index - _initialPage;
+                              final pageRecords = _getWeekRecordsForOffset(pageOffset);
 
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: pageRecords.map((record) {
-                              final now = DateTime.now();
-                              final todayDate = DateTime(now.year, now.month, now.day);
-                              final recDate = DateTime(record.date.year, record.date.month, record.date.day);
-                              
-                              final isToday = recDate.isAtSameMomentAs(todayDate);
-                              final isFuture = recDate.isAfter(todayDate);
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: pageRecords.map((record) {
+                                  final now = DateTime.now();
+                                  final todayDate = DateTime(now.year, now.month, now.day);
+                                  final recDate = DateTime(record.date.year, record.date.month, record.date.day);
 
-                              return GestureDetector(
-                                onTap: () {
-                                  if (isFuture) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Henüz bu güne gelmediniz!',
-                                          style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
-                                        ),
-                                        backgroundColor: AppColors.orange,
-                                        duration: const Duration(seconds: 2),
+                                  final isToday = recDate.isAtSameMomentAs(todayDate);
+                                  final isFuture = recDate.isAfter(todayDate);
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      if (isFuture) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Henüz bu güne gelmediniz!',
+                                              style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                                            ),
+                                            backgroundColor: AppColors.orange,
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      } else {
+                                        HapticFeedback.selectionClick();
+                                        _showPrayerPopup(record);
+                                      }
+                                    },
+                                    child: Opacity(
+                                      opacity: isFuture ? 0.4 : 1.0,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _getDayName(record.date),
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 12,
+                                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                              color: isToday ? AppColors.teal : context.colors.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: 46,
+                                            height: 46,
+                                            child: CustomPaint(
+                                              painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs, surfaceColor: context.colors.surface, borderColor: context.colors.border),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    );
-                                  } else {
-                                    _showPrayerPopup(record);
-                                  }
-                                },
-                                child: Opacity(
-                                  opacity: isFuture ? 0.4 : 1.0,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _getDayName(record.date),
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                          color: isToday ? AppColors.teal : context.colors.textSecondary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        width: 46,
-                                        height: 46,
-                                        child: CustomPaint(
-                                          painter: PrayerPieChartPainter(record.prayers, cinsiyet, record.tesbihats, record.sunnahs, context.colors.surface, context.colors.border),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${record.date.day}',
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                          color: isToday ? AppColors.teal : context.colors.textTertiary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                }).toList(),
                               );
-                            }).toList(),
-                          );
-                        },
-                      ),
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 32),
-              HabitTrackerWidget(),
-            ],
+            ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.teal,
+                labelColor: AppColors.teal,
+                unselectedLabelColor: context.colors.textSecondary,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800),
+                unselectedLabelStyle: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'Alışkanlıklarım'),
+                  Tab(text: 'Virdlerim'),
+                ],
+              ),
+            ),
           ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: const HabitTrackerWidget(),
+            ),
+            const VirdlerimContentWidget(),
+          ],
         ),
       ),
     );
   }
+}
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  _TabBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(color: context.colors.surface, child: tabBar);
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate oldDelegate) => tabBar != oldDelegate.tabBar;
 }
 
 class PrayerPieChartPainter extends CustomPainter {
@@ -1185,7 +2372,10 @@ class PrayerPieChartPainter extends CustomPainter {
   final Color surfaceColor;
   final Color borderColor;
 
-  PrayerPieChartPainter(this.prayers, this.cinsiyet, this.tesbihats, this.sunnahs, this.surfaceColor, this.borderColor);
+  PrayerPieChartPainter(this.prayers, this.cinsiyet, this.tesbihats, this.sunnahs, {
+    this.surfaceColor = Colors.white,
+    this.borderColor = const Color(0xFFE2E8F0),
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1292,54 +2482,137 @@ class PrayerPieChartPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class KerahatChartPainter extends CustomPainter {
+class _RingGaugePainter extends CustomPainter {
+  final double progress; // 0.0 .. 1.0
+  final Color color;
+  final Color backgroundColor;
+  final double strokeWidth;
+
+  _RingGaugePainter({
+    required this.progress,
+    required this.color,
+    required this.backgroundColor,
+    required this.strokeWidth,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 42; // Dış etiketler için kenar payı (çemberi biraz küçülterek yazıları dışa aldık)
+    final radius = (math.min(size.width, size.height) / 2) - strokeWidth / 2;
+
+    final bgPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..color = backgroundColor;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    if (progress <= 0) return;
+
+    final fgPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..color = color;
     final rect = Rect.fromCircle(center: center, radius: radius);
-
-    double toRad(double deg) => deg * math.pi / 180;
-
-    void drawSector(double startDeg, double sweepDeg, Color fillColor, Color borderColor) {
-      final fillPaint = Paint()
-        ..color = fillColor
-        ..style = PaintingStyle.fill;
-
-      final borderPaint = Paint()
-        ..color = borderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-
-      canvas.drawArc(rect, toRad(startDeg), toRad(sweepDeg), true, fillPaint);
-      canvas.drawArc(rect, toRad(startDeg), toRad(sweepDeg), true, borderPaint);
-    }
-
-    // 1. Akşam öncesi Kerahet (Kırmızı)
-    drawSector(-10, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
-
-    // 2. Akşam'dan İmsak'a (Yeşil)
-    drawSector(10, 125, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
-
-    // 3. İmsak - Güneş arası (Sarı)
-    drawSector(135, 45, AppColors.goldSoft.withValues(alpha: 0.25), AppColors.gold);
-
-    // 4. Güneş sonrası Kerahet (Kırmızı)
-    drawSector(180, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
-
-    // 5. Sabah kerahet bitişi - Öğle kerahet başlangıcı (Yeşil)
-    drawSector(200, 55, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
-
-    // 6. Zeval vakti / Öğle öncesi Kerahet (Kırmızı)
-    drawSector(255, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed);
-
-    // 7. Öğle - İkindi arası (Yeşil)
-    drawSector(270, 45, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen);
-
-    // 8. İkindi - Akşam kerahet başlangıcı arası (Mavi/Teal)
-    drawSector(315, 35, AppColors.tealSoft.withValues(alpha: 0.25), AppColors.teal);
+    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * progress, false, fgPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RingGaugePainter old) =>
+      old.progress != progress ||
+      old.color != color ||
+      old.backgroundColor != backgroundColor ||
+      old.strokeWidth != strokeWidth;
 }
+
+class KerahatChartPainter extends CustomPainter {
+  final String? highlightSector; // 'red' | 'yellow' | 'green' | 'blue' | null
+  final Color textColor;
+
+  KerahatChartPainter({this.highlightSector, this.textColor = const Color(0xFF1E293B)});
+
+  static const double innerR = 50; // iç delik (orta beyaz dairenin yarıçapı)
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerRadius = size.width / 2 - 42; // dış kenardan iç boşluk (etiketler için)
+    final innerRadius = innerR;
+
+    double toRad(double deg) => deg * math.pi / 180;
+
+    Path donutSectorPath(double startDeg, double sweepDeg) {
+      final outerRect = Rect.fromCircle(center: center, radius: outerRadius);
+      final innerRect = Rect.fromCircle(center: center, radius: innerRadius);
+      final startOuter = Offset(
+        center.dx + outerRadius * math.cos(toRad(startDeg)),
+        center.dy + outerRadius * math.sin(toRad(startDeg)),
+      );
+      return Path()
+        ..moveTo(startOuter.dx, startOuter.dy)
+        ..arcTo(outerRect, toRad(startDeg), toRad(sweepDeg), false)
+        ..arcTo(innerRect, toRad(startDeg + sweepDeg), -toRad(sweepDeg), false)
+        ..close();
+    }
+
+    void drawSector(double startDeg, double sweepDeg, Color fillColor, Color borderColor, {String? sectorKey}) {
+      final isHighlighted = highlightSector != null && sectorKey == highlightSector;
+      final fillPaint = Paint()
+        ..color = isHighlighted ? borderColor.withValues(alpha: 0.32) : fillColor
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isHighlighted ? 2.6 : 2.0
+        ..strokeJoin = StrokeJoin.round;
+      final path = donutSectorPath(startDeg, sweepDeg);
+      canvas.drawPath(path, fillPaint);
+      canvas.drawPath(path, borderPaint);
+    }
+
+    // Sektörler (vakit sınırları)
+    drawSector(-10, 20, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green'); // Akşam → Yatsı
+    drawSector(10, 125, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
+    drawSector(135, 45, AppColors.goldSoft.withValues(alpha: 0.25), AppColors.gold, sectorKey: 'yellow');
+    drawSector(180, 20, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red');
+    drawSector(200, 55, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
+    drawSector(255, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red');
+    drawSector(270, 45, AppColors.successGreen.withValues(alpha: 0.15), AppColors.successGreen, sectorKey: 'green');
+    drawSector(315, 20, AppColors.tealSoft.withValues(alpha: 0.25), AppColors.teal, sectorKey: 'blue');   // İkindi başı
+    drawSector(335, 15, AppColors.errorRed.withValues(alpha: 0.15), AppColors.errorRed, sectorKey: 'red'); // Akşam öncesi kerahat
+
+    // Vakit etiketleri — sektör sınırları (vakit başlangıçları)
+    final labelRadius = outerRadius + 18;
+    void drawLabel(String text, double angleDeg) {
+      final angle = toRad(angleDeg);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: GoogleFonts.nunito(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final x = center.dx + labelRadius * math.cos(angle) - tp.width / 2;
+      final y = center.dy + labelRadius * math.sin(angle) - tp.height / 2;
+      tp.paint(canvas, Offset(x, y));
+    }
+
+    drawLabel('Öğle', 270);
+    drawLabel('İkindi', 315);
+    drawLabel('Akşam', -10);
+    drawLabel('Yatsı', 10);
+    drawLabel('İmsak', 135);
+    drawLabel('Güneş', 180);
+  }
+
+  @override
+  bool shouldRepaint(covariant KerahatChartPainter old) =>
+      old.highlightSector != highlightSector;
+}
+
+
+

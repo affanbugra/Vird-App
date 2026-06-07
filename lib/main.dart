@@ -10,21 +10,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app_colors.dart';
 import 'app_theme.dart';
-// VirdColorsX (context.colors) bu dosyadan gelir
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/profile_setup_screen.dart';
+import 'widgets/mandatory_setup_sheet.dart';
 import 'screens/auth/magic_link_confirm_screen.dart';
+import 'screens/auth/profile_setup_screen.dart';
 import 'screens/hatimlerim_screen.dart';
 import 'screens/ekipler_screen.dart';
 import 'screens/profil_screen.dart';
 import 'screens/gunluk_takipler_screen.dart';
 import 'widgets/log_entry_bottom_sheet.dart';
-import 'widgets/mandatory_setup_sheet.dart';
 import 'services/streak_freeze_service.dart';
 
 Future<void> _logErrorToFirestore(FlutterErrorDetails details) async {

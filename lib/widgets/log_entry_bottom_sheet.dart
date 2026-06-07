@@ -335,14 +335,17 @@ class _LogEntryBottomSheetState extends State<LogEntryBottomSheet>
         seriUpdate = {'seri': currentSeri + 1, 'lastLogDate': FieldValue.serverTimestamp()};
       } else {
         // lastLogDate null — dünkü loglara bak (migration / veri bozulması)
+        // Dizin hatasını önlemek için composite index gerektirmeyen tek alanlı sorgu yapıp
+        // bellek içinde filtreliyoruz.
         final hadLogYesterday = lastLogDate == null
             ? await userRef.collection('logs')
-                .where('type', whereIn: ['arapca', 'meal'])
                 .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
                 .where('createdAt', isLessThan: Timestamp.fromDate(today))
-                .limit(1)
                 .get()
-                .then((s) => s.docs.isNotEmpty)
+                .then((s) => s.docs.any((doc) {
+                      final t = doc.data()['type'] as String?;
+                      return t == 'arapca' || t == 'meal';
+                    }))
             : false;
         if (hadLogYesterday) {
           // Gerçek zincir uzunluğunu bilmiyoruz; commit sonrası recalculate hesaplar

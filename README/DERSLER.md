@@ -46,6 +46,50 @@ Image.asset('assets/v_logo.png', color: Colors.white, colorBlendMode: BlendMode.
 
 ### Flutter — State & Widget
 
+**`NestedScrollView.body` olarak `Column` → scroll controller crash ("Promise hatası")**
+`TabBar + Expanded(TabBarView)` kombinasyonunu `Column` içine koyup bunu `NestedScrollView.body`'ye vermek scroll controller çakışmasına yol açar. Flutter web'de "Promise hatası: Error" olarak görünür, `flutter analyze` hata vermez.
+```dart
+// ❌ YANLIŞ — Column body, crash
+body: Column(children: [
+  TabBar(...),
+  Expanded(child: TabBarView(...)),
+]),
+
+// ✅ DOĞRU — TabBar header'da, TabBarView direkt body
+headerSliverBuilder: (ctx, _) => [
+  ...,
+  SliverPersistentHeader(pinned: true, delegate: _TabBarDelegate(TabBar(...))),
+],
+body: TabBarView(...),
+```
+`_TabBarDelegate extends SliverPersistentHeaderDelegate` → `minExtent` / `maxExtent` = `tabBar.preferredSize.height`.
+
+**`TabBarView` içindeki widget, tab değişiminde dispose → `setState() called after dispose()`**
+`TabBarView` görünmeyen tab'ın widget'ını dispose eder. O widget'ın async işlemi (Firestore fetch, dialog await) bitince `setState` çağırır → crash.
+İki katmanlı çözüm:
+```dart
+// 1. AutomaticKeepAliveClientMixin — widget tab değişiminde dispose olmaz
+class _MyState extends State<MyWidget> with AutomaticKeepAliveClientMixin {
+  @override bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // zorunlu!
+    ...
+  }
+}
+
+// 2. Async setState öncesi mounted kontrolü (güvenlik katmanı)
+Future<void> _fetchData() async {
+  ...
+  await someFirestoreCall();
+  if (!mounted) return; // ← zorunlu
+  setState(() => _isLoading = false);
+}
+```
+
+
+
 **`Dismissible` + `StreamBuilder` çakışması**
 Silme animasyonu biter ama Firestore onayı gelmeden stream eski veriyi tekrar render eder → item "geri döner".
 ```dart

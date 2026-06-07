@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../app_colors.dart';
 import '../app_theme.dart';
 import '../models/hatim_model.dart';
+import 'duolingo_button.dart';
 import '../data/quran_cuz.dart';
 import '../data/tilavet_secde.dart';
 import '../models/reading_log_model.dart';
@@ -539,6 +541,29 @@ class _HatimHeatMapSheetState extends State<HatimHeatMapSheet> {
                       const SizedBox(height: 12),
                       // Tarih bilgileri
                       _HatimDatesRow(hatim: widget.hatim),
+                      // Devam Et butonu (sadece aktif hatimler için)
+                      if (widget.onDevamEt != null) ...[
+                        const SizedBox(height: 12),
+                        DuolingoButton(
+                          color: AppColors.teal,
+                          bottomColor: AppColors.tealDark,
+                          onPressed: () async {
+                            final callback = widget.onDevamEt!;
+                            Navigator.pop(context);
+                            await Future.delayed(const Duration(milliseconds: 200));
+                            callback();
+                          },
+                          child: Text(
+                            'DEVAM ET',
+                            style: GoogleFonts.nunito(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
                       // Son okumalar
                       if (sortedDocs.isNotEmpty) ...[
                         const SizedBox(height: 12),
@@ -1125,11 +1150,18 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
       );
       await batch.commit();
 
+      // Arka planda asenkron çalıştır (UI bloklanmasın)
       final hatimId = data['hatimId'] as String?;
-      if (hatimId != null) {
-        await HatimCalculator.recalculate(widget.uid, hatimId);
-      }
-      await SeriCalculator.recalculate(widget.uid);
+      Future.microtask(() async {
+        try {
+          if (hatimId != null) {
+            await HatimCalculator.recalculate(widget.uid, hatimId);
+          }
+          await SeriCalculator.recalculate(widget.uid);
+        } catch (e) {
+          debugPrint('Arka plan recalculate hatası: $e');
+        }
+      });
     } catch (e) {
       debugPrint('Log sil hatası: $e');
     }
@@ -1158,7 +1190,18 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+            Navigator.pop(ctx, true);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           seriDrops ? '🔥 Seri Etkilenecek' : 'Kaydı sil',
@@ -1233,6 +1276,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
             ),
           ),
         ],
+      ),
       ),
     ) ?? false;
     if (confirmed) await _deleteLog(doc);
@@ -1313,7 +1357,7 @@ class _AllLogsSheetState extends State<_AllLogsSheet> {
                     controller: controller,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     itemCount: docs.length,
-                    separatorBuilder: (_, _) =>
+                    separatorBuilder: (_, __) =>
                         Divider(height: 1, color: context.colors.border),
                     itemBuilder: (context, i) {
                       final doc = docs[i];
