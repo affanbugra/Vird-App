@@ -51,7 +51,10 @@
     window.addEventListener('unhandledrejection', function(e) {
       var d = document.getElementById('err');
       d.style.display = 'block';
-      d.textContent += '\nPromise hatası: ' + (e.reason && (e.reason.stack || e.reason.message || e.reason) || e);
+      var r = e.reason;
+      var msg = '';
+      try { msg = (r && r.name ? r.name + ': ' : '') + (r && r.message ? r.message : String(r)); } catch (_) { msg = '' + r; }
+      d.textContent += '\nPromise hatası: ' + msg + '\n--- stack ---\n' + (r && r.stack || '(stack yok)');
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>

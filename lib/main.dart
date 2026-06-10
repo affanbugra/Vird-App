@@ -66,10 +66,14 @@ void main() async {
     return true; // true = hatayı yutar, uygulama çökmez
   };
 
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-  );
+  // Web'de persistence ayarı Safari/IndexedDB kısıtlamaları yüzünden
+  // Promise rejection fırlatıyor — JS SDK kendi cache'ini zaten yönetiyor.
+  if (!kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  }
 
   final prefs = await SharedPreferences.getInstance();
 

@@ -323,3 +323,11 @@ Firebase Hosting rewrite kuralı `FontManifest.json` veya `AssetManifest.bin` bu
 
 **`flutter_service_worker.js` yoksa uygulama açılmaz**
 Deploy öncesi `build/web/flutter_service_worker.js` varlığını kontrol et. Yoksa `flutter_bootstrap.js`'ten `serviceWorkerSettings`'i kaldır.
+
+**Firestore `persistenceEnabled: true` web'de hata fırlatır**
+`FirebaseFirestore.instance.settings = Settings(persistenceEnabled: true, ...)` yalnızca native içindir — web'de (özellikle iOS Safari, IndexedDB kısıtlaması) Promise rejection üretir. JS SDK kendi cache'ini zaten yönetiyor. Ayarı daima `if (!kIsWeb)` ile sar (`lib/main.dart`).
+
+**Kırmızı tam ekran "Promise hatası" = debug overlay, uygulama çökmesi değil**
+`web/index.html` içinde `window.onerror` + `unhandledrejection` yakalayan kırmızı debug overlay var (`#err` div). Her yakalanmamış Promise hatasını tam ekran basar — uygulama altta çalışıyor olabilir. İki tuzak:
+- Safari'nin `e.reason.stack` formatı hata mesajını **içermez** (Chrome içerir) — sadece satır numaraları görünür. Overlay önce `name + message` göstermeli, stack'i sonra eklemeli.
+- Bu overlay debug aracıdır; sorun çözülünce kaldırılmalı, kullanıcılar production'da görmemeli.
